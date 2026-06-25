@@ -1,0 +1,110 @@
+import { NavLink } from 'react-router-dom'
+import { useAuth } from '../contexts/AuthContext'
+
+const NAV = [
+  {
+    section: 'Principal',
+    items: [
+      { label: 'Dashboard',     path: '/dashboard',  Icon: IconDashboard  },
+      { label: 'Monitoramento', path: '/monitoring', Icon: IconMonitor    },
+    ],
+  },
+  {
+    section: 'Infraestrutura',
+    items: [
+      { label: 'Sistemas',      path: '/systems',    Icon: IconSystems    },
+      { label: 'Inventário',    path: '/inventory',  Icon: IconInventory  },
+      { label: 'Rede',          path: '/network',    Icon: IconNetwork    },
+    ],
+  },
+  {
+    section: 'Suporte',
+    items: [
+      { label: 'Chamados',      path: '/tickets',    Icon: IconTicket     },
+      { label: 'Anotações',     path: '/notes',      Icon: IconNotes      },
+      { label: 'Planejamento',  path: '/planning',   Icon: IconPlanning   },
+    ],
+  },
+]
+
+export default function Sidebar() {
+  const { user, logout } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+  const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() ?? 'U'
+
+  return (
+    <aside style={{ width: 224, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)', display: 'flex', flexDirection: 'column', minHeight: '100vh', flexShrink: 0 }}>
+
+      {/* Logo */}
+      <div style={{ padding: '18px 16px', borderBottom: '1px solid var(--sidebar-border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
+          </div>
+          <div>
+            <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>NexusIT</p>
+            <p style={{ color: 'var(--sidebar-label)', fontSize: 11, marginTop: 2 }}>Painel de TI</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Nav */}
+      <nav style={{ flex: 1, padding: '14px 10px', overflowY: 'auto' }}>
+        {NAV.map(group => (
+          <div key={group.section} style={{ marginBottom: 20 }}>
+            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--sidebar-label)', padding: '0 8px', marginBottom: 4 }}>
+              {group.section}
+            </p>
+            {group.items.map(({ label, path, Icon }) => (
+              <NavLink
+                key={path}
+                to={path}
+                className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+              >
+                <Icon />
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </div>
+        ))}
+      </nav>
+
+      {/* Bottom */}
+      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '10px 10px 14px' }}>
+        {isAdmin && (
+          <NavLink to="/settings" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+            <IconSettings />
+            <span>Configurações</span>
+          </NavLink>
+        )}
+        <NavLink to="/profile" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
+          <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+            {initials}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1 }}>{user?.name}</p>
+            <p style={{ fontSize: 11, color: 'var(--sidebar-label)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
+          </div>
+        </NavLink>
+        <button onClick={logout} className="nav-item" style={{ width: '100%' }}>
+          <IconLogout />
+          <span>Sair</span>
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+const i = { width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, viewBox: '0 0 24 24', strokeLinecap: 'round', strokeLinejoin: 'round' }
+function IconDashboard() { return <svg {...i}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> }
+function IconMonitor()   { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> }
+function IconSystems()   { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><path d="M7 9h.01M11 9h.01M15 9h.01"/></svg> }
+function IconInventory() { return <svg {...i}><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/><path d="M12 3v18M3 6l9 3 9-3"/></svg> }
+function IconNetwork()   { return <svg {...i}><circle cx="12" cy="12" r="2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M6 6h4M14 6h4M6 18h4M14 18h4M12 10v2M10 12H6M18 12h-4"/></svg> }
+function IconTicket()    { return <svg {...i}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
+function IconNotes()     { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
+function IconPlanning()  { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg> }
+function IconSettings()  { return <svg {...i}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> }
+function IconLogout()    { return <svg {...i}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg> }

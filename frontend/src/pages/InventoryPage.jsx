@@ -1,0 +1,282 @@
+import { useState, useEffect, useCallback } from 'react'
+import Layout from '../components/Layout'
+import Modal from '../components/Modal'
+import Badge from '../components/Badge'
+import ConfirmDialog from '../components/ConfirmDialog'
+import { useAuth } from '../contexts/AuthContext'
+import { getInventory, createItem, updateItem, deleteItem } from '../services/inventory'
+import { getUsers } from '../services/users'
+
+const TYPES   = ['COMPUTADOR', 'SERVIDOR', 'SWITCH', 'ROTEADOR', 'IMPRESSORA', 'NOBREAK', 'OUTRO']
+const STATUSES = ['ACTIVE', 'INACTIVE', 'MAINTENANCE']
+const EMPTY_FORM = {
+  name: '', type: 'COMPUTADOR', brand: '', model: '', serialNumber: '',
+  location: '', responsibleId: '', purchaseDate: '', status: 'ACTIVE', notes: '',
+}
+
+export default function InventoryPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+
+  const [items, setItems]       = useState([])
+  const [users, setUsers]       = useState([])
+  const [loading, setLoading]   = useState(true)
+  const [search, setSearch]     = useState('')
+  const [filterType, setFilterType] = useState('')
+  const [filterStatus, setFilterStatus] = useState('')
+
+  const [modalOpen, setModalOpen] = useState(false)
+  const [editing, setEditing]     = useState(null)
+  const [form, setForm]           = useState(EMPTY_FORM)
+  const [saving, setSaving]       = useState(false)
+  const [formError, setFormError] = useState('')
+
+  const [deleteTarget, setDeleteTarget] = useState(null)
+  const [deleting, setDeleting]         = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const params = {}
+      if (filterType)   params.type   = filterType
+      if (filterStatus) params.status = filterStatus
+      if (search)       params.search = search
+      setItems(await getInventory(params))
+    } finally {
+      setLoading(false)
+    }
+  }, [filterType, filterStatus, search])
+
+  useEffect(() => { load() }, [load])
+  useEffect(() => { if (isAdmin) getUsers().then(setUsers).catch(() => {}) }, [isAdmin])
+
+  const openCreate = () => {
+    setEditing(null)
+    setForm(EMPTY_FORM)
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  const openEdit = (item) => {
+    setEditing(item)
+    setForm({
+      name: item.name, type: item.type, brand: item.brand ?? '',
+      model: item.model ?? '', serialNumber: item.serialNumber ?? '',
+      location: item.location ?? '', responsibleId: item.responsible?.id ?? '',
+      purchaseDate: item.purchaseDate ?? '', status: item.status, notes: item.notes ?? '',
+    })
+    setFormError('')
+    setModalOpen(true)
+  }
+
+  const handleSave = async (e) => {
+    e.preventDefault()
+    setSaving(true)
+    setFormError('')
+    try {
+      const payload = {
+        ...form,
+        responsibleId: form.responsibleId || null,
+        purchaseDate: form.purchaseDate || null,
+      }
+      if (editing) await updateItem(editing.id, payload)
+      else await createItem(payload)
+      setModalOpen(false)
+      load()
+    } catch (err) {
+      setFormError(err.response?.data?.detail ?? 'Erro ao salvar.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      await deleteItem(deleteTarget.id)
+      setDeleteTarget(null)
+      load()
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const statusLabel = { ACTIVE: 'Ativo', INACTIVE: 'Inativo', MAINTENANCE: 'Manutenção' }
+  const typeLabel   = { COMPUTADOR: 'Computador', SERVIDOR: 'Servidor', SWITCH: 'Switch',
+                        ROTEADOR: 'Roteador', IMPRESSORA: 'Impressora', NOBREAK: 'Nobreak', OUTRO: 'Outro' }
+
+  return (
+    <Layout>
+      <div className="page fade-up">
+        {/* Header */}
+        <div className="page-header">
+          <div className="page-header-left">
+            <h1>Inventário de Hardware</h1>
+            <p>{items.length} item(s) encontrado(s)</p>
+          </div>
+          {isAdmin && (
+            <button onClick={openCreate} className="btn btn-primary">+ Novo Item</button>
+          )}
+        </div>
+
+        {/* Filtros */}
+        <div className="filter-bar">
+          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome ou nº série..." className="input" style={{ width: 220, height: 32 }} />
+          <select value={filterType} onChange={e => setFilterType(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+            <option value="">Todos os tipos</option>
+            {TYPES.map(t => <option key={t} value={t}>{typeLabel[t]}</option>)}
+          </select>
+          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+            <option value="">Todos os status</option>
+            {STATUSES.map(s => <option key={s} value={s}>{statusLabel[s]}</option>)}
+          </select>
+        </div>
+
+        {/* Tabela */}
+        <div className="card" style={{ overflow: 'hidden' }}>
+          {loading ? (
+            <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {[...Array(5)].map((_, i) => <div key={i} className="skeleton" style={{ height: 36, borderRadius: 6 }} />)}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon"><svg width="22" height="22" fill="none" stroke="currentColor" viewBox="0 0 24 24" strokeWidth="2"><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/></svg></div>
+              <h3>Nenhum item encontrado</h3>
+              {isAdmin && <p>Clique em "Novo Item" para cadastrar.</p>}
+            </div>
+          ) : (
+            <div className="scroll-x">
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    {['Nome', 'Tipo', 'Marca / Modelo', 'Nº Série', 'Localização', 'Responsável', 'Status', ''].map(h => (
+                      <th key={h}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(item => (
+                    <tr key={item.id}>
+                      <td style={{ fontWeight: 500 }}>{item.name}</td>
+                      <td><Badge value={item.type} /></td>
+                      <td className="muted">{[item.brand, item.model].filter(Boolean).join(' / ') || '—'}</td>
+                      <td className="mono">{item.serialNumber || '—'}</td>
+                      <td className="muted">{item.location || '—'}</td>
+                      <td className="muted">{item.responsible?.name || '—'}</td>
+                      <td><Badge value={item.status} /></td>
+                      <td>
+                        {isAdmin && (
+                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                            <button onClick={() => openEdit(item)} className="btn btn-default btn-sm">Editar</button>
+                            <button onClick={() => setDeleteTarget(item)} className="btn btn-danger btn-sm">Excluir</button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal form */}
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Item' : 'Novo Item'} size="lg">
+        <form onSubmit={handleSave} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
+              <input required value={form.name} onChange={f('name')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ex: Dell PowerEdge R740" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Tipo *</label>
+              <select value={form.type} onChange={f('type')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                {TYPES.map(t => <option key={t} value={t}>{typeLabel[t]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
+              <select value={form.status} onChange={f('status')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                {STATUSES.map(s => <option key={s} value={s}>{statusLabel[s]}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Marca</label>
+              <input value={form.brand} onChange={f('brand')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ex: Dell, HP, Cisco" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Modelo</label>
+              <input value={form.model} onChange={f('model')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ex: PowerEdge R740" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Número de Série</label>
+              <input value={form.serialNumber} onChange={f('serialNumber')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="SN..." />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Localização</label>
+              <input value={form.location} onChange={f('location')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="Ex: Rack A, Sala TI" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
+              <select value={form.responsibleId} onChange={f('responsibleId')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <option value="">— Nenhum —</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Data de Compra</label>
+              <input type="date" value={form.purchaseDate} onChange={f('purchaseDate')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div className="col-span-2">
+              <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
+              <textarea value={form.notes} onChange={f('notes')} rows={3}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                placeholder="Observações adicionais..." />
+            </div>
+          </div>
+
+          {formError && (
+            <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{formError}</p>
+          )}
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button type="button" onClick={() => setModalOpen(false)}
+              className="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+              Cancelar
+            </button>
+            <button type="submit" disabled={saving}
+              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg font-medium">
+              {saving ? 'Salvando...' : (editing ? 'Salvar' : 'Criar')}
+            </button>
+          </div>
+        </form>
+      </Modal>
+
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onClose={() => setDeleteTarget(null)}
+        onConfirm={handleDelete}
+        loading={deleting}
+        title="Excluir Item"
+        message={`Deseja excluir "${deleteTarget?.name}"? Esta ação não pode ser desfeita.`}
+      />
+    </Layout>
+  )
+}

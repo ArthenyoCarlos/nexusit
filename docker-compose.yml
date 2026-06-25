@@ -1,0 +1,58 @@
+version: '3.9'
+
+services:
+  nexusit-db:
+    image: postgres:16
+    container_name: nexusit-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-nexusit}
+      POSTGRES_USER: ${DB_USER:-nexusit}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - nexusit-db-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-nexusit}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  nexusit-backend:
+    build: ./backend
+    container_name: nexusit-backend
+    restart: unless-stopped
+    depends_on:
+      nexusit-db:
+        condition: service_healthy
+    environment:
+      DB_HOST: nexusit-db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-nexusit}
+      DB_USER: ${DB_USER:-nexusit}
+      DB_PASSWORD: ${DB_PASSWORD}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRATION: ${JWT_EXPIRATION:-28800000}
+      ZABBIX_API_URL: ${ZABBIX_API_URL:-http://localhost/api_jsonrpc.php}
+      ZABBIX_USER: ${ZABBIX_USER:-admin}
+      ZABBIX_PASSWORD: ${ZABBIX_PASSWORD:-}
+      GLPI_API_URL: ${GLPI_API_URL:-http://localhost/apirest.php}
+      GLPI_APP_TOKEN: ${GLPI_APP_TOKEN:-}
+      GLPI_USER_TOKEN: ${GLPI_USER_TOKEN:-}
+    ports:
+      - "8080:8080"
+
+  nexusit-frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    container_name: nexusit-frontend
+    restart: unless-stopped
+    depends_on:
+      - nexusit-backend
+    ports:
+      - "80:80"
+
+volumes:
+  nexusit-db-data:

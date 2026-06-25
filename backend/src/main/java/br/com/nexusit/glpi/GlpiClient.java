@@ -1,0 +1,128 @@
+package br.com.nexusit.glpi;
+
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.*;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.util.List;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicReference;
+
+@Service
+@Slf4j
+public class GlpiClient {
+
+    private final GlpiProperties props;
+    private final RestTemplate restTemplate;
+    private final AtomicReference<String> sessionToken = new AtomicReference<>();
+
+    public GlpiClient(GlpiProperties props) {
+        this.props = props;
+        var factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);
+        factory.setReadTimeout(10000);
+        this.restTemplate = new RestTemplate(factory);
+    }
+
+    // ── Session ───────────────────────────────────────────────────────────
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    private String initSession() {
+        HttpHeaders headers = buildBaseHeaders(null);
+        headers.set("Authorization", "user_token " + props.getUserToken());
+
+        ResponseEntity<Map> resp = restTemplate.exchange(
+                url("/initSession"), HttpMethod.GET,
+                new HttpEntity<>(headers), Map.class);
+
+        String token = String.valueOf(resp.getBody().get("session_token"));
+        sessionToken.set(token);
+        log.debug("GLPI session initialized");
+        return token;
+    }
+
+    private String session() {
+        String token = sessionToken.get();
+        return token != null ? token : initSession();
+    }
+
+    // ── HTTP helpers ──────────────────────────────────────────────────────
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public List<Map<String, Object>> getList(String path, Map<String, String> params) {
+        return withRetry(() -> {
+            String u = buildUrl(path, params);
+            ResponseEntity<List> resp = restTemplate.exchange(
+                    u, HttpMethod.GET, new HttpEntity<>(buildBaseHeaders(session())), List.class);
+            return (List<Map<String, Object>>) resp.getBody();
+        });
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Map<String, Object> getOne(String path, Map<String, String> params) {
+        return withRetry(() -> {
+            String u = buildUrl(path, params);
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    u, HttpMethod.GET, new HttpEntity<>(buildBaseHeaders(session())), Map.class);
+            return (Map<String, Object>) resp.getBody();
+        });
+    }
+
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Map<String, Object> post(String path, Object body) {
+        return withRetry(() -> {
+            HttpHeaders headers = buildBaseHeaders(session());
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    url(path), HttpMethod.POST,
+                    new HttpEntity<>(body, headers), Map.class);
+            return (Map<String, Object>) resp.getBody();
+        });
+    }
+
+    public void put(String path, Object body) {
+        withRetry(() -> {
+            HttpHeaders headers = buildBaseHeaders(session());
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            restTemplate.exchange(url(path), HttpMethod.PUT,
+                    new HttpEntity<>(body, headers), Void.class);
+            return null;
+        });
+    }
+
+    // ── Internals ─────────────────────────────────────────────────────────
+
+    private <T> T withRetry(java.util.function.Supplier<T> supplier) {
+        try {
+            return supplier.get();
+        } catch (HttpClientErrorException e) {
+            if (e.getStatusCode() == HttpStatus.UNAUTHORIZED || e.getStatusCode() == HttpStatus.FORBIDDEN) {
+                sessionToken.set(null);
+                initSession();
+                return supplier.get();
+            }
+            throw e;
+        }
+    }
+
+    private HttpHeaders buildBaseHeaders(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("App-Token", props.getAppToken());
+        if (token != null) headers.set("Session-Token", token);
+        return headers;
+    }
+
+    private String url(String path) {
+        return props.getApiUrl() + path;
+    }
+
+    private String buildUrl(String path, Map<String, String> params) {
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(url(path));
+        if (params != null) params.forEach(builder::queryParam);
+        return builder.toUriString();
+    }
+}

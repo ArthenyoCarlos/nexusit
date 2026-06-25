@@ -1,0 +1,45 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:nexusit}
+    username: ${DB_USER:nexusit}
+    password: ${DB_PASSWORD:nexusit}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+
+application:
+  jwt:
+    secret: ${JWT_SECRET:changeme-use-a-real-256-bit-secret-in-production-env}
+    expiration: ${JWT_EXPIRATION:28800000}
+    refresh-expiration: 604800000
+
+  zabbix:
+    api-url: ${ZABBIX_API_URL:http://localhost/api_jsonrpc.php}
+    user: ${ZABBIX_USER:admin}
+    password: ${ZABBIX_PASSWORD:}
+
+  glpi:
+    api-url: ${GLPI_API_URL:http://localhost/apirest.php}
+    app-token: ${GLPI_APP_TOKEN:}
+    user-token: ${GLPI_USER_TOKEN:}
+
+server:
+  port: 8080
+
+springdoc:
+  api-docs:
+    path: /api/v3/api-docs
+  swagger-ui:
+    path: /api/swagger-ui.html
