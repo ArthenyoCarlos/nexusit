@@ -39,6 +39,8 @@ app:
   base-url: ${APP_BASE_URL:http://nexus.local}
   company-name: ${APP_COMPANY_NAME:Armazém Galdino}
   support-phone: ${APP_SUPPORT_PHONE:}
+  vault:
+    encryption-key: ${VAULT_ENCRYPTION_KEY:nexusit-default-key-CHANGE-IN-PROD!!}
 
 server:
   port: 8080

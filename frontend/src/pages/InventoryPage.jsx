@@ -6,6 +6,7 @@ import Badge from '../components/Badge'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { getInventory, createItem, updateItem, deleteItem } from '../services/inventory'
+import { downloadInventoryCsv } from '../services/reports'
 import { getUsers } from '../services/users'
 
 const TYPES   = ['COMPUTADOR', 'SERVIDOR', 'SWITCH', 'ROTEADOR', 'IMPRESSORA', 'NOBREAK', 'OUTRO']
@@ -122,9 +123,14 @@ export default function InventoryPage() {
             <h1>Inventário de Hardware</h1>
             <p>{items.length} item(s) encontrado(s)</p>
           </div>
-          {isAdmin && (
-            <button onClick={openCreate} className="btn btn-primary">+ Novo Item</button>
-          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            {isAdmin && (
+              <button onClick={downloadInventoryCsv} className="btn btn-default">↓ Exportar CSV</button>
+            )}
+            {isAdmin && (
+              <button onClick={openCreate} className="btn btn-primary">+ Novo Item</button>
+            )}
+          </div>
         </div>
 
         {/* Filtros */}

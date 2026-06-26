@@ -41,6 +41,7 @@ services:
       APP_BASE_URL: ${APP_BASE_URL:-http://nexus.local}
       APP_COMPANY_NAME: ${APP_COMPANY_NAME:-Armazém Galdino}
       APP_SUPPORT_PHONE: ${APP_SUPPORT_PHONE:-}
+      VAULT_ENCRYPTION_KEY: ${VAULT_ENCRYPTION_KEY}
     expose:
       - "8080"
     networks:

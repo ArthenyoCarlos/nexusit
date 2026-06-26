@@ -1,5 +1,7 @@
 import { useEffect, useRef } from 'react'
 import Sidebar from './Sidebar'
+import GlobalSearch from './GlobalSearch'
+import NotificationBell from './NotificationBell'
 import { useToast } from '../contexts/ToastContext'
 import { getProblems } from '../services/monitoring'
 
@@ -35,9 +37,16 @@ export default function Layout({ children }) {
       <div style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 10 }}>
         <Sidebar />
       </div>
-      <main style={{ flex: 1, overflowY: 'auto', minWidth: 0, marginLeft: 224 }}>
-        {children}
-      </main>
+      <div style={{ flex: 1, minWidth: 0, marginLeft: 224, display: 'flex', flexDirection: 'column' }}>
+        {/* Top bar */}
+        <div style={{ position: 'sticky', top: 0, zIndex: 9, background: 'var(--bg-page)', borderBottom: '1px solid var(--border-muted)', padding: '8px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+          <GlobalSearch />
+          <NotificationBell />
+        </div>
+        <main style={{ flex: 1, overflowY: 'auto' }}>
+          {children}
+        </main>
+      </div>
     </div>
   )
 }

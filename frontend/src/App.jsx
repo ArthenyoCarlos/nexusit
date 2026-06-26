@@ -16,6 +16,11 @@ import SettingsPage from './pages/SettingsPage'
 import NotFoundPage from './pages/NotFoundPage'
 import SystemDetailPage from './pages/SystemDetailPage'
 import InventoryDetailPage from './pages/InventoryDetailPage'
+import VaultPage from './pages/VaultPage'
+import LicensesPage from './pages/LicensesPage'
+import OnboardingPage from './pages/OnboardingPage'
+import OnboardingDetailPage from './pages/OnboardingDetailPage'
+import UrlMonitorPage from './pages/UrlMonitorPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -41,8 +46,13 @@ export default function App() {
               <Route path="/planning"   element={<PlanningPage />} />
               <Route path="/network"    element={<NetworkDocsPage />} />
               <Route path="/profile"    element={<ProfilePage />} />
-              <Route path="/settings"   element={<SettingsPage />} />
-              <Route path="/"           element={<Navigate to="/dashboard" replace />} />
+              <Route path="/settings"        element={<SettingsPage />} />
+              <Route path="/vault"           element={<VaultPage />} />
+              <Route path="/licenses"        element={<LicensesPage />} />
+              <Route path="/onboarding"      element={<OnboardingPage />} />
+              <Route path="/onboarding/:id"  element={<OnboardingDetailPage />} />
+              <Route path="/url-monitor"     element={<UrlMonitorPage />} />
+              <Route path="/"               element={<Navigate to="/dashboard" replace />} />
             </Route>
 
             <Route path="*" element={<NotFoundPage />} />

@@ -3,7 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Badge from '../components/Badge'
 import { getInventoryItem, getEtiqueta } from '../services/inventory'
+import { getMaintenance, createMaintenance, deleteMaintenance } from '../services/maintenance'
 import { getHosts } from '../services/monitoring'
+import { useAuth } from '../contexts/AuthContext'
 
 function QrCode({ value, size = 160 }) {
   const canvasRef = useRef(null)
@@ -66,6 +68,8 @@ const TYPE_ICON = {
 export default function InventoryDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
 
   const [item, setItem]           = useState(null)
   const [hosts, setHosts]         = useState([])
@@ -73,16 +77,38 @@ export default function InventoryDetailPage() {
   const [error, setError]         = useState('')
   const [printLoading, setPrintLoading] = useState(false)
 
+  const [records, setRecords]     = useState([])
+  const [mForm, setMForm]         = useState({ title: '', description: '', performedAt: '', cost: '' })
+  const [mSaving, setMSaving]     = useState(false)
+  const [mOpen, setMOpen]         = useState(false)
+
   useEffect(() => {
     setLoading(true)
-    Promise.allSettled([getInventoryItem(id), getHosts()])
-      .then(([itemRes, hostsRes]) => {
+    Promise.allSettled([getInventoryItem(id), getHosts(), getMaintenance(id)])
+      .then(([itemRes, hostsRes, mRes]) => {
         if (itemRes.status === 'fulfilled') setItem(itemRes.value)
         else setError('Item não encontrado.')
         if (hostsRes.status === 'fulfilled') setHosts(hostsRes.value?.data ?? [])
+        if (mRes.status === 'fulfilled') setRecords(mRes.value)
       })
       .finally(() => setLoading(false))
   }, [id])
+
+  const handleAddMaintenance = async (e) => {
+    e.preventDefault(); setMSaving(true)
+    try {
+      const payload = { title: mForm.title, description: mForm.description || null, performedAt: mForm.performedAt, cost: mForm.cost !== '' ? parseFloat(mForm.cost) : null }
+      const rec = await createMaintenance(id, payload)
+      setRecords(r => [rec, ...r])
+      setMForm({ title: '', description: '', performedAt: '', cost: '' })
+      setMOpen(false)
+    } finally { setMSaving(false) }
+  }
+
+  const handleDeleteMaintenance = async (recId) => {
+    await deleteMaintenance(id, recId)
+    setRecords(r => r.filter(x => x.id !== recId))
+  }
 
   const zabbixHost = item
     ? hosts.find(h => h.name?.toLowerCase() === item.name?.toLowerCase() || h.ip === item.ip)
@@ -254,6 +280,62 @@ export default function InventoryDetailPage() {
               <p style={{ fontSize: 13.5, color: 'var(--text-primary)', lineHeight: 1.7 }}>{item.notes}</p>
             </div>
           )}
+
+          {/* Histórico de Manutenção */}
+          <div className="card" style={{ padding: '20px 24px', gridColumn: '1 / -1' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Histórico de Manutenção</h3>
+              <button onClick={() => setMOpen(o => !o)} className="btn btn-default btn-sm">+ Registrar</button>
+            </div>
+
+            {mOpen && (
+              <form onSubmit={handleAddMaintenance} style={{ background: 'var(--bg-muted)', borderRadius: 10, padding: '16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Título *</label>
+                    <input required value={mForm.title} onChange={e => setMForm(f => ({...f, title: e.target.value}))} className="input" style={{ marginTop: 4 }} placeholder="Ex: Troca de HD" />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Data *</label>
+                    <input required type="date" value={mForm.performedAt} onChange={e => setMForm(f => ({...f, performedAt: e.target.value}))} className="input" style={{ marginTop: 4 }} />
+                  </div>
+                  <div>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Custo (R$)</label>
+                    <input type="number" step="0.01" value={mForm.cost} onChange={e => setMForm(f => ({...f, cost: e.target.value}))} className="input" style={{ marginTop: 4 }} placeholder="0,00" />
+                  </div>
+                  <div style={{ gridColumn: '1/-1' }}>
+                    <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Descrição</label>
+                    <textarea value={mForm.description} onChange={e => setMForm(f => ({...f, description: e.target.value}))} className="input" rows={2} style={{ marginTop: 4, resize: 'none' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button type="button" onClick={() => setMOpen(false)} className="btn btn-default btn-sm">Cancelar</button>
+                  <button type="submit" disabled={mSaving} className="btn btn-primary btn-sm">{mSaving ? 'Salvando...' : 'Salvar'}</button>
+                </div>
+              </form>
+            )}
+
+            {records.length === 0 ? (
+              <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Nenhuma manutenção registrada.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {records.map(r => (
+                  <div key={r.id} style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '10px 14px', background: 'var(--bg-muted)', borderRadius: 8 }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <p style={{ fontWeight: 600, fontSize: 13, color: 'var(--text-primary)' }}>{r.title}</p>
+                        <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{new Date(r.performedAt + 'T00:00').toLocaleDateString('pt-BR')}</span>
+                        {r.cost != null && <span style={{ fontSize: 12, color: 'var(--accent)' }}>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(r.cost)}</span>}
+                      </div>
+                      {r.description && <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4 }}>{r.description}</p>}
+                      {r.performedBy && <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 2 }}>Por {r.performedBy}</p>}
+                    </div>
+                    {isAdmin && <button onClick={() => handleDeleteMaintenance(r.id)} className="btn btn-danger btn-sm" style={{ flexShrink: 0 }}>✕</button>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </Layout>
