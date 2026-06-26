@@ -5,6 +5,9 @@ import Layout from '../components/Layout'
 import { getHosts, getProblems } from '../services/monitoring'
 import { getTickets } from '../services/glpi'
 import { getSystems } from '../services/systems'
+import { getLicenses } from '../services/licenses'
+import { getMonitors } from '../services/urlmonitor'
+import { getInventory } from '../services/inventory'
 
 function greet(name) {
   const h = new Date().getHours()
@@ -12,61 +15,63 @@ function greet(name) {
   return `${s}, ${name?.split(' ')[0] ?? 'usuário'}`
 }
 
-const COLORS = {
-  blue:   { icon: '#1a56db', bg: 'var(--accent-light)', dot: '#93c5fd' },
-  green:  { icon: '#0e9f6e', bg: 'var(--green-bg)',    dot: '#6ee7b7' },
-  red:    { icon: '#e02424', bg: 'var(--red-bg)',       dot: '#fca5a5' },
-  amber:  { icon: '#d97706', bg: 'var(--amber-bg)',     dot: '#fcd34d' },
-  purple: { icon: '#7c3aed', bg: 'var(--purple-bg)',    dot: '#c4b5fd' },
+const SEV = {
+  5: { label: 'Disaster', color: '#dc2626', bg: '#fef2f2' },
+  4: { label: 'High',     color: '#ea580c', bg: '#fff7ed' },
+  3: { label: 'Average',  color: '#d97706', bg: '#fffbeb' },
+  2: { label: 'Warning',  color: '#2563eb', bg: '#eff6ff' },
+  1: { label: 'Info',     color: '#64748b', bg: '#f8fafc' },
 }
 
-function StatCard({ icon, label, value, sub, color, to }) {
-  const c = COLORS[color] ?? COLORS.blue
-  const inner = (
-    <div className="stat-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
-      <div className="stat-icon" style={{ background: c.bg, color: c.icon, flexShrink: 0 }}>
-        {icon}
-      </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div className="stat-value" style={{ color: 'var(--text-primary)' }}>{value}</div>
-        <div className="stat-label">{label}</div>
-        {sub && <div style={{ fontSize: 11.5, color: c.icon, marginTop: 4, fontWeight: 500 }}>{sub}</div>}
-      </div>
-    </div>
-  )
-  return to
-    ? <Link to={to} style={{ display: 'block', textDecoration: 'none' }}>{inner}</Link>
-    : <div>{inner}</div>
+const LIC_STATUS = {
+  EXPIRED:       { label: 'Vencida',       color: '#dc2626' },
+  EXPIRING_SOON: { label: 'Vence em breve',color: '#ea580c' },
+  EXPIRING:      { label: 'A vencer',      color: '#d97706' },
+  OK:            { label: 'OK',            color: '#0e9f6e' },
 }
-
-const SHORTCUTS = [
-  { label: 'Monitoramento',  path: '/monitoring', desc: 'Hosts e alertas Zabbix',        Icon: IconMonitor  },
-  { label: 'Chamados GLPI',  path: '/tickets',    desc: 'Tickets de suporte abertos',    Icon: IconTicket   },
-  { label: 'Sistemas',       path: '/systems',    desc: 'Catálogo de sistemas internos',  Icon: IconSystems  },
-  { label: 'Inventário',     path: '/inventory',  desc: 'Equipamentos cadastrados',       Icon: IconInventory},
-  { label: 'Rede',           path: '/network',    desc: 'Documentação de infraestrutura', Icon: IconNetwork  },
-  { label: 'Planejamento',   path: '/planning',   desc: 'Kanban da equipe de TI',         Icon: IconPlanning },
-  { label: 'Anotações',      path: '/notes',      desc: 'Notas pessoais e compartilhadas',Icon: IconNotes    },
-  { label: 'Perfil',         path: '/profile',    desc: 'Configurações da sua conta',     Icon: IconUser     },
-]
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const [stats, setStats] = useState({ hosts: null, online: null, alerts: null, systems: null, tickets: null })
+  const [data, setData] = useState({
+    hosts: null, online: null, problems: [],
+    tickets: [], systems: null, licenses: [],
+    monitors: [], inventory: [],
+  })
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.allSettled([getHosts(), getProblems(), getSystems({}), getTickets(null)])
-      .then(([hostsR, problemsR, systemsR, ticketsR]) => {
-        const hosts    = hostsR.status    === 'fulfilled' ? hostsR.value.data    : []
-        const problems = problemsR.status === 'fulfilled' ? problemsR.value.data : []
-        const systems  = systemsR.status  === 'fulfilled' ? systemsR.value       : []
-        const tickets  = ticketsR.status  === 'fulfilled' ? ticketsR.value.data  : []
-        setStats({ hosts: hosts.length, online: hosts.filter(h => h.available).length, alerts: problems.length, systems: systems.length, tickets: tickets.length })
-      })
+    Promise.allSettled([
+      getHosts(), getProblems(), getSystems({}),
+      getTickets(null), getLicenses(), getMonitors(), getInventory(),
+    ]).then(([hostsR, probR, sysR, tickR, licR, monR, invR]) => {
+      const hosts    = hostsR.status === 'fulfilled' ? hostsR.value.data    : []
+      const problems = probR.status  === 'fulfilled' ? probR.value.data     : []
+      const systems  = sysR.status   === 'fulfilled' ? sysR.value           : []
+      const tickets  = tickR.status  === 'fulfilled' ? tickR.value.data     : []
+      const licenses = licR.status   === 'fulfilled' ? licR.value           : []
+      const monitors = monR.status   === 'fulfilled' ? monR.value           : []
+      const inventory= invR.status   === 'fulfilled' ? invR.value           : []
+      setData({ hosts: hosts.length, online: hosts.filter(h => h.available).length,
+        problems, systems: systems.length, tickets, licenses, monitors, inventory })
+      setLoading(false)
+    })
   }, [])
 
-  const dateStr = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
-  const availPct = stats.hosts ? Math.round((stats.online / stats.hosts) * 100) : null
+  const dateStr   = new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })
+  const availPct  = data.hosts ? Math.round((data.online / data.hosts) * 100) : null
+  const criticals = data.problems.filter(p => Number(p.severity) >= 4).sort((a,b) => b.severity - a.severity)
+  const allAlerts = data.problems.sort((a,b) => b.severity - a.severity)
+  const expiringLics = data.licenses
+    .filter(l => l.status === 'EXPIRED' || l.status === 'EXPIRING_SOON' || l.status === 'EXPIRING')
+    .sort((a, b) => a.daysUntilExpiry - b.daysUntilExpiry)
+    .slice(0, 5)
+  const urlsDown = data.monitors.filter(m => m.enabled && m.lastStatus && m.lastStatus >= 400).length
+  const urlsUp   = data.monitors.filter(m => m.enabled && m.lastStatus && m.lastStatus < 400).length
+  const invActive = data.inventory.filter(i => i.status === 'ACTIVE').length
+  const invMaint  = data.inventory.filter(i => i.status === 'MAINTENANCE').length
+  const invInact  = data.inventory.filter(i => i.status === 'INACTIVE').length
+  const openTickets  = data.tickets.filter(t => t.status !== 'closed' && t.status !== 'solved')
+  const recentTickets = [...data.tickets].slice(0, 5)
 
   return (
     <Layout>
@@ -84,30 +89,147 @@ export default function DashboardPage() {
         </div>
 
         {/* KPIs */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-          <StatCard icon={<IcoHosts />}   label="Hosts monitorados"  value={stats.hosts   ?? '—'} color="blue"   to="/monitoring" />
-          <StatCard icon={<IcoOnline />}  label="Hosts online"       value={stats.online  ?? '—'} color="green"  to="/monitoring"
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
+          <KpiCard icon={<IcoHosts />}   label="Hosts monitorados" value={data.hosts ?? '—'}  color="#1a56db" bg="var(--accent-light)"  to="/monitoring" />
+          <KpiCard icon={<IcoOnline />}  label="Hosts online"      value={data.online ?? '—'} color="#0e9f6e" bg="var(--green-bg)"      to="/monitoring"
             sub={availPct !== null ? `${availPct}% disponíveis` : undefined} />
-          <StatCard icon={<IcoAlert />}   label="Alertas ativos"     value={stats.alerts  ?? '—'} color={stats.alerts > 0 ? 'red' : 'green'} to="/monitoring" />
-          <StatCard icon={<IcoTicket />}  label="Chamados abertos"   value={stats.tickets ?? '—'} color="amber"  to="/tickets" />
-          <StatCard icon={<IcoSystem />}  label="Sistemas"           value={stats.systems ?? '—'} color="purple" to="/systems" />
+          <KpiCard icon={<IcoAlert />}   label="Alertas ativos"    value={data.problems.length ?? '—'} color={data.problems.length > 0 ? '#e02424' : '#0e9f6e'} bg={data.problems.length > 0 ? 'var(--red-bg)' : 'var(--green-bg)'} to="/monitoring" />
+          <KpiCard icon={<IcoTicket />}  label="Chamados abertos"  value={openTickets.length ?? '—'} color="#d97706" bg="var(--amber-bg)" to="/tickets" />
+          <KpiCard icon={<IcoSystem />}  label="Sistemas"          value={data.systems ?? '—'} color="#7c3aed" bg="var(--purple-bg)"    to="/systems" />
+          <KpiCard icon={<IcoInventory/>}label="Inventário"        value={data.inventory.length ?? '—'} color="#0891b2" bg="var(--cyan-bg,#ecfeff)" to="/inventory"
+            sub={invMaint > 0 ? `${invMaint} em manutenção` : undefined} />
         </div>
 
-        {/* Shortcuts */}
-        <div>
-          <p className="label-caps" style={{ marginBottom: 12 }}>Acesso rápido</p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 10 }}>
-            {SHORTCUTS.map(({ label, path, desc, Icon }) => (
-              <Link key={path} to={path} style={{ display: 'block', textDecoration: 'none' }}>
-                <div className="card card-hover" style={{ padding: '16px 18px' }}>
-                  <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--bg-muted)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--accent)', marginBottom: 10 }}>
-                    <Icon />
+        {/* Main grid: 2 columns */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, alignItems: 'start' }}>
+
+          {/* LEFT COLUMN */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Alertas Zabbix */}
+            <Section title="Alertas Zabbix" count={allAlerts.length} to="/monitoring" emptyMsg="Nenhum alerta ativo">
+              {allAlerts.slice(0, 6).map(p => {
+                const s = SEV[p.severity] ?? SEV[1]
+                const ago = p.clock ? timeAgo(Number(p.clock)) : null
+                return (
+                  <div key={p.problemid} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-muted)' }}>
+                    <span style={{ marginTop: 2, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700, background: s.bg, color: s.color, flexShrink: 0, minWidth: 70 }}>
+                      {s.label}
+                    </span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <p style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, lineHeight: 1.3 }}>{p.name}</p>
+                      <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>{p.hostName ?? p.hosts?.[0]?.host}{ago ? ` · ${ago}` : ''}</p>
+                    </div>
                   </div>
-                  <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>{label}</p>
-                  <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 3, lineHeight: 1.4 }}>{desc}</p>
+                )
+              })}
+            </Section>
+
+            {/* Chamados GLPI */}
+            <Section title="Chamados GLPI" count={data.tickets.length} to="/tickets" emptyMsg="Nenhum chamado aberto">
+              {recentTickets.map(t => (
+                <div key={t.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--border-muted)' }}>
+                  <TicketStatusDot status={t.status} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      #{t.id} {t.name}
+                    </p>
+                    <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 1 }}>{ticketStatusLabel(t.status)} · {t.requester ?? 'Solicitante'}</p>
+                  </div>
                 </div>
-              </Link>
-            ))}
+              ))}
+            </Section>
+
+          </div>
+
+          {/* RIGHT COLUMN */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
+            {/* Inventário por status */}
+            <div className="card" style={{ padding: '16px 20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Inventário</p>
+                <Link to="/inventory" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none' }}>Ver tudo →</Link>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+                {[
+                  { label: 'Ativos',      value: invActive, color: '#0e9f6e' },
+                  { label: 'Manutenção',  value: invMaint,  color: '#d97706' },
+                  { label: 'Inativos',    value: invInact,  color: '#94a3b8' },
+                ].map(s => (
+                  <div key={s.label} style={{ flex: 1, textAlign: 'center', background: 'var(--bg-muted)', borderRadius: 8, padding: '10px 4px' }}>
+                    <p style={{ fontSize: 20, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 4 }}>{s.label}</p>
+                  </div>
+                ))}
+              </div>
+              {data.inventory.length > 0 && (
+                <div style={{ height: 6, borderRadius: 99, background: 'var(--bg-muted)', overflow: 'hidden', display: 'flex' }}>
+                  {invActive > 0 && <div style={{ flex: invActive, background: '#0e9f6e' }} />}
+                  {invMaint  > 0 && <div style={{ flex: invMaint,  background: '#d97706' }} />}
+                  {invInact  > 0 && <div style={{ flex: invInact,  background: '#94a3b8' }} />}
+                </div>
+              )}
+            </div>
+
+            {/* Monitor URLs */}
+            {data.monitors.length > 0 && (
+              <div className="card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Monitor de URLs</p>
+                  <Link to="/url-monitor" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none' }}>Ver tudo →</Link>
+                </div>
+                {urlsDown > 0 && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fef2f2', borderRadius: 8, marginBottom: 10 }}>
+                    <span style={{ fontSize: 14 }}>⚠️</span>
+                    <p style={{ fontSize: 12.5, color: '#dc2626', fontWeight: 600 }}>{urlsDown} URL(s) com falha</p>
+                  </div>
+                )}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {data.monitors.filter(m => m.enabled).slice(0, 6).map(m => {
+                    const ok = m.lastStatus && m.lastStatus < 400
+                    const noCheck = !m.lastStatus
+                    return (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: noCheck ? '#94a3b8' : ok ? '#0e9f6e' : '#dc2626' }} />
+                        <p style={{ flex: 1, fontSize: 12.5, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</p>
+                        <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', flexShrink: 0 }}>
+                          {noCheck ? '—' : ok ? `${m.uptimePct ?? '—'}%` : m.lastStatus}
+                        </p>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Licenças a vencer */}
+            {expiringLics.length > 0 && (
+              <div className="card" style={{ padding: '16px 20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Licenças a Vencer</p>
+                  <Link to="/licenses" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none' }}>Ver tudo →</Link>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {expiringLics.map(l => {
+                    const s = LIC_STATUS[l.status] ?? LIC_STATUS.OK
+                    return (
+                      <div key={l.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontSize: 13, color: 'var(--text-primary)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{l.name}</p>
+                          <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 1 }}>{l.vendor ?? '—'}</p>
+                        </div>
+                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                          <p style={{ fontSize: 12, fontWeight: 600, color: s.color }}>{l.status === 'EXPIRED' ? 'Vencida' : `${l.daysUntilExpiry}d`}</p>
+                          <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{new Date(l.expiryDate).toLocaleDateString('pt-BR')}</p>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
           </div>
         </div>
       </div>
@@ -115,18 +237,64 @@ export default function DashboardPage() {
   )
 }
 
+function Section({ title, count, to, emptyMsg, children }) {
+  const hasContent = count > 0
+  return (
+    <div className="card" style={{ padding: '16px 20px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <p style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>{title}</p>
+          {count > 0 && <span style={{ fontSize: 11, fontWeight: 700, background: 'var(--bg-muted)', color: 'var(--text-secondary)', borderRadius: 99, padding: '1px 7px' }}>{count}</span>}
+        </div>
+        <Link to={to} style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none' }}>Ver tudo →</Link>
+      </div>
+      {!hasContent
+        ? <p style={{ fontSize: 13, color: 'var(--text-tertiary)', padding: '12px 0' }}>{emptyMsg}</p>
+        : <div>{children}</div>
+      }
+    </div>
+  )
+}
+
+function KpiCard({ icon, label, value, sub, color, bg, to }) {
+  const inner = (
+    <div className="stat-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+      <div className="stat-icon" style={{ background: bg, color, flexShrink: 0 }}>{icon}</div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="stat-value" style={{ color: 'var(--text-primary)' }}>{value}</div>
+        <div className="stat-label">{label}</div>
+        {sub && <div style={{ fontSize: 11, color, marginTop: 3, fontWeight: 600 }}>{sub}</div>}
+      </div>
+    </div>
+  )
+  return to
+    ? <Link to={to} style={{ display: 'block', textDecoration: 'none' }}>{inner}</Link>
+    : <div>{inner}</div>
+}
+
+function TicketStatusDot({ status }) {
+  const colors = { new: '#dc2626', assigned: '#d97706', pending: '#2563eb', solved: '#0e9f6e', closed: '#94a3b8' }
+  return <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors[status] ?? '#94a3b8', flexShrink: 0 }} />
+}
+
+function ticketStatusLabel(s) {
+  const m = { new: 'Novo', assigned: 'Atribuído', pending: 'Pendente', solved: 'Resolvido', closed: 'Fechado' }
+  return m[s] ?? s
+}
+
+function timeAgo(unixSec) {
+  const diff = Math.floor(Date.now() / 1000) - unixSec
+  if (diff < 60)   return `${diff}s atrás`
+  if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`
+  if (diff < 86400)return `${Math.floor(diff / 3600)}h atrás`
+  return `${Math.floor(diff / 86400)}d atrás`
+}
+
 const si = { width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 2, viewBox: '0 0 24 24', strokeLinecap: 'round', strokeLinejoin: 'round' }
-function IcoHosts()    { return <svg {...si}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> }
-function IcoOnline()   { return <svg {...si}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> }
-function IcoAlert()    { return <svg {...si}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> }
-function IcoTicket()   { return <svg {...si}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
-function IcoSystem()   { return <svg {...si}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><path d="M7 9h.01M11 9h.01M15 9h.01"/></svg> }
-function IcoTv()       { return <svg {...si}><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M17 2l-5 5-5-5"/></svg> }
-function IconMonitor() { return <svg {...si}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> }
-function IconTicket()  { return <svg {...si}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
-function IconSystems() { return <svg {...si}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><path d="M7 9h.01M11 9h.01M15 9h.01"/></svg> }
-function IconInventory(){ return <svg {...si}><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/><path d="M12 3v18M3 6l9 3 9-3"/></svg> }
-function IconNetwork() { return <svg {...si}><circle cx="12" cy="12" r="2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M6 6h4M14 6h4M6 18h4M14 18h4M12 10v2M10 12H6M18 12h-4"/></svg> }
-function IconPlanning(){ return <svg {...si}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg> }
-function IconNotes()   { return <svg {...si}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
-function IconUser()    { return <svg {...si}><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> }
+function IcoHosts()     { return <svg {...si}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> }
+function IcoOnline()    { return <svg {...si}><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg> }
+function IcoAlert()     { return <svg {...si}><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> }
+function IcoTicket()    { return <svg {...si}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
+function IcoSystem()    { return <svg {...si}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><path d="M7 9h.01M11 9h.01M15 9h.01"/></svg> }
+function IcoInventory() { return <svg {...si}><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/><path d="M12 3v18M3 6l9 3 9-3"/></svg> }
+function IcoTv()        { return <svg {...si}><rect x="2" y="7" width="20" height="15" rx="2"/><path d="M17 2l-5 5-5-5"/></svg> }
