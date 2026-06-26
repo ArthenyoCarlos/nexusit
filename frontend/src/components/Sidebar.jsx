@@ -46,28 +46,43 @@ export default function Sidebar() {
   const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() ?? 'U'
 
   return (
-    <aside style={{ width: 224, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)', display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', flexShrink: 0 }}>
+    <aside style={{
+      width: 'var(--sidebar-w)',
+      background: 'var(--sidebar-bg)',
+      borderRight: '1px solid var(--sidebar-border)',
+      display: 'flex', flexDirection: 'column',
+      height: '100vh', overflow: 'hidden', flexShrink: 0,
+    }}>
 
       {/* Logo */}
-      <div style={{ padding: '18px 16px', borderBottom: '1px solid var(--sidebar-border)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+            background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            boxShadow: '0 4px 12px rgba(79,70,229,0.4)',
+          }}>
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
           <div>
-            <p style={{ color: '#e2e8f0', fontWeight: 700, fontSize: 14, lineHeight: 1 }}>NexusIT</p>
-            <p style={{ color: 'var(--sidebar-label)', fontSize: 11, marginTop: 2 }}>Painel de TI</p>
+            <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14.5, lineHeight: 1, letterSpacing: '-0.01em' }}>NexusIT</p>
+            <p style={{ color: '#4b5563', fontSize: 11, marginTop: 3 }}>Painel de TI</p>
           </div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="sidebar-nav" style={{ flex: 1, padding: '14px 10px', overflowY: 'auto' }}>
+      <nav className="sidebar-nav" style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
         {NAV.map(group => (
-          <div key={group.section} style={{ marginBottom: 20 }}>
-            <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--sidebar-label)', padding: '0 8px', marginBottom: 4 }}>
+          <div key={group.section} style={{ marginBottom: 22 }}>
+            <p style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.09em',
+              textTransform: 'uppercase', color: '#2d3748',
+              padding: '0 8px', marginBottom: 5,
+            }}>
               {group.section}
             </p>
             {group.items.map(({ label, path, Icon }) => (
@@ -85,23 +100,31 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '10px 10px 14px' }}>
+      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '10px 10px 14px', flexShrink: 0 }}>
         {isAdmin && (
           <NavLink to="/settings" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
             <IconSettings />
             <span>Configurações</span>
           </NavLink>
         )}
-        <NavLink to="/profile" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
-          <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+
+        <NavLink to="/profile" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+          style={{ marginTop: 4 }}>
+          <div style={{
+            width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+            background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 10, fontWeight: 700, color: '#fff',
+          }}>
             {initials}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 13, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1 }}>{user?.name}</p>
-            <p style={{ fontSize: 11, color: 'var(--sidebar-label)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
+            <p style={{ fontSize: 12.5, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1 }}>{user?.name}</p>
+            <p style={{ fontSize: 10.5, color: '#374151', marginTop: 2.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
           </div>
         </NavLink>
-        <button onClick={logout} className="nav-item" style={{ width: '100%' }}>
+
+        <button onClick={logout} className="nav-item" style={{ width: '100%', marginTop: 2 }}>
           <IconLogout />
           <span>Sair</span>
         </button>
@@ -110,22 +133,22 @@ export default function Sidebar() {
   )
 }
 
-const i = { width: 16, height: 16, fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, viewBox: '0 0 24 24', strokeLinecap: 'round', strokeLinejoin: 'round' }
-function IconDashboard() { return <svg {...i}><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> }
-function IconMonitor()   { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> }
-function IconSystems()   { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><path d="M7 9h.01M11 9h.01M15 9h.01"/></svg> }
-function IconInventory() { return <svg {...i}><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/><path d="M12 3v18M3 6l9 3 9-3"/></svg> }
-function IconNetwork()   { return <svg {...i}><circle cx="12" cy="12" r="2"/><circle cx="4" cy="6" r="2"/><circle cx="20" cy="6" r="2"/><circle cx="4" cy="18" r="2"/><circle cx="20" cy="18" r="2"/><path d="M6 6h4M14 6h4M6 18h4M14 18h4M12 10v2M10 12H6M18 12h-4"/></svg> }
-function IconTicket()    { return <svg {...i}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
-function IconNotes()     { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
-function IconPlanning()  { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg> }
-function IconSettings()  { return <svg {...i}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> }
-function IconLogout()    { return <svg {...i}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg> }
-function IconVault()     { return <svg {...i}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg> }
-function IconLicense()   { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
-function IconOnboarding(){ return <svg {...i}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg> }
-function IconMonitorUrl(){ return <svg {...i}><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> }
-function IconContract()  { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/><path d="M8 9h2"/></svg> }
-function IconSchedule()  { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="12" cy="15" r="2"/><path d="M12 13v-2"/></svg> }
-function IconWiki()      { return <svg {...i}><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 9h6M9 13h4"/></svg> }
-function IconFinancial() { return <svg {...i}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> }
+const i = { width: 15, height: 15, fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, viewBox: '0 0 24 24', strokeLinecap: 'round', strokeLinejoin: 'round' }
+function IconDashboard()  { return <svg {...i}><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> }
+function IconMonitor()    { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> }
+function IconSystems()    { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><circle cx="7" cy="10" r="1"/><circle cx="12" cy="10" r="1"/></svg> }
+function IconInventory()  { return <svg {...i}><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/><path d="M12 3v18M3 6l9 3 9-3"/></svg> }
+function IconNetwork()    { return <svg {...i}><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M12 11l-5.5 6M12 11l5.5 6"/></svg> }
+function IconTicket()     { return <svg {...i}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
+function IconNotes()      { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
+function IconPlanning()   { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg> }
+function IconSettings()   { return <svg {...i}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> }
+function IconLogout()     { return <svg {...i}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg> }
+function IconVault()      { return <svg {...i}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg> }
+function IconLicense()    { return <svg {...i}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> }
+function IconOnboarding() { return <svg {...i}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg> }
+function IconMonitorUrl() { return <svg {...i}><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> }
+function IconContract()   { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5M8 9h2"/></svg> }
+function IconSchedule()   { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="12" cy="15" r="2"/></svg> }
+function IconWiki()       { return <svg {...i}><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 9h6M9 13h4"/></svg> }
+function IconFinancial()  { return <svg {...i}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> }

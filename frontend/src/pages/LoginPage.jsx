@@ -26,76 +26,87 @@ export default function LoginPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', background: '#0c1322' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', background: 'var(--bg-page)' }}>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .lg-flex { display: none !important; }
+        @media (min-width: 1024px) { .lg-flex { display: flex !important; } .lg-hide { display: none !important; } }
+      `}</style>
 
-      {/* Left — brand */}
-      <div style={{ width: '42%', display: 'none', flexDirection: 'column', justifyContent: 'space-between', padding: '48px 52px', borderRight: '1px solid rgba(255,255,255,0.06)' }}
-        className="lg-flex">
-        <style>{`.lg-flex { display: flex !important; } @media (max-width: 1023px) { .lg-flex { display: none !important; } }`}</style>
+      {/* Left — brand panel */}
+      <div className="lg-flex" style={{
+        width: '44%', flexDirection: 'column', justifyContent: 'space-between',
+        padding: '48px 52px', flexShrink: 0,
+        background: 'var(--sidebar-bg)',
+        borderRight: '1px solid rgba(255,255,255,0.05)',
+        position: 'relative', overflow: 'hidden',
+      }}>
+        {/* Decorative gradient orb */}
+        <div style={{ position: 'absolute', top: -80, right: -80, width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -60, left: -60, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         {/* Logo */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 11, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #818cf8, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(79,70,229,0.45)' }}>
             <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
-          <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 18, letterSpacing: '-0.01em' }}>NexusIT</span>
+          <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 19, letterSpacing: '-0.02em' }}>NexusIT</span>
         </div>
 
         {/* Hero text */}
-        <div>
-          <h1 style={{ color: '#f1f5f9', fontSize: 36, fontWeight: 800, lineHeight: 1.15, letterSpacing: '-0.025em', marginBottom: 14 }}>
+        <div style={{ position: 'relative', zIndex: 1 }}>
+          <h1 style={{ color: '#f1f5f9', fontSize: 38, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.03em', marginBottom: 16 }}>
             Infraestrutura<br />sob controle.
           </h1>
-          <p style={{ color: '#64748b', fontSize: 15, lineHeight: 1.65, marginBottom: 40, maxWidth: 340 }}>
+          <p style={{ color: '#4b5563', fontSize: 15, lineHeight: 1.7, marginBottom: 44, maxWidth: 340 }}>
             Centralize monitoramento, inventário, chamados e documentação da sua equipe de TI.
           </p>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {[
-              { label: 'Monitoramento Zabbix',  desc: 'Hosts e alertas em tempo real' },
-              { label: 'Chamados GLPI',          desc: 'Gestão completa de tickets' },
-              { label: 'Inventário e Sistemas',  desc: 'Controle de equipamentos' },
-              { label: 'Planejamento Kanban',    desc: 'Tarefas organizadas por sprint' },
+              { label: 'Monitoramento Zabbix',  desc: 'Hosts e alertas em tempo real', color: '#818cf8' },
+              { label: 'Chamados GLPI',          desc: 'Gestão completa de tickets',    color: '#6ee7b7' },
+              { label: 'Inventário e Sistemas',  desc: 'Controle de equipamentos',      color: '#fcd34d' },
+              { label: 'Planejamento Kanban',    desc: 'Tarefas organizadas por sprint', color: '#f9a8d4' },
             ].map(f => (
               <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#3b82f6', flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: f.color, flexShrink: 0, boxShadow: `0 0 8px ${f.color}` }} />
                 <div>
                   <p style={{ color: '#cbd5e1', fontSize: 13.5, fontWeight: 500, lineHeight: 1 }}>{f.label}</p>
-                  <p style={{ color: '#475569', fontSize: 12, marginTop: 2 }}>{f.desc}</p>
+                  <p style={{ color: '#374151', fontSize: 12, marginTop: 3 }}>{f.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <p style={{ color: '#334155', fontSize: 12 }}>© 2026 NexusIT · Painel Interno de TI</p>
+        <p style={{ color: '#1f2937', fontSize: 12, position: 'relative', zIndex: 1 }}>© 2026 NexusIT · Painel Interno de TI</p>
       </div>
 
       {/* Right — form */}
-      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 32, background: 'var(--bg-page)' }}>
-        <div style={{ width: '100%', maxWidth: 360 }}>
+      <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '32px 24px' }}>
+        <div style={{ width: '100%', maxWidth: 380 }} className="fade-up">
 
           {/* Mobile logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 32 }} className="lg-hide">
-            <style>{`.lg-hide { display: none !important; } @media (max-width: 1023px) { .lg-hide { display: flex !important; } }`}</style>
-            <div style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg, #3b82f6, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div className="lg-hide" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #818cf8, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(79,70,229,0.4)' }}>
               <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
               </svg>
             </div>
-            <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 17 }}>NexusIT</span>
+            <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' }}>NexusIT</span>
           </div>
 
           {/* Header */}
-          <div style={{ marginBottom: 28 }}>
-            <h2 style={{ fontSize: 22, fontWeight: 700, color: 'var(--text-primary)', letterSpacing: '-0.01em' }}>Entrar na conta</h2>
-            <p style={{ fontSize: 13.5, color: 'var(--text-tertiary)', marginTop: 4 }}>Use suas credenciais corporativas de acesso</p>
+          <div style={{ marginBottom: 30 }}>
+            <h2 style={{ fontSize: 24, fontWeight: 800, color: 'var(--text-primary)', letterSpacing: '-0.025em' }}>Bem-vindo</h2>
+            <p style={{ fontSize: 14, color: 'var(--text-tertiary)', marginTop: 5 }}>Entre com suas credenciais corporativas</p>
           </div>
 
-          {/* Card */}
-          <div className="card" style={{ padding: '28px 28px' }}>
+          {/* Form card */}
+          <div style={{ background: 'var(--bg-surface)', borderRadius: 'var(--r-2xl)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-md)', padding: '32px 30px' }}>
             <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
               <div>
                 <label className="input-label">Email corporativo</label>
@@ -105,6 +116,7 @@ export default function LoginPage() {
                   onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
                   placeholder="voce@empresa.com.br"
                   className="input"
+                  style={{ height: 42 }}
                 />
               </div>
 
@@ -116,19 +128,20 @@ export default function LoginPage() {
                   onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
                   placeholder="••••••••"
                   className="input"
+                  style={{ height: 42 }}
                 />
               </div>
 
               {error && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--red-bg)', border: '1px solid var(--red-border)', color: 'var(--red)', fontSize: 13, padding: '10px 12px', borderRadius: 'var(--r-md)' }}>
-                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: 'var(--red-bg)', border: '1px solid var(--red-border)', color: 'var(--red)', fontSize: 13, padding: '11px 13px', borderRadius: 'var(--r-md)' }}>
+                  <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" style={{ flexShrink: 0 }}>
                     <circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/>
                   </svg>
                   {error}
                 </div>
               )}
 
-              <button type="submit" disabled={loading} className="btn btn-primary btn-lg" style={{ width: '100%', marginTop: 2 }}>
+              <button type="submit" disabled={loading} className="btn btn-primary" style={{ width: '100%', height: 44, fontSize: 14, fontWeight: 600, marginTop: 4, borderRadius: 'var(--r-lg)' }}>
                 {loading ? (
                   <>
                     <svg width="16" height="16" fill="none" viewBox="0 0 24 24" style={{ animation: 'spin 1s linear infinite' }}>
@@ -141,8 +154,6 @@ export default function LoginPage() {
               </button>
             </form>
           </div>
-
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
     </div>

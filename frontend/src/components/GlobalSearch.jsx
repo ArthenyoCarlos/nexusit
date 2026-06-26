@@ -33,10 +33,7 @@ export default function GlobalSearch() {
 
   useEffect(() => {
     const handler = (e) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-        e.preventDefault()
-        inputRef.current?.focus()
-      }
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') { e.preventDefault(); inputRef.current?.focus() }
       if (e.key === 'Escape') { setOpen(false); setQuery('') }
     }
     window.addEventListener('keydown', handler)
@@ -50,16 +47,15 @@ export default function GlobalSearch() {
     if (e.key === 'Enter' && idx >= 0) { navigate(results[idx].path); setOpen(false); setQuery('') }
   }
 
-  const handleSelect = (hit) => {
-    navigate(hit.path)
-    setOpen(false)
-    setQuery('')
-  }
+  const handleSelect = (hit) => { navigate(hit.path); setOpen(false); setQuery('') }
 
   return (
-    <div style={{ position: 'relative', width: 260 }}>
+    <div style={{ position: 'relative', width: 280 }}>
       <div style={{ position: 'relative' }}>
-        <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }} width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <svg style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', pointerEvents: 'none' }}
+          width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+          <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
+        </svg>
         <input
           ref={inputRef}
           value={query}
@@ -69,45 +65,57 @@ export default function GlobalSearch() {
           onBlur={() => setTimeout(() => setOpen(false), 200)}
           placeholder="Buscar... (Ctrl+K)"
           style={{
-            width: '100%', paddingLeft: 32, paddingRight: 10, height: 32,
-            borderRadius: 8, border: '1px solid var(--border-muted)',
-            background: 'var(--bg-muted)', color: 'var(--text-primary)',
-            fontSize: 13, outline: 'none',
+            width: '100%', paddingLeft: 34, paddingRight: 42, height: 34,
+            borderRadius: 'var(--r-md)', border: '1.5px solid var(--border)',
+            background: 'var(--bg-surface)', color: 'var(--text-primary)',
+            fontSize: 13, outline: 'none', transition: 'border-color 0.15s, box-shadow 0.15s',
+            boxShadow: 'var(--shadow-xs)',
           }}
+          onFocusCapture={e => { e.target.style.borderColor = 'var(--accent)'; e.target.style.boxShadow = '0 0 0 3px var(--accent-ring)' }}
+          onBlurCapture={e => { e.target.style.borderColor = 'var(--border)'; e.target.style.boxShadow = 'var(--shadow-xs)' }}
         />
-        {loading && <div style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', width: 12, height: 12, borderRadius: '50%', border: '2px solid var(--accent)', borderTopColor: 'transparent', animation: 'spin 0.6s linear infinite' }} />}
+        <kbd style={{
+          position: 'absolute', right: 9, top: '50%', transform: 'translateY(-50%)',
+          fontSize: 10, color: 'var(--text-tertiary)', background: 'var(--bg-muted)',
+          border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px',
+          fontFamily: 'var(--font-mono)', pointerEvents: 'none',
+        }}>⌃K</kbd>
+        {loading && (
+          <div style={{
+            position: 'absolute', right: 36, top: '50%', transform: 'translateY(-50%)',
+            width: 12, height: 12, borderRadius: '50%',
+            border: '2px solid var(--accent)', borderTopColor: 'transparent',
+            animation: 'spin 0.6s linear infinite',
+          }} />
+        )}
       </div>
 
       {open && results.length > 0 && (
         <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4,
-          background: 'var(--bg-card)', border: '1px solid var(--border-muted)',
-          borderRadius: 10, boxShadow: '0 8px 24px rgba(0,0,0,0.12)', zIndex: 1000,
-          overflow: 'hidden',
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+          background: 'var(--bg-surface)', border: '1px solid var(--border)',
+          borderRadius: 'var(--r-lg)', boxShadow: 'var(--shadow-lg)', zIndex: 1000, overflow: 'hidden',
         }}>
           {results.map((hit, i) => (
-            <div
-              key={hit.id}
-              onMouseDown={() => handleSelect(hit)}
-              style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer',
-                background: i === idx ? 'var(--accent-subtle)' : 'transparent',
-                borderBottom: i < results.length - 1 ? '1px solid var(--border-muted)' : 'none',
-              }}
-            >
+            <div key={hit.id} onMouseDown={() => handleSelect(hit)} style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', cursor: 'pointer',
+              background: i === idx ? 'var(--accent-light)' : 'transparent',
+              borderBottom: i < results.length - 1 ? '1px solid var(--border-muted)' : 'none',
+              transition: 'background 0.1s',
+            }}>
               <span style={{ fontSize: 16 }}>{TYPE_ICON[hit.type]}</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--text-primary)' }}>{hit.title}</p>
-                {hit.subtitle && <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginTop: 1 }}>{hit.subtitle}</p>}
+                {hit.subtitle && <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 1 }}>{hit.subtitle}</p>}
               </div>
-              <span style={{ fontSize: 10, fontWeight: 600, padding: '1px 6px', borderRadius: 8, background: 'var(--bg-muted)', color: 'var(--text-tertiary)', flexShrink: 0 }}>{TYPE_LABEL[hit.type]}</span>
+              <span style={{ fontSize: 10.5, fontWeight: 600, padding: '2px 7px', borderRadius: 'var(--r-full)', background: 'var(--bg-muted)', color: 'var(--text-tertiary)', flexShrink: 0, letterSpacing: '0.03em' }}>{TYPE_LABEL[hit.type]}</span>
             </div>
           ))}
         </div>
       )}
 
       {open && query.length >= 2 && results.length === 0 && !loading && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 4, background: 'var(--bg-card)', border: '1px solid var(--border-muted)', borderRadius: 10, padding: '14px', zIndex: 1000 }}>
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: 'var(--r-lg)', padding: 16, zIndex: 1000 }}>
           <p style={{ fontSize: 13, color: 'var(--text-tertiary)', textAlign: 'center' }}>Nenhum resultado para "{query}"</p>
         </div>
       )}

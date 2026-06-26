@@ -34,16 +34,31 @@ export default function Layout({ children }) {
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>
+
+      {/* Sidebar fixo */}
       <div style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 10 }}>
         <Sidebar />
       </div>
-      <div style={{ flex: 1, minWidth: 0, marginLeft: 224, display: 'flex', flexDirection: 'column' }}>
-        {/* Top bar */}
-        <div style={{ position: 'sticky', top: 0, zIndex: 9, background: 'var(--bg-page)', borderBottom: '1px solid var(--border-muted)', padding: '8px 24px', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 12 }}>
+
+      {/* Conteúdo principal */}
+      <div style={{ flex: 1, minWidth: 0, marginLeft: 'var(--sidebar-w)', display: 'flex', flexDirection: 'column' }}>
+
+        {/* Topbar */}
+        <header style={{
+          position: 'sticky', top: 0, zIndex: 9,
+          background: 'rgba(244,246,250,0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          borderBottom: '1px solid var(--border-muted)',
+          padding: '0 28px',
+          height: 54,
+          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10,
+        }}>
           <GlobalSearch />
           <NotificationBell />
-        </div>
-        <main style={{ flex: 1, overflowY: 'auto' }}>
+        </header>
+
+        <main style={{ flex: 1 }}>
           {children}
         </main>
       </div>
