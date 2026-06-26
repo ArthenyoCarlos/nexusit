@@ -46,7 +46,7 @@ export default function Sidebar() {
   const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() ?? 'U'
 
   return (
-    <aside style={{ width: 224, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)', display: 'flex', flexDirection: 'column', minHeight: '100vh', flexShrink: 0 }}>
+    <aside style={{ width: 224, background: 'var(--sidebar-bg)', borderRight: '1px solid var(--sidebar-border)', display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden', flexShrink: 0 }}>
 
       {/* Logo */}
       <div style={{ padding: '18px 16px', borderBottom: '1px solid var(--sidebar-border)' }}>
