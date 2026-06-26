@@ -109,9 +109,9 @@ export default function WikiPage() {
           )}
         </div>
 
-        <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Editar Artigo' : 'Novo Artigo'}>
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Editar Artigo' : 'Novo Artigo'} size="lg">
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="input-label">Título *</label>
                 <input required value={form.title} onChange={e => setForm(f=>({...f,title:e.target.value}))} className="input" />
@@ -128,7 +128,7 @@ export default function WikiPage() {
               </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="input-label">Conteúdo (Markdown)</label>
-                <textarea value={form.content} onChange={e => setForm(f=>({...f,content:e.target.value}))} className="input" rows={14} style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }} placeholder="# Título&#10;&#10;Escreva em **Markdown**..." />
+                <textarea value={form.content} onChange={e => setForm(f=>({...f,content:e.target.value}))} className="input" rows={10} style={{ resize: 'vertical', fontFamily: 'monospace', fontSize: 13 }} placeholder="# Título&#10;&#10;Escreva em **Markdown**..." />
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>

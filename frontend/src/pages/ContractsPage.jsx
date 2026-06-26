@@ -116,9 +116,9 @@ export default function ContractsPage() {
           </table>
         </div>
 
-        <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Editar Contrato' : 'Novo Contrato'}>
-          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Editar Contrato' : 'Novo Contrato'} size="lg">
+          <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="input-label">Nome *</label>
                 <input required value={form.name} onChange={e => setForm(f=>({...f,name:e.target.value}))} className="input" />
@@ -134,15 +134,15 @@ export default function ContractsPage() {
                 </select>
               </div>
               <div>
-                <label className="input-label">Valor (R$)</label>
-                <input type="number" step="0.01" value={form.value} onChange={e => setForm(f=>({...f,value:e.target.value}))} className="input" />
-              </div>
-              <div>
                 <label className="input-label">Renovação automática</label>
                 <select value={form.autoRenew} onChange={e => setForm(f=>({...f,autoRenew:e.target.value==='true'}))} className="input">
                   <option value="false">Não</option>
                   <option value="true">Sim</option>
                 </select>
+              </div>
+              <div>
+                <label className="input-label">Valor (R$)</label>
+                <input type="number" step="0.01" value={form.value} onChange={e => setForm(f=>({...f,value:e.target.value}))} className="input" />
               </div>
               <div>
                 <label className="input-label">Início</label>
@@ -160,12 +160,16 @@ export default function ContractsPage() {
                 <label className="input-label">E-mail contato</label>
                 <input type="email" value={form.contactEmail} onChange={e => setForm(f=>({...f,contactEmail:e.target.value}))} className="input" />
               </div>
+              <div>
+                <label className="input-label">Telefone contato</label>
+                <input value={form.contactPhone} onChange={e => setForm(f=>({...f,contactPhone:e.target.value}))} className="input" />
+              </div>
               <div style={{ gridColumn: '1/-1' }}>
                 <label className="input-label">Observações</label>
-                <textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} className="input" rows={3} style={{ resize: 'none' }} />
+                <textarea value={form.notes} onChange={e => setForm(f=>({...f,notes:e.target.value}))} className="input" rows={2} style={{ resize: 'none' }} />
               </div>
             </div>
-            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
               <button type="button" onClick={() => setModal(false)} className="btn btn-default">Cancelar</button>
               <button type="submit" disabled={saving} className="btn btn-primary">{saving ? 'Salvando...' : 'Salvar'}</button>
             </div>
