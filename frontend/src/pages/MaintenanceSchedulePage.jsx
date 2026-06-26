@@ -111,7 +111,7 @@ export default function MaintenanceSchedulePage() {
           )}
         </div>
 
-        <Modal isOpen={modal} onClose={() => setModal(false)} title="Nova Tarefa de Manutenção">
+        <Modal open={modal} onClose={() => setModal(false)} title="Nova Tarefa de Manutenção">
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label className="input-label">Título *</label>
@@ -147,7 +147,7 @@ export default function MaintenanceSchedulePage() {
           </form>
         </Modal>
 
-        <Modal isOpen={!!completing} onClose={() => setCompleting(null)} title="Registrar conclusão">
+        <Modal open={!!completing} onClose={() => setCompleting(null)} title="Registrar conclusão">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label className="input-label">Observações (opcional)</label>
@@ -161,7 +161,7 @@ export default function MaintenanceSchedulePage() {
           </div>
         </Modal>
 
-        <ConfirmDialog isOpen={!!confirm} title="Remover tarefa?" message="A tarefa será marcada como inativa."
+        <ConfirmDialog open={!!confirm} title="Remover tarefa?" message="A tarefa será marcada como inativa."
           onConfirm={() => { deleteSchedule(confirm); setConfirm(null); load() }} onCancel={() => setConfirm(null)} />
       </div>
     </Layout>

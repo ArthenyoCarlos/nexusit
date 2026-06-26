@@ -109,7 +109,7 @@ export default function WikiPage() {
           )}
         </div>
 
-        <Modal isOpen={modal} onClose={() => setModal(false)} title={editing ? 'Editar Artigo' : 'Novo Artigo'} wide>
+        <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Editar Artigo' : 'Novo Artigo'}>
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ gridColumn: '1/-1' }}>
@@ -138,7 +138,7 @@ export default function WikiPage() {
           </form>
         </Modal>
 
-        <ConfirmDialog isOpen={!!confirm} title="Excluir artigo?" message="Esta ação não pode ser desfeita."
+        <ConfirmDialog open={!!confirm} title="Excluir artigo?" message="Esta ação não pode ser desfeita."
           onConfirm={() => { handleDelete(confirm); setConfirm(null) }} onCancel={() => setConfirm(null)} />
       </div>
     </Layout>

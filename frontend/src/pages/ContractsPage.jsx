@@ -116,7 +116,7 @@ export default function ContractsPage() {
           </table>
         </div>
 
-        <Modal isOpen={modal} onClose={() => setModal(false)} title={editing ? 'Editar Contrato' : 'Novo Contrato'}>
+        <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Editar Contrato' : 'Novo Contrato'}>
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ gridColumn: '1/-1' }}>
@@ -172,7 +172,7 @@ export default function ContractsPage() {
           </form>
         </Modal>
 
-        <ConfirmDialog isOpen={!!confirm} title="Excluir contrato?" message="Esta ação não pode ser desfeita."
+        <ConfirmDialog open={!!confirm} title="Excluir contrato?" message="Esta ação não pode ser desfeita."
           onConfirm={() => { handleDelete(confirm); setConfirm(null) }} onCancel={() => setConfirm(null)} />
       </div>
     </Layout>

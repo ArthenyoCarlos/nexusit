@@ -156,7 +156,7 @@ export default function FinancialPage() {
           </table>
         </div>
 
-        <Modal isOpen={modal} onClose={() => setModal(false)} title={editing ? 'Editar Conta' : 'Nova Conta a Pagar'}>
+        <Modal open={modal} onClose={() => setModal(false)} title={editing ? 'Editar Conta' : 'Nova Conta a Pagar'}>
           <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               <div style={{ gridColumn: '1/-1' }}>
@@ -193,7 +193,7 @@ export default function FinancialPage() {
           </form>
         </Modal>
 
-        <ConfirmDialog isOpen={!!confirm} title="Excluir conta?" message="Esta ação não pode ser desfeita."
+        <ConfirmDialog open={!!confirm} title="Excluir conta?" message="Esta ação não pode ser desfeita."
           onConfirm={() => { handleDelete(confirm); setConfirm(null) }} onCancel={() => setConfirm(null)} />
       </div>
     </Layout>
