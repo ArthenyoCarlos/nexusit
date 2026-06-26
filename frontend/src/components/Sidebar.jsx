@@ -55,33 +55,33 @@ export default function Sidebar() {
     }}>
 
       {/* Logo */}
-      <div style={{ padding: '20px 16px 16px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
+      <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
           <div style={{
-            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+            width: 30, height: 30, borderRadius: 9, flexShrink: 0,
             background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 12px rgba(79,70,229,0.4)',
+            boxShadow: '0 4px 10px rgba(79,70,229,0.4)',
           }}>
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
           <div>
-            <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14.5, lineHeight: 1, letterSpacing: '-0.01em' }}>NexusIT</p>
-            <p style={{ color: '#4b5563', fontSize: 11, marginTop: 3 }}>Painel de TI</p>
+            <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14, lineHeight: 1, letterSpacing: '-0.01em' }}>NexusIT</p>
+            <p style={{ color: '#4b5563', fontSize: 10.5, marginTop: 2.5 }}>Painel de TI</p>
           </div>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="sidebar-nav" style={{ flex: 1, padding: '12px 10px', overflowY: 'auto' }}>
+      <nav className="sidebar-nav" style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
         {NAV.map(group => (
-          <div key={group.section} style={{ marginBottom: 22 }}>
+          <div key={group.section} style={{ marginBottom: 16 }}>
             <p style={{
-              fontSize: 10, fontWeight: 700, letterSpacing: '0.09em',
+              fontSize: 9.5, fontWeight: 700, letterSpacing: '0.10em',
               textTransform: 'uppercase', color: '#2d3748',
-              padding: '0 8px', marginBottom: 5,
+              padding: '0 7px', marginBottom: 3,
             }}>
               {group.section}
             </p>
@@ -100,7 +100,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '10px 10px 14px', flexShrink: 0 }}>
+      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '8px 8px 12px', flexShrink: 0 }}>
         {isAdmin && (
           <NavLink to="/settings" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
             <IconSettings />
@@ -109,22 +109,22 @@ export default function Sidebar() {
         )}
 
         <NavLink to="/profile" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-          style={{ marginTop: 4 }}>
+          style={{ marginTop: 2 }}>
           <div style={{
-            width: 26, height: 26, borderRadius: '50%', flexShrink: 0,
+            width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
             background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 10, fontWeight: 700, color: '#fff',
+            fontSize: 9.5, fontWeight: 700, color: '#fff',
           }}>
             {initials}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 12.5, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1 }}>{user?.name}</p>
-            <p style={{ fontSize: 10.5, color: '#374151', marginTop: 2.5, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
+            <p style={{ fontSize: 12, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1 }}>{user?.name}</p>
+            <p style={{ fontSize: 10, color: '#374151', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
           </div>
         </NavLink>
 
-        <button onClick={logout} className="nav-item" style={{ width: '100%', marginTop: 2 }}>
+        <button onClick={logout} className="nav-item" style={{ width: '100%', marginTop: 1 }}>
           <IconLogout />
           <span>Sair</span>
         </button>
