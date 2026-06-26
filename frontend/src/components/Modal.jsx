@@ -1,4 +1,5 @@
 import { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 const SIZE_MAP = { sm: 400, md: 520, lg: 740, xl: 920 }
 
@@ -12,7 +13,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
 
   if (!open) return null
 
-  return (
+  return createPortal(
     <div
       className="fade-in"
       style={{
@@ -63,6 +64,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
