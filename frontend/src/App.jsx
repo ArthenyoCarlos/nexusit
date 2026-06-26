@@ -14,6 +14,8 @@ import NetworkDocsPage from './pages/NetworkDocsPage'
 import ProfilePage from './pages/ProfilePage'
 import SettingsPage from './pages/SettingsPage'
 import NotFoundPage from './pages/NotFoundPage'
+import SystemDetailPage from './pages/SystemDetailPage'
+import InventoryDetailPage from './pages/InventoryDetailPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -30,8 +32,10 @@ export default function App() {
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard"  element={<DashboardPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
-              <Route path="/systems"    element={<SystemsPage />} />
-              <Route path="/inventory"  element={<InventoryPage />} />
+              <Route path="/systems"        element={<SystemsPage />} />
+              <Route path="/systems/:id"   element={<SystemDetailPage />} />
+              <Route path="/inventory"     element={<InventoryPage />} />
+              <Route path="/inventory/:id" element={<InventoryDetailPage />} />
               <Route path="/tickets"    element={<TicketsPage />} />
               <Route path="/notes"      element={<NotesPage />} />
               <Route path="/planning"   element={<PlanningPage />} />

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import Badge from '../components/Badge'
@@ -16,6 +17,7 @@ const EMPTY_FORM = {
 
 export default function SystemsPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const isAdmin = user?.role === 'ADMIN'
 
   const [systems, setSystems]     = useState([])
@@ -161,9 +163,12 @@ export default function SystemsPage() {
                   <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>Responsável: {s.responsible.name}</p>
                 )}
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 'auto', paddingTop: 10, borderTop: '1px solid var(--border-muted)' }}>
+                  <button onClick={() => navigate(`/systems/${s.id}`)} className="btn btn-default btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
+                    Ver detalhes
+                  </button>
                   {s.url && (
-                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm" style={{ flex: 1, justifyContent: 'center' }}>
-                      Acessar ↗
+                    <a href={s.url} target="_blank" rel="noopener noreferrer" className="btn btn-primary btn-sm">
+                      ↗
                     </a>
                   )}
                   {isAdmin && (

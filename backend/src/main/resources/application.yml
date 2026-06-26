@@ -35,6 +35,11 @@ application:
     app-token: ${GLPI_APP_TOKEN:}
     user-token: ${GLPI_USER_TOKEN:}
 
+app:
+  base-url: ${APP_BASE_URL:http://nexus.local}
+  company-name: ${APP_COMPANY_NAME:Armazém Galdino}
+  support-phone: ${APP_SUPPORT_PHONE:}
+
 server:
   port: 8080
 

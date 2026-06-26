@@ -2,7 +2,9 @@ package br.com.nexusit.inventory;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +18,7 @@ import java.util.UUID;
 public class InventoryController {
 
     private final InventoryService service;
+    private final LabelService labelService;
 
     @GetMapping
     public List<InventoryResponse> findAll(
@@ -48,5 +51,16 @@ public class InventoryController {
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         service.delete(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{id}/etiqueta")
+    public ResponseEntity<byte[]> getEtiqueta(@PathVariable UUID id) {
+        byte[] pdf = labelService.generateLabel(id);
+        InventoryResponse item = service.findById(id);
+        String filename = (item.tombamento() != null ? item.tombamento() : "etiqueta") + ".pdf";
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
+                .body(pdf);
     }
 }

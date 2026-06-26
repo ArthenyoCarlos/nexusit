@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import Badge from '../components/Badge'
@@ -12,10 +13,12 @@ const STATUSES = ['ACTIVE', 'INACTIVE', 'MAINTENANCE']
 const EMPTY_FORM = {
   name: '', type: 'COMPUTADOR', brand: '', model: '', serialNumber: '',
   location: '', responsibleId: '', purchaseDate: '', status: 'ACTIVE', notes: '',
+  warrantyUntil: '', value: '',
 }
 
 export default function InventoryPage() {
   const { user } = useAuth()
+  const navigate = useNavigate()
   const isAdmin = user?.role === 'ADMIN'
 
   const [items, setItems]       = useState([])
@@ -64,6 +67,7 @@ export default function InventoryPage() {
       model: item.model ?? '', serialNumber: item.serialNumber ?? '',
       location: item.location ?? '', responsibleId: item.responsible?.id ?? '',
       purchaseDate: item.purchaseDate ?? '', status: item.status, notes: item.notes ?? '',
+      warrantyUntil: item.warrantyUntil ?? '', value: item.value ?? '',
     })
     setFormError('')
     setModalOpen(true)
@@ -78,6 +82,8 @@ export default function InventoryPage() {
         ...form,
         responsibleId: form.responsibleId || null,
         purchaseDate: form.purchaseDate || null,
+        warrantyUntil: form.warrantyUntil || null,
+        value: form.value !== '' ? parseFloat(form.value) : null,
       }
       if (editing) await updateItem(editing.id, payload)
       else await createItem(payload)
@@ -151,7 +157,7 @@ export default function InventoryPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    {['Nome', 'Tipo', 'Marca / Modelo', 'Nº Série', 'Localização', 'Responsável', 'Status', ''].map(h => (
+                    {['Tombamento', 'Nome', 'Tipo', 'Marca / Modelo', 'Nº Série', 'Localização', 'Responsável', 'Status', ''].map(h => (
                       <th key={h}>{h}</th>
                     ))}
                   </tr>
@@ -159,6 +165,9 @@ export default function InventoryPage() {
                 <tbody>
                   {items.map(item => (
                     <tr key={item.id}>
+                      <td className="mono" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
+                        {item.tombamento || '—'}
+                      </td>
                       <td style={{ fontWeight: 500 }}>{item.name}</td>
                       <td><Badge value={item.type} /></td>
                       <td className="muted">{[item.brand, item.model].filter(Boolean).join(' / ') || '—'}</td>
@@ -167,12 +176,15 @@ export default function InventoryPage() {
                       <td className="muted">{item.responsible?.name || '—'}</td>
                       <td><Badge value={item.status} /></td>
                       <td>
-                        {isAdmin && (
-                          <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
-                            <button onClick={() => openEdit(item)} className="btn btn-default btn-sm">Editar</button>
-                            <button onClick={() => setDeleteTarget(item)} className="btn btn-danger btn-sm">Excluir</button>
-                          </div>
-                        )}
+                        <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                          <button onClick={() => navigate(`/inventory/${item.id}`)} className="btn btn-default btn-sm">Detalhes</button>
+                          {isAdmin && (
+                            <>
+                              <button onClick={() => openEdit(item)} className="btn btn-default btn-sm">Editar</button>
+                              <button onClick={() => setDeleteTarget(item)} className="btn btn-danger btn-sm">Excluir</button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -243,6 +255,17 @@ export default function InventoryPage() {
               <label className="block text-sm font-medium text-slate-700 mb-1">Data de Compra</label>
               <input type="date" value={form.purchaseDate} onChange={f('purchaseDate')}
                 className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Garantia até</label>
+              <input type="date" value={form.warrantyUntil} onChange={f('warrantyUntil')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
+              <input type="number" step="0.01" min="0" value={form.value} onChange={f('value')}
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                placeholder="0,00" />
             </div>
             <div className="col-span-2">
               <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>

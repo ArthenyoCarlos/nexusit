@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Year;
 import java.util.List;
 import java.util.UUID;
 
@@ -32,7 +33,20 @@ public class InventoryService {
     @Transactional
     public InventoryResponse create(InventoryRequest req) {
         InventoryItem item = toEntity(new InventoryItem(), req);
+        item.setTombamento(generateTombamento());
         return InventoryResponse.from(repository.save(item));
+    }
+
+    private String generateTombamento() {
+        String year = String.valueOf(Year.now().getValue());
+        String max = repository.findMaxTombamentoForYear(year).orElse(null);
+        int next = 1;
+        if (max != null) {
+            // format: GAL-YYYY-NNN
+            String[] parts = max.split("-");
+            next = Integer.parseInt(parts[2]) + 1;
+        }
+        return String.format("GAL-%s-%03d", year, next);
     }
 
     @Transactional
@@ -57,6 +71,8 @@ public class InventoryService {
         item.setSerialNumber(req.serialNumber());
         item.setLocation(req.location());
         item.setPurchaseDate(req.purchaseDate());
+        item.setWarrantyUntil(req.warrantyUntil());
+        item.setValue(req.value());
         item.setStatus(req.status() != null ? req.status() : ItemStatus.ACTIVE);
         item.setNotes(req.notes());
         item.setResponsible(req.responsibleId() != null

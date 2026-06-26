@@ -38,6 +38,9 @@ services:
       GLPI_API_URL: ${GLPI_API_URL}
       GLPI_APP_TOKEN: ${GLPI_APP_TOKEN:-}
       GLPI_USER_TOKEN: ${GLPI_USER_TOKEN:-}
+      APP_BASE_URL: ${APP_BASE_URL:-http://nexus.local}
+      APP_COMPANY_NAME: ${APP_COMPANY_NAME:-Armazém Galdino}
+      APP_SUPPORT_PHONE: ${APP_SUPPORT_PHONE:-}
     expose:
       - "8080"
     networks:

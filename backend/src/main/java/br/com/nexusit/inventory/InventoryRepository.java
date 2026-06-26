@@ -5,9 +5,13 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface InventoryRepository extends JpaRepository<InventoryItem, UUID> {
+
+    @Query("SELECT MAX(i.tombamento) FROM InventoryItem i WHERE i.tombamento LIKE CONCAT('GAL-', :year, '-%')")
+    Optional<String> findMaxTombamentoForYear(@Param("year") String year);
 
     @Query("""
             SELECT i FROM InventoryItem i

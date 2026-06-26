@@ -1,6 +1,61 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { getHosts, getProblems } from '../services/monitoring'
 import { getTickets } from '../services/glpi'
+
+function useAlertSound() {
+  const muted = useRef(false)
+
+  const play = useCallback((severity) => {
+    if (muted.current) return
+    try {
+      const ctx = new (window.AudioContext || window.webkitAudioContext)()
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+
+      if (severity >= 5) {
+        // Disaster: 3 urgent beeps
+        osc.type = 'square'
+        const t = ctx.currentTime
+        gain.gain.setValueAtTime(0, t)
+        ;[0, 0.25, 0.5].forEach(offset => {
+          gain.gain.linearRampToValueAtTime(0.4, t + offset + 0.01)
+          gain.gain.linearRampToValueAtTime(0, t + offset + 0.18)
+        })
+        osc.frequency.setValueAtTime(880, t)
+        osc.start(t)
+        osc.stop(t + 0.8)
+      } else if (severity >= 3) {
+        // Average/High: 2 medium beeps
+        osc.type = 'sine'
+        const t = ctx.currentTime
+        gain.gain.setValueAtTime(0, t)
+        ;[0, 0.3].forEach(offset => {
+          gain.gain.linearRampToValueAtTime(0.25, t + offset + 0.01)
+          gain.gain.linearRampToValueAtTime(0, t + offset + 0.2)
+        })
+        osc.frequency.setValueAtTime(660, t)
+        osc.start(t)
+        osc.stop(t + 0.6)
+      } else {
+        // Info/Warning: 1 soft beep
+        osc.type = 'sine'
+        const t = ctx.currentTime
+        gain.gain.setValueAtTime(0, t)
+        gain.gain.linearRampToValueAtTime(0.15, t + 0.01)
+        gain.gain.linearRampToValueAtTime(0, t + 0.25)
+        osc.frequency.setValueAtTime(520, t)
+        osc.start(t)
+        osc.stop(t + 0.35)
+      }
+
+      osc.onended = () => ctx.close()
+    } catch { /* AudioContext not available */ }
+  }, [])
+
+  return { play, muted }
+}
 
 const SEVERITY = {
   5: { label: 'Disaster', text: 'text-red-400',    counter: 'text-red-400',    border: 'border-red-500/50',    bg: 'bg-red-950/40' },
@@ -29,15 +84,16 @@ function formatUptime(seconds) {
   return d > 0 ? `${d}d ${h}h` : `${h}h`
 }
 
-function useDashboardData() {
+function useDashboardData(onNewAlerts) {
   const [hosts, setHosts] = useState([])
   const [problems, setProblems] = useState([])
   const [tickets, setTickets] = useState([])
   const [lastUpdate, setLastUpdate] = useState(null)
   const [stale, setStale] = useState(false)
   const cache = useRef({ hosts: [], problems: [], tickets: [] })
+  const knownProblemIds = useRef(null)
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const [hostsRes, problemsRes, ticketsRes] = await Promise.allSettled([
         getHosts(),
@@ -47,6 +103,18 @@ function useDashboardData() {
       const newHosts    = hostsRes.status    === 'fulfilled' ? hostsRes.value.data    : cache.current.hosts
       const newProblems = problemsRes.status === 'fulfilled' ? problemsRes.value.data : cache.current.problems
       const newTickets  = ticketsRes.status  === 'fulfilled' ? ticketsRes.value.data  : cache.current.tickets
+
+      // Detect new problems since last fetch
+      if (knownProblemIds.current !== null && problemsRes.status === 'fulfilled') {
+        const newIds = newProblems.filter(p => !knownProblemIds.current.has(p.id))
+        if (newIds.length > 0) {
+          const maxSev = Math.max(...newIds.map(p => p.severity))
+          onNewAlerts?.(maxSev)
+        }
+      }
+      if (problemsRes.status === 'fulfilled') {
+        knownProblemIds.current = new Set(newProblems.map(p => p.id))
+      }
 
       cache.current = { hosts: newHosts, problems: newProblems, tickets: newTickets }
       setHosts(newHosts)
@@ -60,13 +128,13 @@ function useDashboardData() {
       setTickets(cache.current.tickets)
       setStale(true)
     }
-  }
+  }, [onNewAlerts])
 
   useEffect(() => {
     fetchData()
     const interval = setInterval(fetchData, 30000)
     return () => clearInterval(interval)
-  }, [])
+  }, [fetchData])
 
   return { hosts, problems, tickets, lastUpdate, stale }
 }
@@ -81,7 +149,18 @@ function useClock() {
 }
 
 export default function TvDashboardPage() {
-  const { hosts, problems, tickets, lastUpdate, stale } = useDashboardData()
+  const { play, muted } = useAlertSound()
+  const [isMuted, setIsMuted] = useState(false)
+  const toggleMute = () => {
+    muted.current = !muted.current
+    setIsMuted(muted.current)
+  }
+
+  const handleNewAlerts = useCallback((maxSeverity) => {
+    play(maxSeverity)
+  }, [play])
+
+  const { hosts, problems, tickets, lastUpdate, stale } = useDashboardData(handleNewAlerts)
   const clock = useClock()
 
   const availableHosts = hosts.filter(h => h.available)
@@ -117,13 +196,26 @@ export default function TvDashboardPage() {
               : 'Ao vivo'}
           </div>
         </div>
-        <div className="text-right">
-          <p className="text-3xl font-mono font-semibold tabular-nums tracking-tight">
-            {clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-          </p>
-          <p className="text-xs text-slate-500">
-            {clock.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
-          </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <button
+            onClick={toggleMute}
+            title={isMuted ? 'Ativar som' : 'Silenciar'}
+            style={{
+              background: 'transparent', border: '1px solid rgba(255,255,255,0.15)',
+              borderRadius: 8, padding: '6px 10px', cursor: 'pointer',
+              color: isMuted ? '#64748b' : '#94a3b8', fontSize: 18, lineHeight: 1,
+            }}
+          >
+            {isMuted ? '🔇' : '🔔'}
+          </button>
+          <div className="text-right">
+            <p className="text-3xl font-mono font-semibold tabular-nums tracking-tight">
+              {clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            </p>
+            <p className="text-xs text-slate-500">
+              {clock.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
+            </p>
+          </div>
         </div>
       </header>
 

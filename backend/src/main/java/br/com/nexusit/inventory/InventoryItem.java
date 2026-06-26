@@ -49,6 +49,14 @@ public class InventoryItem {
 
     private String notes;
 
+    @Column(unique = true, length = 20)
+    private String tombamento;
+
+    @Column(name = "warranty_until")
+    private LocalDate warrantyUntil;
+
+    private java.math.BigDecimal value;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
