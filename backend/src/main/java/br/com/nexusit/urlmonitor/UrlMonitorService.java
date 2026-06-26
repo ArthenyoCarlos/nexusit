@@ -1,7 +1,9 @@
 package br.com.nexusit.urlmonitor;
 
+import br.com.nexusit.email.EmailAlertService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -23,6 +25,7 @@ public class UrlMonitorService {
 
     private final MonitoredUrlRepository monitorRepo;
     private final UrlCheckResultRepository checkRepo;
+    @Lazy private final EmailAlertService emailAlertService;
 
     public List<UrlMonitorResponse> findAll() {
         return monitorRepo.findAllByOrderByNameAsc().stream().map(UrlMonitorResponse::from).toList();
@@ -102,9 +105,11 @@ public class UrlMonitorService {
         int ms = (int) (System.currentTimeMillis() - start);
         boolean ok = statusCode >= 200 && statusCode < 400;
 
+        boolean wasOk = m.getLastStatus() == null || m.getLastStatus() < 400;
         m.setLastCheck(LocalDateTime.now());
         m.setLastStatus(statusCode);
         if (ok) m.setLastOk(LocalDateTime.now());
+        if (!ok && wasOk) emailAlertService.sendUrlDownAlert(m);
 
         UrlCheckResult result = UrlCheckResult.builder()
                 .monitor(m).checkedAt(LocalDateTime.now())

@@ -1,12 +1,12 @@
 package br.com.nexusit.auth;
 
+import br.com.nexusit.user.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -18,5 +18,13 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody AuthRequest request) {
         return ResponseEntity.ok(authService.login(request));
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<Map<String,String>> changePassword(
+            @AuthenticationPrincipal User user,
+            @RequestBody ChangePasswordRequest req) {
+        authService.changePassword(user, req);
+        return ResponseEntity.ok(Map.of("message", "Senha alterada com sucesso"));
     }
 }

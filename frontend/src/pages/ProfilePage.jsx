@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../contexts/AuthContext'
 import { updateProfile } from '../services/users'
+import api from '../services/api'
 import Layout from '../components/Layout'
 
 export default function ProfilePage() {
@@ -34,7 +35,7 @@ export default function ProfilePage() {
     }
     setPassSaving(true); setPassMsg(null)
     try {
-      await updateProfile({ currentPassword: passForm.currentPassword, newPassword: passForm.newPassword })
+      await api.post('/auth/change-password', { currentPassword: passForm.currentPassword, newPassword: passForm.newPassword })
       setPassForm({ currentPassword: '', newPassword: '', confirmPassword: '' })
       setPassMsg({ ok: true, text: 'Senha alterada com sucesso.' })
     } catch (err) {

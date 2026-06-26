@@ -39,8 +39,22 @@ app:
   base-url: ${APP_BASE_URL:http://nexus.local}
   company-name: ${APP_COMPANY_NAME:Armazém Galdino}
   support-phone: ${APP_SUPPORT_PHONE:}
+  alert-email: ${ALERT_EMAIL:}
   vault:
     encryption-key: ${VAULT_ENCRYPTION_KEY:nexusit-default-key-CHANGE-IN-PROD!!}
+
+spring:
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 server:
   port: 8080

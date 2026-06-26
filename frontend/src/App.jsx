@@ -21,6 +21,11 @@ import LicensesPage from './pages/LicensesPage'
 import OnboardingPage from './pages/OnboardingPage'
 import OnboardingDetailPage from './pages/OnboardingDetailPage'
 import UrlMonitorPage from './pages/UrlMonitorPage'
+import ContractsPage from './pages/ContractsPage'
+import WikiPage from './pages/WikiPage'
+import WikiArticlePage from './pages/WikiArticlePage'
+import MaintenanceSchedulePage from './pages/MaintenanceSchedulePage'
+import FinancialPage from './pages/FinancialPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -51,7 +56,12 @@ export default function App() {
               <Route path="/licenses"        element={<LicensesPage />} />
               <Route path="/onboarding"      element={<OnboardingPage />} />
               <Route path="/onboarding/:id"  element={<OnboardingDetailPage />} />
-              <Route path="/url-monitor"     element={<UrlMonitorPage />} />
+              <Route path="/url-monitor"          element={<UrlMonitorPage />} />
+              <Route path="/contracts"            element={<ContractsPage />} />
+              <Route path="/wiki"                 element={<WikiPage />} />
+              <Route path="/wiki/:id"             element={<WikiArticlePage />} />
+              <Route path="/maintenance-schedule" element={<MaintenanceSchedulePage />} />
+              <Route path="/financial"            element={<FinancialPage />} />
               <Route path="/"               element={<Navigate to="/dashboard" replace />} />
             </Route>
 

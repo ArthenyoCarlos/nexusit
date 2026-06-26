@@ -3,6 +3,8 @@ package br.com.nexusit.search;
 import br.com.nexusit.inventory.InventoryRepository;
 import br.com.nexusit.notes.NoteRepository;
 import br.com.nexusit.system.SystemRepository;
+import br.com.nexusit.wiki.WikiRepository;
+import br.com.nexusit.contracts.ContractRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +23,8 @@ public class SearchController {
     private final SystemRepository systemRepo;
     private final InventoryRepository inventoryRepo;
     private final NoteRepository noteRepo;
+    private final WikiRepository wikiRepo;
+    private final ContractRepository contractRepo;
 
     @GetMapping
     public SearchResult search(
@@ -62,6 +66,23 @@ public class SearchController {
                 .limit(3)
                 .forEach(n -> hits.add(new SearchResult.Hit("note", n.getId().toString(), n.getTitle(),
                         null, "/notes")));
+
+        // Wiki
+        wikiRepo.findAll().stream()
+                .filter(a -> a.getTitle().toLowerCase().contains(term)
+                        || a.getCategory().toLowerCase().contains(term)
+                        || (a.getContent() != null && a.getContent().toLowerCase().contains(term)))
+                .limit(4)
+                .forEach(a -> hits.add(new SearchResult.Hit("wiki", a.getId().toString(), a.getTitle(),
+                        a.getCategory(), "/wiki/" + a.getId())));
+
+        // Contracts
+        contractRepo.findAll().stream()
+                .filter(c -> c.getName().toLowerCase().contains(term)
+                        || (c.getVendor() != null && c.getVendor().toLowerCase().contains(term)))
+                .limit(3)
+                .forEach(c -> hits.add(new SearchResult.Hit("contract", c.getId().toString(), c.getName(),
+                        c.getVendor(), "/contracts")));
 
         return new SearchResult(hits);
     }

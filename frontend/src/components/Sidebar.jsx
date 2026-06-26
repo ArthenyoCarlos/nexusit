@@ -29,9 +29,13 @@ const NAV = [
   {
     section: 'Ferramentas',
     items: [
-      { label: 'Cofre',         path: '/vault',       Icon: IconVault      },
-      { label: 'Licenças',      path: '/licenses',    Icon: IconLicense    },
-      { label: 'Monitor URLs',  path: '/url-monitor', Icon: IconMonitorUrl },
+      { label: 'Cofre',         path: '/vault',                Icon: IconVault      },
+      { label: 'Licenças',      path: '/licenses',             Icon: IconLicense    },
+      { label: 'Contratos',     path: '/contracts',            Icon: IconContract   },
+      { label: 'Monitor URLs',  path: '/url-monitor',          Icon: IconMonitorUrl },
+      { label: 'Manutenção',    path: '/maintenance-schedule', Icon: IconSchedule   },
+      { label: 'Wiki',          path: '/wiki',                 Icon: IconWiki       },
+      { label: 'Financeiro',    path: '/financial',            Icon: IconFinancial  },
     ],
   },
 ]
@@ -121,3 +125,7 @@ function IconVault()     { return <svg {...i}><rect x="3" y="11" width="18" heig
 function IconLicense()   { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
 function IconOnboarding(){ return <svg {...i}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg> }
 function IconMonitorUrl(){ return <svg {...i}><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> }
+function IconContract()  { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/><path d="M8 9h2"/></svg> }
+function IconSchedule()  { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="12" cy="15" r="2"/><path d="M12 13v-2"/></svg> }
+function IconWiki()      { return <svg {...i}><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 9h6M9 13h4"/></svg> }
+function IconFinancial() { return <svg {...i}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> }
