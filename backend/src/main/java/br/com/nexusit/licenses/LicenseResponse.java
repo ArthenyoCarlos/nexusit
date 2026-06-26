@@ -3,6 +3,7 @@ package br.com.nexusit.licenses;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.UUID;
 
 public record LicenseResponse(
@@ -24,7 +25,7 @@ public record LicenseResponse(
         long days = Long.MAX_VALUE;
         String status = "OK";
         if (l.getExpiryDate() != null) {
-            days = LocalDate.now().until(l.getExpiryDate()).getDays();
+            days = ChronoUnit.DAYS.between(LocalDate.now(), l.getExpiryDate());
             if (days < 0)        status = "EXPIRED";
             else if (days <= 30) status = "EXPIRING_SOON";
             else if (days <= 90) status = "EXPIRING";
