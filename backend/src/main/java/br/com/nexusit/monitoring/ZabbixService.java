@@ -29,7 +29,7 @@ public class ZabbixService {
     public List<ZabbixHost> getHosts() {
         return safeCall(() -> {
             Map<String, Object> params = new LinkedHashMap<>();
-            params.put("output", List.of("hostid", "host", "name", "status", "available"));
+            params.put("output", List.of("hostid", "host", "name", "status"));
             params.put("selectInterfaces", List.of("ip", "main"));
             params.put("monitored_hosts", 1);
 
@@ -42,7 +42,7 @@ public class ZabbixService {
                 String id = str(h, "hostid");
                 String name = str(h, "name");
                 boolean monitored = "0".equals(str(h, "status"));
-                boolean available = "1".equals(str(h, "available"));
+                boolean available = "0".equals(str(h, "status"));
 
                 List<Map<String, Object>> ifaces = (List<Map<String, Object>>) h.get("interfaces");
                 String ip = "";
@@ -88,31 +88,61 @@ public class ZabbixService {
 
     @SuppressWarnings("unchecked")
     public List<ZabbixProblem> getProblems() {
-        return safeCall(() -> {
-            Map<String, Object> params = new LinkedHashMap<>();
-            params.put("output", List.of("eventid", "objectid", "name", "severity", "clock"));
-            params.put("selectHosts", List.of("hostid", "name"));
-            params.put("recent", true);
-            params.put("sortfield", List.of("severity", "clock"));
-            params.put("sortorder", "DESC");
+      return safeCall(() -> {
+        // Busca mapa de hostid -> nome
+        Map<String, Object> hostParams = new LinkedHashMap<>();
+        hostParams.put("output", List.of("hostid", "name"));
+        List<Map<String, Object>> hostList = client.call("host.get", hostParams);
+        Map<String, String> hostMap = new HashMap<>();
+        for (Map<String, Object> h : hostList) {
+            hostMap.put(str(h, "hostid"), str(h, "name"));
+        }
 
-            List<Map<String, Object>> raw = client.call("problem.get", params);
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("output", List.of("eventid", "objectid", "name", "severity", "clock"));
+        params.put("recent", true);
+        params.put("sortfield", List.of("eventid"));
+        params.put("sortorder", "DESC");
 
-            return raw.stream().map(p -> {
-                int sev = intVal(p, "severity");
-                List<Map<String, Object>> hosts = (List<Map<String, Object>>) p.get("hosts");
-                String hostName = (hosts != null && !hosts.isEmpty()) ? str(hosts.get(0), "name") : "Desconhecido";
-                return new ZabbixProblem(
-                        str(p, "eventid"),
-                        str(p, "name"),
-                        sev,
-                        SEVERITY_LABELS.getOrDefault(sev, "?"),
-                        hostName,
-                        longVal(p, "clock")
-                );
-            }).toList();
-        }, List.of());
-    }
+        List<Map<String, Object>> raw = client.call("problem.get", params);
+
+        // Busca triggers para mapear objectid -> hostid
+        List<String> triggerIds = raw.stream()
+                .map(p -> str(p, "objectid"))
+                .filter(id -> !id.isBlank())
+                .distinct()
+                .toList();
+
+        Map<String, String> triggerHostMap = new HashMap<>();
+        if (!triggerIds.isEmpty()) {
+            Map<String, Object> trigParams = new LinkedHashMap<>();
+            trigParams.put("output", List.of("triggerid"));
+            trigParams.put("selectHosts", List.of("hostid", "name"));
+            trigParams.put("triggerids", triggerIds);
+            List<Map<String, Object>> triggers = client.call("trigger.get", trigParams);
+            for (Map<String, Object> t : triggers) {
+                List<Map<String, Object>> hosts = (List<Map<String, Object>>) t.get("hosts");
+                if (hosts != null && !hosts.isEmpty()) {
+                    triggerHostMap.put(str(t, "triggerid"), str(hosts.get(0), "name"));
+                }
+            }
+        }
+
+        return raw.stream().map(p -> {
+            int sev = intVal(p, "severity");
+            String triggerId = str(p, "objectid");
+            String hostName = triggerHostMap.getOrDefault(triggerId, "Desconhecido");
+            return new ZabbixProblem(
+                    str(p, "eventid"),
+                    str(p, "name"),
+                    sev,
+                    SEVERITY_LABELS.getOrDefault(sev, "?"),
+                    hostName,
+                    longVal(p, "clock")
+            );
+        }).toList();
+    }, List.of());
+}
 
     // ── Host Metrics ──────────────────────────────────────────────────────
 
@@ -194,7 +224,6 @@ public class ZabbixService {
 
             Map<String, Object> params = new LinkedHashMap<>();
             params.put("output", List.of("eventid", "objectid", "name", "severity", "clock", "r_clock"));
-            params.put("selectHosts", List.of("name"));
             params.put("time_from", timeFrom);
             params.put("value", 1);  // 1 = problem events
             params.put("object", 0); // 0 = triggers

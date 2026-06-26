@@ -35,15 +35,17 @@ export default function MonitoringPage() {
       setHosts(hostsRes.data)
       setProblems(problemsRes.data)
       setLastUpdate(new Date())
-      const first = hostsRes.data.find(h => h.available)
-      if (first && first.id !== chartHostId) {
-        setChartHostId(first.id)
-        const m = await getHostMetrics(first.id)
-        setMetrics(m.data)
-      } else if (chartHostId) {
-        const m = await getHostMetrics(chartHostId)
-        setMetrics(m.data)
-      }
+      if (!chartHostId) {
+  	const first = hostsRes.data.find(h => h.available)
+  	if (first) {
+    	  setChartHostId(first.id)
+    	  const m = await getHostMetrics(first.id)
+    	  setMetrics(m.data)
+  	}
+  } else {
+  const m = await getHostMetrics(chartHostId)
+  setMetrics(m.data)
+}
     } catch {}
     finally { setLoading(false) }
   }, [chartHostId])
