@@ -27,6 +27,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.io.ByteArrayOutputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @RestController
@@ -107,7 +108,7 @@ public class ReportController {
                 table.addHeaderCell(new Cell().add(new Paragraph(h).setFont(fontBold).setFontSize(9)));
             }
             expiring.forEach(l -> {
-                long days = LocalDate.now().until(l.getExpiryDate()).getDays();
+                long days = ChronoUnit.DAYS.between(LocalDate.now(), l.getExpiryDate());
                 table.addCell(new Cell().add(new Paragraph(l.getName()).setFont(fontRegular).setFontSize(9)));
                 table.addCell(new Cell().add(new Paragraph(l.getVendor() != null ? l.getVendor() : "—").setFont(fontRegular).setFontSize(9)));
                 table.addCell(new Cell().add(new Paragraph(l.getExpiryDate().format(fmt) + " (" + days + "d)").setFont(fontRegular).setFontSize(9)));
