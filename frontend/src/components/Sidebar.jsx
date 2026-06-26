@@ -64,7 +64,7 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav style={{ flex: 1, padding: '14px 10px', overflowY: 'auto' }}>
+      <nav className="sidebar-nav" style={{ flex: 1, padding: '14px 10px', overflowY: 'auto' }}>
         {NAV.map(group => (
           <div key={group.section} style={{ marginBottom: 20 }}>
             <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--sidebar-label)', padding: '0 8px', marginBottom: 4 }}>
