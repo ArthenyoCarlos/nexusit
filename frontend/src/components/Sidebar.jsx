@@ -55,7 +55,7 @@ export default function Sidebar() {
     }}>
 
       {/* Logo */}
-      <div style={{ padding: '16px 14px 14px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
+      <div style={{ padding: '14px 12px 12px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
           <div style={{
             width: 30, height: 30, borderRadius: 9, flexShrink: 0,
@@ -75,13 +75,13 @@ export default function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="sidebar-nav" style={{ flex: 1, padding: '10px 8px', overflowY: 'auto' }}>
+      <nav className="sidebar-nav" style={{ flex: 1, padding: '8px 7px', overflowY: 'auto' }}>
         {NAV.map(group => (
-          <div key={group.section} style={{ marginBottom: 16 }}>
+          <div key={group.section} style={{ marginBottom: 10 }}>
             <p style={{
               fontSize: 9.5, fontWeight: 700, letterSpacing: '0.10em',
               textTransform: 'uppercase', color: '#2d3748',
-              padding: '0 7px', marginBottom: 3,
+              padding: '0 6px', marginBottom: 2,
             }}>
               {group.section}
             </p>
@@ -100,7 +100,7 @@ export default function Sidebar() {
       </nav>
 
       {/* Bottom */}
-      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '8px 8px 12px', flexShrink: 0 }}>
+      <div style={{ borderTop: '1px solid var(--sidebar-border)', padding: '6px 7px 10px', flexShrink: 0 }}>
         {isAdmin && (
           <NavLink to="/settings" className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}>
             <IconSettings />
