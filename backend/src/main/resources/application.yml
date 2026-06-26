@@ -4,7 +4,6 @@ spring:
     username: ${DB_USER:nexusit}
     password: ${DB_PASSWORD:nexusit}
     driver-class-name: org.postgresql.Driver
-
   jpa:
     hibernate:
       ddl-auto: validate
@@ -13,23 +12,31 @@ spring:
       hibernate:
         dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
-
   flyway:
     enabled: true
     locations: classpath:db/migration
     baseline-on-migrate: true
+  mail:
+    host: ${MAIL_HOST:smtp.gmail.com}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USERNAME:}
+    password: ${MAIL_PASSWORD:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
 application:
   jwt:
     secret: ${JWT_SECRET:changeme-use-a-real-256-bit-secret-in-production-env}
     expiration: ${JWT_EXPIRATION:28800000}
     refresh-expiration: 604800000
-
   zabbix:
     api-url: ${ZABBIX_API_URL:http://localhost/api_jsonrpc.php}
     user: ${ZABBIX_USER:admin}
     password: ${ZABBIX_PASSWORD:}
-
   glpi:
     api-url: ${GLPI_API_URL:http://localhost/apirest.php}
     app-token: ${GLPI_APP_TOKEN:}
@@ -42,19 +49,6 @@ app:
   alert-email: ${ALERT_EMAIL:}
   vault:
     encryption-key: ${VAULT_ENCRYPTION_KEY:nexusit-default-key-CHANGE-IN-PROD!!}
-
-spring:
-  mail:
-    host: ${MAIL_HOST:smtp.gmail.com}
-    port: ${MAIL_PORT:587}
-    username: ${MAIL_USERNAME:}
-    password: ${MAIL_PASSWORD:}
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
 
 server:
   port: 8080
