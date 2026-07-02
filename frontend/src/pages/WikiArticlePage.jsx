@@ -36,7 +36,7 @@ export default function WikiArticlePage() {
             </p>
           </div>
           <hr style={{ border: 'none', borderTop: '1px solid var(--border-muted)', marginBottom: 20 }} />
-          <div className="markdown-body" style={{ fontSize: 14, lineHeight: 1.8, color: 'var(--text-primary)' }}>
+          <div className="prose">
             <ReactMarkdown>{article.content}</ReactMarkdown>
           </div>
         </div>

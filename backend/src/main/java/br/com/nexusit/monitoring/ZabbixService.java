@@ -100,47 +100,52 @@ public class ZabbixService {
 
         Map<String, Object> params = new LinkedHashMap<>();
         params.put("output", List.of("eventid", "objectid", "name", "severity", "clock"));
-        params.put("recent", true);
-        params.put("sortfield", List.of("eventid"));
+        // Match Monitoring > Problems: only current/open problems. Recent/resolved
+        // events are history and must not feed the active-alert dashboard.
+        params.put("recent", false);
+        params.put("sortfield", "eventid");
         params.put("sortorder", "DESC");
 
         List<Map<String, Object>> raw = client.call("problem.get", params);
 
-        // Busca triggers para mapear objectid -> hostid
+        // Busca triggers para mapear objectid -> host e filtrar eventos obsoletos.
+        // A API pode manter eventos antigos com r_eventid=0 mesmo depois que o
+        // trigger/item foi desabilitado; a tela Monitoring > Problems esconde
+        // esses casos, então o NexusIT deve esconder também.
         List<String> triggerIds = raw.stream()
                 .map(p -> str(p, "objectid"))
                 .filter(id -> !id.isBlank())
                 .distinct()
                 .toList();
 
-        Map<String, String> triggerHostMap = new HashMap<>();
+        Map<String, Map<String, Object>> triggerMap = new HashMap<>();
         if (!triggerIds.isEmpty()) {
             Map<String, Object> trigParams = new LinkedHashMap<>();
-            trigParams.put("output", List.of("triggerid"));
-            trigParams.put("selectHosts", List.of("hostid", "name"));
+            trigParams.put("output", List.of("triggerid", "status", "value", "state"));
+            trigParams.put("selectHosts", List.of("hostid", "name", "status", "maintenance_status"));
+            trigParams.put("selectItems", List.of("itemid", "name", "key_", "status", "state", "lastclock"));
             trigParams.put("triggerids", triggerIds);
             List<Map<String, Object>> triggers = client.call("trigger.get", trigParams);
             for (Map<String, Object> t : triggers) {
-                List<Map<String, Object>> hosts = (List<Map<String, Object>>) t.get("hosts");
-                if (hosts != null && !hosts.isEmpty()) {
-                    triggerHostMap.put(str(t, "triggerid"), str(hosts.get(0), "name"));
-                }
+                triggerMap.put(str(t, "triggerid"), t);
             }
         }
 
-        return raw.stream().map(p -> {
-            int sev = intVal(p, "severity");
-            String triggerId = str(p, "objectid");
-            String hostName = triggerHostMap.getOrDefault(triggerId, "Desconhecido");
-            return new ZabbixProblem(
-                    str(p, "eventid"),
-                    str(p, "name"),
-                    sev,
-                    SEVERITY_LABELS.getOrDefault(sev, "?"),
-                    hostName,
-                    longVal(p, "clock")
-            );
-        }).toList();
+        return raw.stream()
+                .filter(p -> isVisibleActiveProblem(p, triggerMap.get(str(p, "objectid"))))
+                .map(p -> {
+                    int sev = intVal(p, "severity");
+                    String triggerId = str(p, "objectid");
+                    String hostName = hostNameFromTrigger(triggerMap.get(triggerId));
+                    return new ZabbixProblem(
+                            str(p, "eventid"),
+                            str(p, "name"),
+                            sev,
+                            SEVERITY_LABELS.getOrDefault(sev, "?"),
+                            hostName,
+                            longVal(p, "clock")
+                    );
+                }).toList();
     }, List.of());
 }
 
@@ -251,6 +256,53 @@ public class ZabbixService {
                 );
             }).toList();
         }, List.of());
+    }
+
+    // ── Problem visibility helpers ───────────────────────────────────────
+
+    @SuppressWarnings("unchecked")
+    private boolean isVisibleActiveProblem(Map<String, Object> problem, Map<String, Object> trigger) {
+        // If trigger metadata could not be fetched, keep the problem visible rather
+        // than hiding a real alert due to a transient Zabbix API shape issue.
+        if (trigger == null || trigger.isEmpty()) {
+            return true;
+        }
+
+        // Disabled trigger: Zabbix UI hides it from Monitoring > Problems.
+        if (!"0".equals(str(trigger, "status"))) {
+            return false;
+        }
+
+        List<Map<String, Object>> hosts = (List<Map<String, Object>>) trigger.get("hosts");
+        if (hosts != null && !hosts.isEmpty()) {
+            boolean anyDisabledHost = hosts.stream().anyMatch(h -> !"0".equals(str(h, "status")));
+            if (anyDisabledHost) {
+                return false;
+            }
+        }
+
+        List<Map<String, Object>> items = (List<Map<String, Object>>) trigger.get("items");
+        if (items != null && !items.isEmpty()) {
+            boolean allItemsDisabled = items.stream().allMatch(i -> !"0".equals(str(i, "status")));
+            if (allItemsDisabled) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String hostNameFromTrigger(Map<String, Object> trigger) {
+        if (trigger == null) {
+            return "Desconhecido";
+        }
+        List<Map<String, Object>> hosts = (List<Map<String, Object>>) trigger.get("hosts");
+        if (hosts == null || hosts.isEmpty()) {
+            return "Desconhecido";
+        }
+        String name = str(hosts.get(0), "name");
+        return name.isBlank() ? "Desconhecido" : name;
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────

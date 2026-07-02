@@ -4,27 +4,59 @@ import GlobalSearch from './GlobalSearch'
 import NotificationBell from './NotificationBell'
 import { useToast } from '../contexts/ToastContext'
 import { getProblems } from '../services/monitoring'
+import { getTickets } from '../services/glpi'
+import { playAlertSound, unlockAlertSound } from '../utils/alertSound'
+
+function problemKey(p) {
+  return String(p.id ?? p.problemid ?? p.eventid ?? `${p.hostName}:${p.name}:${p.clock}`)
+}
 
 export default function Layout({ children }) {
   const { add: addToast } = useToast()
-  const prevIdsRef = useRef(null)
+  const prevProblemIdsRef = useRef(null)
+  const prevTicketIdsRef = useRef(null)
+
+  useEffect(() => {
+    const unlock = () => unlockAlertSound()
+    window.addEventListener('pointerdown', unlock, { once: true })
+    window.addEventListener('keydown', unlock, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   useEffect(() => {
     async function poll() {
       try {
-        const { data } = await getProblems()
-        const current = data ?? []
-        if (prevIdsRef.current === null) {
-          prevIdsRef.current = new Set(current.map(p => p.problemid))
+        const [problemsRes, ticketsRes] = await Promise.allSettled([getProblems(), getTickets(null)])
+        const currentProblems = problemsRes.status === 'fulfilled' ? (problemsRes.value.data ?? []) : []
+        const currentTickets = ticketsRes.status === 'fulfilled' ? (ticketsRes.value.data ?? []) : []
+
+        if (prevProblemIdsRef.current === null) {
+          prevProblemIdsRef.current = new Set(currentProblems.map(problemKey))
+          prevTicketIdsRef.current = new Set(currentTickets.map(t => String(t.id)))
           return
         }
-        const newProblems = current.filter(
-          p => !prevIdsRef.current.has(p.problemid) && Number(p.severity) >= 4
+
+        const newProblems = currentProblems.filter(
+          p => !prevProblemIdsRef.current.has(problemKey(p)) && Number(p.severity) >= 4
         )
-        newProblems.forEach(p =>
+        const newTickets = currentTickets.filter(t => !prevTicketIdsRef.current.has(String(t.id)))
+
+        newProblems.forEach(p => {
           addToast(`Alerta Zabbix: ${p.name} [${p.hostName ?? 'host'}]`, 'error')
-        )
-        prevIdsRef.current = new Set(current.map(p => p.problemid))
+          playAlertSound(Number(p.severity))
+        })
+
+        if (newTickets.length > 0) {
+          const newest = newTickets[0]
+          addToast(`Novo chamado GLPI #${newest.id}: ${newest.title ?? newest.name ?? 'sem título'}`, 'warning')
+          playAlertSound(Number(newest.priority) >= 4 ? 4 : 3)
+        }
+
+        prevProblemIdsRef.current = new Set(currentProblems.map(problemKey))
+        prevTicketIdsRef.current = new Set(currentTickets.map(t => String(t.id)))
       } catch {}
     }
     poll()

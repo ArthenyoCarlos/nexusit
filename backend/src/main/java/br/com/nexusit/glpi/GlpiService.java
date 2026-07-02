@@ -45,7 +45,7 @@ public class GlpiService {
             params.put("get_hateoas", "false");
             params.put("is_deleted", "0");
             params.put("order", "DESC");
-            params.put("sort", "15"); // sort by date_mod
+            params.put("sort", "date_mod"); // sort by date_mod
 
             List<Map<String, Object>> raw = client.getList("/Ticket", params);
             if (raw == null) return List.of();

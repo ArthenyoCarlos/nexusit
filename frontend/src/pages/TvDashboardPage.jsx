@@ -80,15 +80,108 @@ function timeActive(clockSec) {
   return `${Math.floor(diff/86400)}d`
 }
 
+/* ─── Event detection ────────────────────────────────────────────────────── */
+function problemKey(p) {
+  return String(p?.id ?? p?.problemid ?? p?.eventid ?? `${p?.hostName ?? p?.hosts?.[0]?.host ?? 'host'}:${p?.name ?? 'problem'}:${p?.clock ?? ''}`)
+}
+
+function ticketKey(t) {
+  return String(t?.id ?? t?.ticketId ?? `${t?.title ?? t?.name ?? 'ticket'}:${t?.openedAt ?? ''}`)
+}
+
+function problemTitle(p) {
+  return p?.name ?? p?.title ?? 'Alerta Zabbix'
+}
+
+function problemHost(p) {
+  return p?.hostName ?? p?.hosts?.[0]?.host ?? p?.host ?? ''
+}
+
+function ticketTitle(t) {
+  return t?.title ?? t?.name ?? 'Chamado GLPI'
+}
+
+function buildDashboardEvents(previous, current) {
+  if (!previous) return []
+
+  const events = []
+  const previousProblems = new Map(previous.problems.map(p => [problemKey(p), p]))
+  const currentProblems = new Map(current.problems.map(p => [problemKey(p), p]))
+  const previousTickets = new Map(previous.tickets.map(t => [ticketKey(t), t]))
+  const currentTickets = new Map(current.tickets.map(t => [ticketKey(t), t]))
+
+  for (const [key, p] of currentProblems) {
+    if (!previousProblems.has(key)) {
+      events.push({
+        id: `problem:new:${key}:${Date.now()}`,
+        type: 'problem-new',
+        title: 'Novo alerta Zabbix',
+        subject: problemTitle(p),
+        detail: problemHost(p),
+        severity: Number(p?.severity ?? 1),
+        tone: 'danger',
+        happenedAt: new Date()
+      })
+    }
+  }
+
+  for (const [key, p] of previousProblems) {
+    if (!currentProblems.has(key)) {
+      events.push({
+        id: `problem:resolved:${key}:${Date.now()}`,
+        type: 'problem-resolved',
+        title: 'Alerta resolvido',
+        subject: problemTitle(p),
+        detail: problemHost(p),
+        severity: Number(p?.severity ?? 1),
+        tone: 'success',
+        happenedAt: new Date()
+      })
+    }
+  }
+
+  for (const [key, t] of currentTickets) {
+    if (!previousTickets.has(key)) {
+      events.push({
+        id: `ticket:new:${key}:${Date.now()}`,
+        type: 'ticket-new',
+        title: 'Novo chamado GLPI',
+        subject: `#${t?.id ?? key} · ${ticketTitle(t)}`,
+        detail: t?.requester ? `Solicitante: ${t.requester}` : (t?.priorityLabel ? `Prioridade: ${t.priorityLabel}` : ''),
+        severity: Number(t?.priority ?? 3),
+        tone: 'warning',
+        happenedAt: new Date()
+      })
+    }
+  }
+
+  for (const [key, t] of previousTickets) {
+    if (!currentTickets.has(key)) {
+      events.push({
+        id: `ticket:resolved:${key}:${Date.now()}`,
+        type: 'ticket-resolved',
+        title: 'Chamado resolvido/fechado',
+        subject: `#${t?.id ?? key} · ${ticketTitle(t)}`,
+        detail: t?.assignedTo ? `Responsável: ${t.assignedTo}` : (t?.statusLabel ? `Status anterior: ${t.statusLabel}` : ''),
+        severity: Number(t?.priority ?? 1),
+        tone: 'success',
+        happenedAt: new Date()
+      })
+    }
+  }
+
+  return events
+}
+
 /* ─── Data hook ──────────────────────────────────────────────────────────── */
-function useDashboardData(onNewAlerts) {
+function useDashboardData(onDashboardEvents) {
   const [hosts, setHosts]       = useState([])
   const [problems, setProblems] = useState([])
   const [tickets, setTickets]   = useState([])
   const [lastUpdate, setLastUpdate] = useState(null)
   const [stale, setStale]       = useState(false)
   const cache = useRef({ hosts: [], problems: [], tickets: [] })
-  const knownIds = useRef(null)
+  const lastSnapshot = useRef(null)
 
   const fetchData = useCallback(async () => {
     try {
@@ -97,20 +190,21 @@ function useDashboardData(onNewAlerts) {
       const p = pR.status === 'fulfilled' ? pR.value.data : cache.current.problems
       const t = tR.status === 'fulfilled' ? tR.value.data : cache.current.tickets
 
-      if (knownIds.current !== null && pR.status === 'fulfilled') {
-        const newOnes = p.filter(x => !knownIds.current.has(x.id))
-        if (newOnes.length > 0) onNewAlerts?.(Math.max(...newOnes.map(x => x.severity)))
+      const currentSnapshot = { hosts: h, problems: p, tickets: t }
+      if (pR.status === 'fulfilled' && tR.status === 'fulfilled') {
+        const events = buildDashboardEvents(lastSnapshot.current, currentSnapshot)
+        if (events.length > 0) onDashboardEvents?.(events)
+        lastSnapshot.current = currentSnapshot
       }
-      if (pR.status === 'fulfilled') knownIds.current = new Set(p.map(x => x.id))
 
-      cache.current = { hosts: h, problems: p, tickets: t }
+      cache.current = currentSnapshot
       setHosts(h); setProblems(p); setTickets(t)
       setLastUpdate(new Date()); setStale(false)
     } catch {
       setHosts(cache.current.hosts); setProblems(cache.current.problems); setTickets(cache.current.tickets)
       setStale(true)
     }
-  }, [onNewAlerts])
+  }, [onDashboardEvents])
 
   useEffect(() => { fetchData(); const id = setInterval(fetchData, 30000); return () => clearInterval(id) }, [fetchData])
   return { hosts, problems, tickets, lastUpdate, stale }
@@ -224,13 +318,67 @@ function TicketRow({ t }) {
   )
 }
 
+function EventOverlay({ event }) {
+  if (!event) return null
+  const palette = {
+    danger:  { icon: '🚨', color: '#f87171', border: 'rgba(248,113,113,.55)', bg: 'rgba(127,29,29,.93)', shadow: '0 0 80px rgba(239,68,68,.35)' },
+    warning: { icon: '📋', color: '#fbbf24', border: 'rgba(251,191,36,.5)',  bg: 'rgba(120,53,15,.93)', shadow: '0 0 70px rgba(251,191,36,.25)' },
+    success: { icon: '✅', color: '#4ade80', border: 'rgba(74,222,128,.45)',  bg: 'rgba(20,83,45,.93)', shadow: '0 0 70px rgba(74,222,128,.25)' },
+  }[event.tone] ?? { icon: 'ℹ️', color: '#60a5fa', border: 'rgba(96,165,250,.45)', bg: 'rgba(30,58,138,.93)', shadow: '0 0 70px rgba(96,165,250,.25)' }
+
+  return (
+    <div style={{
+      position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center',
+      background: 'radial-gradient(circle at center, rgba(15,23,42,.45), rgba(2,8,23,.9))',
+      backdropFilter: 'blur(3px)', animation: 'overlayShow .25s ease-out', pointerEvents: 'none'
+    }}>
+      <div style={{
+        width: 'min(980px, 86vw)', borderRadius: 28, padding: '44px 52px',
+        background: `linear-gradient(135deg, ${palette.bg}, rgba(2,8,23,.96))`,
+        border: `2px solid ${palette.border}`, boxShadow: palette.shadow,
+        textAlign: 'center'
+      }}>
+        <div style={{ fontSize: 76, lineHeight: 1, marginBottom: 18 }}>{palette.icon}</div>
+        <p style={{
+          fontSize: 18, fontWeight: 900, letterSpacing: '0.16em', textTransform: 'uppercase',
+          color: palette.color, marginBottom: 14
+        }}>{event.title}</p>
+        <h1 style={{
+          fontSize: 40, lineHeight: 1.15, fontWeight: 850, color: '#f8fafc',
+          margin: '0 auto 16px', maxWidth: 860
+        }}>{event.subject}</h1>
+        {event.detail && <p style={{ fontSize: 22, color: '#cbd5e1', marginBottom: 18 }}>{event.detail}</p>}
+        {event.count > 1 && <p style={{ fontSize: 16, color: palette.color, fontWeight: 800, marginBottom: 14 }}>+{event.count - 1} outro(s) evento(s) no mesmo ciclo</p>}
+        <p style={{ fontSize: 15, color: '#94a3b8' }}>
+          {event.happenedAt?.toLocaleTimeString?.('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })} · esta tela some automaticamente em 10 segundos
+        </p>
+      </div>
+    </div>
+  )
+}
+
 /* ─── Page ───────────────────────────────────────────────────────────────── */
 export default function TvDashboardPage() {
   const { play, muted } = useAlertSound()
   const [isMuted, setIsMuted] = useState(false)
+  const [activeEvent, setActiveEvent] = useState(null)
+  const overlayTimer = useRef(null)
   const toggleMute = () => { muted.current = !muted.current; setIsMuted(muted.current) }
 
-  const { hosts, problems, tickets, lastUpdate, stale } = useDashboardData(useCallback(sev => play(sev), [play]))
+  const showDashboardEvents = useCallback((events) => {
+    if (!events?.length) return
+    const topEvent = [...events].sort((a, b) => (b.severity ?? 0) - (a.severity ?? 0))[0]
+    setActiveEvent({ ...topEvent, count: events.length })
+    play(topEvent.tone === 'success' ? 1 : topEvent.severity)
+    if (overlayTimer.current) clearTimeout(overlayTimer.current)
+    overlayTimer.current = setTimeout(() => setActiveEvent(null), 10000)
+  }, [play])
+
+  useEffect(() => () => {
+    if (overlayTimer.current) clearTimeout(overlayTimer.current)
+  }, [])
+
+  const { hosts, problems, tickets, lastUpdate, stale } = useDashboardData(showDashboardEvents)
   const clock = useClock()
 
   const online  = hosts.filter(h => h.available)
@@ -250,8 +398,11 @@ export default function TvDashboardPage() {
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes fadein { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
+        @keyframes overlayShow { from{opacity:0;transform:scale(.98)} to{opacity:1;transform:scale(1)} }
         .tv-row { animation: fadein .3s ease }
       `}</style>
+
+      <EventOverlay event={activeEvent} />
 
       {/* ── Header ── */}
       <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 32px', borderBottom: '1px solid rgba(255,255,255,.07)', background: 'rgba(255,255,255,.02)', flexShrink: 0 }}>
