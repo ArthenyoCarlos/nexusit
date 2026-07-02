@@ -26,6 +26,11 @@ import WikiPage from './pages/WikiPage'
 import WikiArticlePage from './pages/WikiArticlePage'
 import MaintenanceSchedulePage from './pages/MaintenanceSchedulePage'
 import FinancialPage from './pages/FinancialPage'
+import TermosPage from './pages/TermosPage'
+import TermoNovoPage from './pages/TermoNovoPage'
+import TermoDetalhePage from './pages/TermoDetalhePage'
+import TermoAssinarPage from './pages/TermoAssinarPage'
+import TermoTemplatePage from './pages/TermoTemplatePage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -62,6 +67,11 @@ export default function App() {
               <Route path="/wiki/:id"             element={<WikiArticlePage />} />
               <Route path="/maintenance-schedule" element={<MaintenanceSchedulePage />} />
               <Route path="/financial"            element={<FinancialPage />} />
+              <Route path="/termos"               element={<TermosPage />} />
+              <Route path="/termos/novo"          element={<TermoNovoPage />} />
+              <Route path="/termos/template"      element={<TermoTemplatePage />} />
+              <Route path="/termos/:id"           element={<TermoDetalhePage />} />
+              <Route path="/termos/:id/assinar"   element={<TermoAssinarPage />} />
               <Route path="/"               element={<Navigate to="/dashboard" replace />} />
             </Route>
 

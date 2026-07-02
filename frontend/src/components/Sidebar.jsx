@@ -32,6 +32,7 @@ const NAV = [
       { label: 'Cofre',         path: '/vault',                Icon: IconVault      },
       { label: 'Licenças',      path: '/licenses',             Icon: IconLicense    },
       { label: 'Contratos',     path: '/contracts',            Icon: IconContract   },
+      { label: 'Termos Resp.',   path: '/termos',               Icon: IconContract   },
       { label: 'Monitor URLs',  path: '/url-monitor',          Icon: IconMonitorUrl },
       { label: 'Manutenção',    path: '/maintenance-schedule', Icon: IconSchedule   },
       { label: 'Wiki',          path: '/wiki',                 Icon: IconWiki       },
