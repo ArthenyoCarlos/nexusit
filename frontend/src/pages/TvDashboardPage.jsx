@@ -222,14 +222,14 @@ function SevCounter({ sev, count }) {
   const active = count > 0
   return (
     <div style={{
-      textAlign: 'center', minWidth: 80, padding: '12px 16px', borderRadius: 12,
-      border: `1px solid ${active ? s.border : 'rgba(255,255,255,.06)'}`,
-      background: active ? `${s.dimColor}88` : 'rgba(255,255,255,.03)',
-      boxShadow: active ? s.glow : 'none',
+      textAlign: 'center', minWidth: 80, padding: '12px 16px', borderRadius: 16,
+      border: `1px solid ${active ? s.border : 'rgba(255,255,255,.08)'}`,
+      background: active ? `linear-gradient(135deg, ${s.dimColor}cc, rgba(31,22,51,.72))` : 'rgba(255,255,255,.045)',
+      boxShadow: active ? `${s.glow}, inset 0 1px 0 rgba(255,255,255,.08)` : 'inset 0 1px 0 rgba(255,255,255,.05)',
       transition: 'all .4s',
     }}>
-      <p style={{ fontSize: 40, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: active ? s.color : '#334155' }}>{count}</p>
-      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', marginTop: 4, color: active ? s.color : '#475569' }}>{s.label}</p>
+      <p style={{ fontSize: 40, fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: active ? s.color : '#79628c' }}>{count}</p>
+      <p style={{ fontSize: 10, fontWeight: 850, letterSpacing: '0.10em', marginTop: 5, color: active ? s.color : '#8d7ca8' }}>{s.label}</p>
     </div>
   )
 }
@@ -239,12 +239,13 @@ function PriCounter({ pri, count }) {
   const active = count > 0
   return (
     <div style={{
-      textAlign: 'center', minWidth: 72, padding: '10px 12px', borderRadius: 10,
-      border: `1px solid ${active ? p.border : 'rgba(255,255,255,.06)'}`,
-      background: active ? 'rgba(255,255,255,.05)' : 'rgba(255,255,255,.02)',
+      textAlign: 'center', minWidth: 72, padding: '10px 12px', borderRadius: 14,
+      border: `1px solid ${active ? p.border : 'rgba(255,255,255,.08)'}`,
+      background: active ? 'rgba(255,255,255,.075)' : 'rgba(255,255,255,.035)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)'
     }}>
-      <p style={{ fontSize: 32, fontWeight: 800, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: active ? p.color : '#334155' }}>{count}</p>
-      <p style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', marginTop: 4, color: active ? p.color : '#475569' }}>{p.label}</p>
+      <p style={{ fontSize: 32, fontWeight: 900, lineHeight: 1, fontVariantNumeric: 'tabular-nums', color: active ? p.color : '#79628c' }}>{count}</p>
+      <p style={{ fontSize: 10, fontWeight: 800, letterSpacing: '0.08em', marginTop: 4, color: active ? p.color : '#8d7ca8' }}>{p.label}</p>
     </div>
   )
 }
@@ -253,20 +254,20 @@ function HostChip({ host }) {
   const up = host.available
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 10,
-      border: `1px solid ${up ? 'rgba(74,222,128,.25)' : 'rgba(248,113,113,.35)'}`,
-      background: up ? 'rgba(20,83,45,.35)' : 'rgba(127,29,29,.35)',
-      boxShadow: up ? '' : '0 0 10px rgba(239,68,68,.15)',
+      display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px', borderRadius: 13,
+      border: `1px solid ${up ? 'rgba(194,239,78,.24)' : 'rgba(248,113,113,.42)'}`,
+      background: up ? 'linear-gradient(135deg, rgba(194,239,78,.10), rgba(255,255,255,.045))' : 'linear-gradient(135deg, rgba(127,29,29,.55), rgba(31,22,51,.62))',
+      boxShadow: up ? 'inset 0 1px 0 rgba(255,255,255,.05)' : '0 0 18px rgba(239,68,68,.18), inset 0 1px 0 rgba(255,255,255,.06)',
     }}>
       <div style={{
         width: 8, height: 8, borderRadius: '50%', flexShrink: 0,
-        background: up ? '#4ade80' : '#f87171',
-        boxShadow: up ? '0 0 6px #4ade80' : '0 0 6px #f87171',
+        background: up ? '#c2ef4e' : '#f87171',
+        boxShadow: up ? '0 0 8px #c2ef4e' : '0 0 8px #f87171',
         animation: up ? 'none' : 'pulse 1.5s infinite',
       }} />
       <div>
-        <p style={{ fontSize: 12.5, fontWeight: 600, color: '#e2e8f0', lineHeight: 1.2 }}>{host.name}</p>
-        {host.ip && <p style={{ fontSize: 11, color: '#64748b', lineHeight: 1.2 }}>{host.ip}</p>}
+        <p style={{ fontSize: 12.5, fontWeight: 700, color: '#f7f2ff', lineHeight: 1.2 }}>{host.name}</p>
+        {host.ip && <p style={{ fontSize: 11, color: '#9c8bb5', lineHeight: 1.2 }}>{host.ip}</p>}
       </div>
       {host.uptimeSeconds != null && (
         <span style={{ fontSize: 10.5, color: up ? '#4ade80' : '#f87171', marginLeft: 4, fontWeight: 500 }}>
@@ -282,10 +283,10 @@ function ProblemRow({ p }) {
   const active = timeActive(p.clock)
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderRadius: 10,
+      display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderRadius: 15,
       border: `1px solid ${s.border}`,
-      background: `${s.dimColor}55`,
-      boxShadow: p.severity >= 4 ? s.glow : 'none',
+      background: `linear-gradient(135deg, ${s.dimColor}77, rgba(31,22,51,.62))`,
+      boxShadow: p.severity >= 4 ? `${s.glow}, inset 0 1px 0 rgba(255,255,255,.06)` : 'inset 0 1px 0 rgba(255,255,255,.05)',
     }}>
       <span style={{
         fontSize: 10, fontWeight: 800, letterSpacing: '0.07em', padding: '3px 8px',
@@ -293,8 +294,8 @@ function ProblemRow({ p }) {
         background: `${s.dimColor}99`,
       }}>{s.label}</span>
       <div style={{ flex: 1, minWidth: 0 }}>
-        <p style={{ fontSize: 13, fontWeight: 500, color: '#e2e8f0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
-        <p style={{ fontSize: 11, color: '#64748b', marginTop: 1 }}>{p.hostName ?? p.hosts?.[0]?.host}</p>
+        <p style={{ fontSize: 13, fontWeight: 650, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.name}</p>
+        <p style={{ fontSize: 11, color: '#9c8bb5', marginTop: 2 }}>{p.hostName ?? p.hosts?.[0]?.host}</p>
       </div>
       <div style={{ textAlign: 'right', flexShrink: 0 }}>
         {active && <p style={{ fontSize: 12, color: s.color, fontWeight: 600 }}>{active}</p>}
@@ -308,11 +309,12 @@ function TicketRow({ t }) {
   const p = PRI[t.priority] || PRI[3]
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 9,
-      border: `1px solid ${p.border}`, background: 'rgba(255,255,255,.03)',
+      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 14,
+      border: `1px solid ${p.border}`, background: 'rgba(255,255,255,.055)',
+      boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)'
     }}>
-      <span style={{ fontSize: 11, fontWeight: 700, color: p.color, flexShrink: 0 }}>#{t.id}</span>
-      <p style={{ flex: 1, fontSize: 12.5, color: '#cbd5e1', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.name ?? t.title}</p>
+      <span style={{ fontSize: 11, fontWeight: 850, color: p.color, flexShrink: 0 }}>#{t.id}</span>
+      <p style={{ flex: 1, fontSize: 12.5, color: '#f7f2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{t.name ?? t.title}</p>
       <span style={{ fontSize: 11, fontWeight: 600, color: p.color, flexShrink: 0 }}>{p.label}</span>
     </div>
   )
@@ -393,54 +395,86 @@ export default function TvDashboardPage() {
   const hasCritical = problems.some(p => p.severity >= 4)
 
   return (
-    <div style={{ minHeight: '100vh', background: '#020817', color: '#e2e8f0', fontFamily: 'system-ui,sans-serif', display: 'flex', flexDirection: 'column' }}>
+    <div style={{
+      minHeight: '100vh', color: '#f7f2ff', fontFamily: 'Inter, Rubik, system-ui, -apple-system, sans-serif',
+      display: 'flex', flexDirection: 'column', overflow: 'hidden',
+      background: `
+        radial-gradient(circle at 13% 8%, rgba(106,95,193,.36), transparent 28%),
+        radial-gradient(circle at 88% 12%, rgba(194,239,78,.13), transparent 24%),
+        radial-gradient(circle at 55% 100%, rgba(59,130,246,.16), transparent 30%),
+        linear-gradient(135deg, #150f23 0%, #1f1633 46%, #0f172a 100%)`
+    }}>
 
       <style>{`
         @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
         @keyframes fadein { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:none} }
         @keyframes overlayShow { from{opacity:0;transform:scale(.98)} to{opacity:1;transform:scale(1)} }
+        @keyframes shimmer { 0%{transform:translateX(-120%)} 100%{transform:translateX(120%)} }
         .tv-row { animation: fadein .3s ease }
+        .tv-panel-scroll::-webkit-scrollbar { width: 8px; height: 8px; }
+        .tv-panel-scroll::-webkit-scrollbar-thumb { background: rgba(121,98,140,.6); border-radius: 999px; }
+        .tv-panel-scroll::-webkit-scrollbar-track { background: rgba(255,255,255,.04); }
       `}</style>
 
       <EventOverlay event={activeEvent} />
 
       {/* ── Header ── */}
-      <header style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 32px', borderBottom: '1px solid rgba(255,255,255,.07)', background: 'rgba(255,255,255,.02)', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg,#3b82f6,#1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>N</div>
-          <span style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.02em', color: '#f1f5f9' }}>NexusIT Monitor</span>
+      <header style={{
+        position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '18px 32px', flexShrink: 0, overflow: 'hidden',
+        borderBottom: '1px solid rgba(194,239,78,.13)',
+        background: 'linear-gradient(90deg, rgba(31,22,51,.88), rgba(21,15,35,.62))',
+        boxShadow: '0 18px 50px rgba(0,0,0,.22)', backdropFilter: 'blur(18px) saturate(160%)'
+      }}>
+        <div style={{ position: 'absolute', inset: 0, pointerEvents: 'none', opacity: .55, background: 'linear-gradient(110deg, transparent 0%, rgba(255,255,255,.08) 35%, transparent 62%)', animation: 'shimmer 9s linear infinite' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, position: 'relative', zIndex: 1 }}>
           <div style={{
-            display: 'flex', alignItems: 'center', gap: 6, fontSize: 11, padding: '4px 10px', borderRadius: 99,
-            background: stale ? 'rgba(234,179,8,.12)' : 'rgba(74,222,128,.1)',
-            color: stale ? '#fbbf24' : '#4ade80',
-            border: `1px solid ${stale ? 'rgba(234,179,8,.25)' : 'rgba(74,222,128,.2)'}`,
+            width: 44, height: 44, borderRadius: 14,
+            background: 'linear-gradient(135deg,#c2ef4e,#6a5fc1 55%,#422082)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 950, fontSize: 18,
+            color: '#150f23', boxShadow: '0 0 34px rgba(106,95,193,.42), inset 0 1px 0 rgba(255,255,255,.45)'
+          }}>N</div>
+          <div>
+            <span style={{ fontSize: 20, fontWeight: 850, letterSpacing: '-0.03em', color: '#fff' }}>NexusIT Monitor</span>
+            <p style={{ fontSize: 11, color: '#a99ac0', marginTop: 2, letterSpacing: '.18em', textTransform: 'uppercase' }}>TV Operacional · Armazém Galdino</p>
+          </div>
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 7, fontSize: 11, padding: '6px 12px', borderRadius: 999,
+            background: stale ? 'rgba(251,191,36,.12)' : 'rgba(194,239,78,.10)',
+            color: stale ? '#fbbf24' : '#c2ef4e',
+            border: `1px solid ${stale ? 'rgba(251,191,36,.30)' : 'rgba(194,239,78,.25)'}`,
+            boxShadow: stale ? 'none' : '0 0 24px rgba(194,239,78,.10)'
           }}>
-            <div style={{ width: 6, height: 6, borderRadius: '50%', background: stale ? '#fbbf24' : '#4ade80', animation: stale ? 'none' : 'pulse 2s infinite' }} />
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: stale ? '#fbbf24' : '#c2ef4e', animation: stale ? 'none' : 'pulse 2s infinite' }} />
             {stale ? `Atualizado ${lastUpdate?.toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}` : 'Ao vivo'}
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 22, position: 'relative', zIndex: 1 }}>
           {/* Uptime bar */}
           {hosts.length > 0 && (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 12, color: '#64748b' }}>{online.length}/{hosts.length} hosts</span>
-              <div style={{ width: 120, height: 6, borderRadius: 99, background: 'rgba(255,255,255,.08)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${pctOnline}%`, background: pctOnline === 100 ? '#4ade80' : pctOnline >= 80 ? '#fbbf24' : '#f87171', borderRadius: 99, transition: 'width .6s' }} />
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 14,
+              background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.11)',
+              boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)'
+            }}>
+              <span style={{ fontSize: 12, color: '#c7badb', fontWeight: 650 }}>{online.length}/{hosts.length} hosts</span>
+              <div style={{ width: 138, height: 8, borderRadius: 99, background: 'rgba(0,0,0,.28)', overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)' }}>
+                <div style={{ height: '100%', width: `${pctOnline}%`, background: pctOnline === 100 ? 'linear-gradient(90deg,#86efac,#c2ef4e)' : pctOnline >= 80 ? 'linear-gradient(90deg,#fbbf24,#ffb287)' : 'linear-gradient(90deg,#fb7185,#ef4444)', borderRadius: 99, transition: 'width .6s', boxShadow: pctOnline === 100 ? '0 0 12px rgba(194,239,78,.5)' : '' }} />
               </div>
-              <span style={{ fontSize: 12, fontWeight: 700, color: pctOnline === 100 ? '#4ade80' : pctOnline >= 80 ? '#fbbf24' : '#f87171' }}>{pctOnline}%</span>
+              <span style={{ fontSize: 13, fontWeight: 900, color: pctOnline === 100 ? '#c2ef4e' : pctOnline >= 80 ? '#fbbf24' : '#f87171' }}>{pctOnline}%</span>
             </div>
           )}
 
-          <button onClick={toggleMute} style={{ background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', color: isMuted ? '#475569' : '#94a3b8', fontSize: 16 }}>
+          <button onClick={toggleMute} style={{ background: 'rgba(255,255,255,.09)', border: '1px solid rgba(255,255,255,.13)', borderRadius: 12, padding: '8px 13px', cursor: 'pointer', color: isMuted ? '#79628c' : '#f7f2ff', fontSize: 17, boxShadow: '0 8px 20px rgba(0,0,0,.16)' }}>
             {isMuted ? '🔇' : '🔔'}
           </button>
 
-          <div style={{ textAlign: 'right' }}>
-            <p style={{ fontSize: 32, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.03em', lineHeight: 1, color: hasCritical ? '#f87171' : '#f1f5f9' }}>
+          <div style={{ textAlign: 'right', minWidth: 158 }}>
+            <p style={{ fontSize: 35, fontWeight: 850, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.045em', lineHeight: 1, color: hasCritical ? '#f87171' : '#ffffff', textShadow: hasCritical ? '0 0 18px rgba(248,113,113,.35)' : '0 0 18px rgba(194,239,78,.08)' }}>
               {clock.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
             </p>
-            <p style={{ fontSize: 11, color: '#475569', marginTop: 2, textTransform: 'capitalize' }}>
+            <p style={{ fontSize: 11, color: '#9c8bb5', marginTop: 3, textTransform: 'capitalize' }}>
               {clock.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
             </p>
           </div>
@@ -448,13 +482,19 @@ export default function TvDashboardPage() {
       </header>
 
       {/* ── Body: 3-column grid ── */}
-      <main style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 420px', gap: 0, overflow: 'hidden' }}>
+      <main style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr 420px', gap: 18, overflow: 'hidden', padding: 18 }}>
 
         {/* COL 1 — Hosts + Tickets */}
-        <div style={{ borderRight: '1px solid rgba(255,255,255,.06)', padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20, overflowY: 'auto' }}>
+        <div className="tv-panel-scroll" style={{
+          padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 18, overflowY: 'auto',
+          border: '1px solid rgba(255,255,255,.10)', borderRadius: 22,
+          background: 'linear-gradient(180deg, rgba(255,255,255,.085), rgba(255,255,255,.045))',
+          boxShadow: '0 18px 55px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08)',
+          backdropFilter: 'blur(18px) saturate(150%)'
+        }}>
 
           {/* Hosts */}
-          <section>
+          <section style={{ borderRadius: 18, padding: 14, background: 'rgba(21,15,35,.36)', border: '1px solid rgba(255,255,255,.06)' }}>
             <SectionTitle>Status dos Hosts <Chip>{online.length} online {offline.length > 0 ? `· ${offline.length} offline` : ''}</Chip></SectionTitle>
             {offline.length > 0 && (
               <div style={{ marginBottom: 10 }}>
@@ -468,7 +508,7 @@ export default function TvDashboardPage() {
           </section>
 
           {/* Tickets */}
-          <section style={{ flex: 1 }}>
+          <section style={{ flex: 1, borderRadius: 18, padding: 14, background: 'rgba(21,15,35,.28)', border: '1px solid rgba(255,255,255,.06)' }}>
             <SectionTitle>Chamados GLPI <Chip>{tickets.length} aberto(s)</Chip></SectionTitle>
             <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
               {PRI_ORDER.filter(p => p >= 3).map(p => <PriCounter key={p} pri={p} count={byPri[p]} />)}
@@ -482,7 +522,13 @@ export default function TvDashboardPage() {
         </div>
 
         {/* COL 2 — Problems list */}
-        <div style={{ borderRight: '1px solid rgba(255,255,255,.06)', padding: '20px 24px', display: 'flex', flexDirection: 'column', overflowY: 'hidden' }}>
+        <div className="tv-panel-scroll" style={{
+          padding: '20px 22px', display: 'flex', flexDirection: 'column', overflowY: 'hidden',
+          border: '1px solid rgba(255,255,255,.10)', borderRadius: 22,
+          background: 'linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.04))',
+          boxShadow: '0 18px 55px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08)',
+          backdropFilter: 'blur(18px) saturate(150%)'
+        }}>
           <SectionTitle>
             Problemas Zabbix
             {problems.length > 0 && <span style={{ marginLeft: 8, color: '#f87171', fontWeight: 800 }}>({problems.length})</span>}
@@ -494,14 +540,20 @@ export default function TvDashboardPage() {
               <p style={{ fontSize: 13, color: '#475569' }}>Nenhum alerta ativo no Zabbix</p>
             </div>
           ) : (
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <div className="tv-panel-scroll" style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, paddingRight: 4 }}>
               {sortedProblems.map(p => <ProblemRow key={p.id ?? p.problemid} p={p} />)}
             </div>
           )}
         </div>
 
         {/* COL 3 — Severity counters + summary */}
-        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 20, overflowY: 'auto' }}>
+        <div className="tv-panel-scroll" style={{
+          padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 18, overflowY: 'auto',
+          border: '1px solid rgba(255,255,255,.10)', borderRadius: 22,
+          background: 'linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.045))',
+          boxShadow: '0 18px 55px rgba(0,0,0,.22), inset 0 1px 0 rgba(255,255,255,.08)',
+          backdropFilter: 'blur(18px) saturate(150%)'
+        }}>
 
           {/* Severity counters */}
           <section>
@@ -521,9 +573,9 @@ export default function TvDashboardPage() {
                 { label: 'Críticos/High',  value: (bySev[5] || 0) + (bySev[4] || 0), color: (bySev[5] || 0) + (bySev[4] || 0) > 0 ? '#f87171' : '#4ade80' },
                 { label: 'Chamados',       value: tickets.length, color: tickets.length > 0 ? '#fbbf24' : '#4ade80' },
               ].map(r => (
-                <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 14px', borderRadius: 10, background: 'rgba(255,255,255,.04)', border: '1px solid rgba(255,255,255,.07)' }}>
-                  <span style={{ fontSize: 13, color: '#94a3b8' }}>{r.label}</span>
-                  <span style={{ fontSize: 18, fontWeight: 800, color: r.color, fontVariantNumeric: 'tabular-nums' }}>{r.value}</span>
+                <div key={r.label} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 14px', borderRadius: 14, background: 'rgba(255,255,255,.055)', border: '1px solid rgba(255,255,255,.09)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)' }}>
+                  <span style={{ fontSize: 13, color: '#c7badb', fontWeight: 650 }}>{r.label}</span>
+                  <span style={{ fontSize: 19, fontWeight: 900, color: r.color, fontVariantNumeric: 'tabular-nums' }}>{r.value}</span>
                 </div>
               ))}
             </div>
@@ -543,16 +595,17 @@ export default function TvDashboardPage() {
 
 function SectionTitle({ children }) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-      <h2 style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.09em', textTransform: 'uppercase', color: '#475569' }}>{children}</h2>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 13 }}>
+      <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#c2ef4e', boxShadow: '0 0 14px rgba(194,239,78,.45)' }} />
+      <h2 style={{ fontSize: 11, fontWeight: 850, letterSpacing: '0.13em', textTransform: 'uppercase', color: '#d9cced' }}>{children}</h2>
     </div>
   )
 }
 
 function Chip({ children }) {
-  return <span style={{ fontSize: 11, color: '#334155', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{children}</span>
+  return <span style={{ fontSize: 11, color: '#9c8bb5', fontWeight: 600, textTransform: 'none', letterSpacing: 0, marginLeft: 4 }}>{children}</span>
 }
 
 function EmptyState({ children }) {
-  return <p style={{ fontSize: 13, color: '#334155', padding: '12px 0' }}>{children}</p>
+  return <p style={{ fontSize: 13, color: '#9c8bb5', padding: '12px 0' }}>{children}</p>
 }
