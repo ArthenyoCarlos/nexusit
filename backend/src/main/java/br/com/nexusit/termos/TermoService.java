@@ -122,10 +122,10 @@ public class TermoService {
     private String nextNumber(String prefix) {
         int year = Year.now().getValue();
         String base = prefix + "-" + year + "-";
-        Optional<String> last = prefix.equals("TRM")
-                ? termoRepository.findTopByNumeroTermoStartingWithOrderByNumeroTermoDesc(base).map(TermoResponsabilidade::getNumeroTermo)
-                : termoRepository.findTopByTombamentoStartingWithOrderByTombamentoDesc(base).map(TermoResponsabilidade::getTombamento);
-        int n = last.map(s -> Integer.parseInt(s.substring(s.lastIndexOf('-') + 1))).orElse(0) + 1;
+        Integer current = prefix.equals("TRM")
+                ? termoRepository.maxNumeroTermoSeq(base)
+                : termoRepository.maxTombamentoSeq(base);
+        int n = (current == null ? 0 : current) + 1;
         return base + String.format("%03d", n);
     }
 
