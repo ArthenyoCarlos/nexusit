@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTickets, getTicket, addFollowup, closeTicket, assignTicket } from '../services/glpi'
+import { createArticle } from '../services/wiki'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
@@ -73,6 +75,8 @@ export default function TicketsPage() {
   const [assignUserId, setAssignUserId] = useState('')
   const [actionLoading, setActionLoading] = useState(false)
   const [actionMsg, setActionMsg] = useState(null)
+  const [assistantDraft, setAssistantDraft] = useState(null)
+  const [wikiCreating, setWikiCreating] = useState(false)
 
   const fetchTickets = useCallback(async () => {
     setLoading(true)
@@ -87,7 +91,7 @@ export default function TicketsPage() {
   useEffect(() => { fetchTickets() }, [fetchTickets])
 
   const openDetail = async (ticket) => {
-    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null)
+    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null); setAssistantDraft(null)
     setDetailLoading(true)
     try { const res = await getTicket(ticket.id); setDetail(res.data) }
     catch { setDetail(null) }
@@ -126,6 +130,56 @@ export default function TicketsPage() {
       setAssignUserId(''); const res = await getTicket(selected.id); setDetail(res.data)
     } catch { setActionMsg({ type: 'error', text: 'Erro ao atribuir técnico.' }) }
     finally { setActionLoading(false) }
+  }
+
+  const copyToClipboard = async (text) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setActionMsg({ type: 'success', text: 'Texto copiado para a área de transferência.' })
+    } catch {
+      setActionMsg({ type: 'error', text: 'Não foi possível copiar automaticamente. Selecione o texto manualmente.' })
+    }
+  }
+
+  const handleSmartSummary = () => {
+    if (!detail) return
+    setAssistantDraft({
+      type: 'summary',
+      title: 'Resumo do chamado gerado pelo Hermes',
+      text: buildTicketSummary(detail),
+    })
+  }
+
+  const handleSmartResolution = () => {
+    if (!detail) return
+    const text = buildSuggestedResolution(detail)
+    setAssistantDraft({
+      type: 'resolution',
+      title: 'Resolução sugerida pelo Hermes',
+      text,
+    })
+    setFollowupText(text)
+  }
+
+  const handleCreateWikiArticle = async () => {
+    if (!detail) return
+    const resolution = assistantDraft?.type === 'resolution' ? assistantDraft.text : buildSuggestedResolution(detail)
+    const article = buildWikiArticleFromTicket(detail, resolution)
+    setWikiCreating(true)
+    try {
+      const created = await createArticle(article)
+      setActionMsg({ type: 'success', text: 'Artigo criado na Wiki.' })
+      setAssistantDraft({
+        type: 'wiki',
+        title: 'Artigo criado na Wiki',
+        text: `${created.title}\n\n${window.location.origin}/wiki/${created.id}`,
+        url: `/wiki/${created.id}`,
+      })
+    } catch {
+      setActionMsg({ type: 'error', text: 'Erro ao criar artigo na Wiki.' })
+    } finally {
+      setWikiCreating(false)
+    }
   }
 
   const filtered = tickets.filter(t => {
@@ -242,6 +296,43 @@ export default function TicketsPage() {
                 {detail.content}
               </div>
             )}
+
+            {/* Hermes Actions */}
+            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
+                <div>
+                  <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Hermes no chamado</p>
+                  <p className="text-sm text-slate-600">Gere resumo, resolução base ou artigo da Wiki a partir do histórico do GLPI.</p>
+                </div>
+                <span className="badge bg-indigo-100 text-indigo-700">NexusAI</span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button onClick={handleSmartSummary} disabled={actionLoading || wikiCreating}
+                  className="btn btn-default text-xs">
+                  Gerar resumo
+                </button>
+                <button onClick={handleSmartResolution} disabled={actionLoading || wikiCreating}
+                  className="btn btn-primary text-xs">
+                  Gerar resolução
+                </button>
+                <button onClick={handleCreateWikiArticle} disabled={actionLoading || wikiCreating}
+                  className="btn btn-default text-xs">
+                  {wikiCreating ? 'Criando...' : 'Documentar na Wiki'}
+                </button>
+              </div>
+              {assistantDraft && (
+                <div className="mt-4 rounded-xl bg-white border border-indigo-100 p-3">
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{assistantDraft.title}</p>
+                    <div className="flex gap-2">
+                      <button onClick={() => copyToClipboard(assistantDraft.text)} className="btn btn-default text-xs">Copiar</button>
+                      {assistantDraft.url && <a href={assistantDraft.url} className="btn btn-primary text-xs" target="_blank" rel="noreferrer">Abrir Wiki</a>}
+                    </div>
+                  </div>
+                  <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans leading-relaxed">{assistantDraft.text}</pre>
+                </div>
+              )}
+            </div>
 
             {/* Followups */}
             <div>
