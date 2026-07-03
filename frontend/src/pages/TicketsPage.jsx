@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTickets, getTicket, addFollowup, closeTicket, assignTicket } from '../services/glpi'
 import { createArticle } from '../services/wiki'
+import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
 import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
@@ -77,6 +78,7 @@ export default function TicketsPage() {
   const [actionMsg, setActionMsg] = useState(null)
   const [assistantDraft, setAssistantDraft] = useState(null)
   const [wikiCreating, setWikiCreating] = useState(false)
+  const [wikiLinks, setWikiLinks] = useState([])
 
   const fetchTickets = useCallback(async () => {
     setLoading(true)
@@ -91,10 +93,17 @@ export default function TicketsPage() {
   useEffect(() => { fetchTickets() }, [fetchTickets])
 
   const openDetail = async (ticket) => {
-    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null); setAssistantDraft(null)
+    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null); setAssistantDraft(null); setWikiLinks([])
     setDetailLoading(true)
-    try { const res = await getTicket(ticket.id); setDetail(res.data) }
-    catch { setDetail(null) }
+    try {
+      const [ticketRes, links] = await Promise.all([
+        getTicket(ticket.id),
+        getTicketWikiLinks(ticket.id).catch(() => []),
+      ])
+      setDetail(ticketRes.data)
+      setWikiLinks(links)
+    }
+    catch { setDetail(null); setWikiLinks([]) }
     finally { setDetailLoading(false) }
   }
 
@@ -168,7 +177,9 @@ export default function TicketsPage() {
     setWikiCreating(true)
     try {
       const created = await createArticle(article)
-      setActionMsg({ type: 'success', text: 'Artigo criado na Wiki.' })
+      const link = await createTicketWikiLink({ glpiTicketId: selected.id, wikiArticleId: created.id }).catch(() => null)
+      if (link) setWikiLinks(prev => [link, ...prev.filter(x => x.id !== link.id)])
+      setActionMsg({ type: 'success', text: 'Artigo criado na Wiki e vinculado ao chamado.' })
       setAssistantDraft({
         type: 'wiki',
         title: 'Artigo criado na Wiki',
@@ -197,6 +208,8 @@ export default function TicketsPage() {
     try {
       const article = buildWikiArticleFromTicket(detail, resolution)
       const created = await createArticle(article)
+      const link = await createTicketWikiLink({ glpiTicketId: selected.id, wikiArticleId: created.id }).catch(() => null)
+      if (link) setWikiLinks(prev => [link, ...prev.filter(x => x.id !== link.id)])
       const wikiFollowup = buildWikiLinkFollowup(created, window.location.origin)
       await addFollowup(selected.id, `${resolution}\n\n${wikiFollowup}`)
       await closeTicket(selected.id)
@@ -372,6 +385,32 @@ export default function TicketsPage() {
                     </div>
                   </div>
                   <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans leading-relaxed">{assistantDraft.text}</pre>
+                </div>
+              )}
+            </div>
+
+            {/* Linked Wiki Articles */}
+            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Artigos relacionados na Wiki</p>
+                <span className="badge bg-slate-100 text-slate-600">{wikiLinks.length}</span>
+              </div>
+              {wikiLinks.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">Nenhum artigo vinculado a este chamado ainda.</p>
+              ) : (
+                <div className="space-y-2">
+                  {wikiLinks.map(link => (
+                    <a key={link.id} href={`/wiki/${link.wikiArticleId}`} target="_blank" rel="noreferrer"
+                      className="block rounded-xl border border-slate-100 p-3 hover:bg-slate-50 transition">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">{link.wikiTitle}</p>
+                          <p className="text-xs text-slate-500">{link.wikiCategory || 'Wiki'} · criado por {link.createdByName || 'Sistema'}</p>
+                        </div>
+                        <span className="text-xs text-slate-400 whitespace-nowrap">{formatDate(link.createdAt)}</span>
+                      </div>
+                    </a>
+                  ))}
                 </div>
               )}
             </div>
