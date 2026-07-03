@@ -8,7 +8,17 @@ import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
+import javax.net.ssl.HostnameVerifier;
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.TrustManager;
+import javax.net.ssl.X509TrustManager;
+import java.io.IOException;
+import java.net.HttpURLConnection;
+import java.security.SecureRandom;
+import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -22,7 +32,7 @@ public class GlpiClient {
 
     public GlpiClient(GlpiProperties props) {
         this.props = props;
-        var factory = new SimpleClientHttpRequestFactory();
+        var factory = createRequestFactory();
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(10000);
         this.restTemplate = new RestTemplate(factory);
@@ -95,6 +105,43 @@ public class GlpiClient {
     }
 
     // ── Internals ─────────────────────────────────────────────────────────
+
+    private SimpleClientHttpRequestFactory createRequestFactory() {
+        String apiUrl = props.getApiUrl() == null ? "" : props.getApiUrl().toLowerCase(Locale.ROOT);
+        boolean internalGlpi = apiUrl.contains("glpi.local") || apiUrl.contains(".local/") || apiUrl.contains("localhost");
+        if (!internalGlpi) {
+            return new SimpleClientHttpRequestFactory();
+        }
+
+        try {
+            TrustManager[] trustAll = new TrustManager[] { new X509TrustManager() {
+                @Override public void checkClientTrusted(X509Certificate[] chain, String authType) { }
+                @Override public void checkServerTrusted(X509Certificate[] chain, String authType) { }
+                @Override public X509Certificate[] getAcceptedIssuers() { return new X509Certificate[0]; }
+            }};
+            SSLContext context = SSLContext.getInstance("TLS");
+            context.init(null, trustAll, new SecureRandom());
+            HostnameVerifier verifier = (hostname, session) -> hostname != null && (
+                    hostname.equalsIgnoreCase("glpi.local") ||
+                    hostname.endsWith(".local") ||
+                    hostname.equalsIgnoreCase("localhost")
+            );
+
+            return new SimpleClientHttpRequestFactory() {
+                @Override
+                protected void prepareConnection(HttpURLConnection connection, String httpMethod) throws IOException {
+                    if (connection instanceof HttpsURLConnection httpsConnection) {
+                        httpsConnection.setSSLSocketFactory(context.getSocketFactory());
+                        httpsConnection.setHostnameVerifier(verifier);
+                    }
+                    super.prepareConnection(connection, httpMethod);
+                }
+            };
+        } catch (Exception e) {
+            log.warn("Could not initialize internal GLPI TLS trust override: {}", e.getMessage());
+            return new SimpleClientHttpRequestFactory();
+        }
+    }
 
     private <T> T withRetry(java.util.function.Supplier<T> supplier) {
         try {

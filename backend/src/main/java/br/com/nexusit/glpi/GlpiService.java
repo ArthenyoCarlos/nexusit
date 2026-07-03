@@ -146,8 +146,8 @@ public class GlpiService {
                 str(t, "date"),
                 str(t, "solvedate"),
                 type,
-                str(t, "slas_id_tto"),
-                str(t, "slas_id_ttr"),
+                nonZeroStr(t, "slas_id_tto"),
+                nonZeroStr(t, "slas_id_ttr"),
                 str(t, "time_to_own"),
                 str(t, "time_to_resolve"),
                 intVal(t, "sla_waiting_duration")
@@ -170,6 +170,11 @@ public class GlpiService {
         if (v == null) return "";
         String s = String.valueOf(v);
         return "null".equals(s) ? "" : s;
+    }
+
+    private String nonZeroStr(Map<String, Object> m, String key) {
+        String s = str(m, key);
+        return "0".equals(s) ? "" : s;
     }
 
     private int intVal(Map<String, Object> m, String key) {
