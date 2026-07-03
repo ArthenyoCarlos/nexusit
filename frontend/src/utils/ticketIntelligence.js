@@ -31,6 +31,44 @@ function resultFromText(text = '') {
   return 'atendimento registrado e validado conforme retorno operacional'
 }
 
+function fieldFromText(text = '', label) {
+  const escaped = label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const match = cleanHtml(text).match(new RegExp(`^${escaped}:\\s*(.+)$`, 'im'))
+  return match?.[1]?.trim() || ''
+}
+
+function isAutomaticZabbixTicket(ticket = {}, content = '') {
+  const text = `${ticket.title || ''}\n${content}`.toLowerCase()
+  return text.includes('zabbix') && (
+    text.includes('chamado aberto automaticamente') ||
+    text.includes('zabbix_event_id') ||
+    text.includes('event id zabbix')
+  )
+}
+
+function hasTechnicalAction(followupText = '') {
+  const text = cleanHtml(followupText).toLowerCase()
+  if (!text) return false
+  return !/chamado aberto automaticamente|zabbix_event_id|event id zabbix/.test(text)
+}
+
+function zabbixNextAction(alert = '') {
+  const value = alert.toLowerCase()
+  if (/interface|link down|porta|port/.test(value)) {
+    return 'verificar fisicamente o cabo/equipamento conectado à porta, confirmar se a porta deveria estar ativa e validar no Zabbix se o evento normalizou.'
+  }
+  if (/vpn|tunnel|tunel|túnel/.test(value)) {
+    return 'validar conectividade entre as pontas da VPN, logs do firewall e estado do túnel antes de fechar o chamado.'
+  }
+  if (/serviço|service|processo/.test(value)) {
+    return 'validar o serviço no host, revisar logs recentes e reiniciar somente se o procedimento permitir.'
+  }
+  if (/disco|space|filesystem|storage/.test(value)) {
+    return 'verificar uso de disco, arquivos temporários/logs e crescimento anormal antes de liberar espaço.'
+  }
+  return 'validar o alerta no Zabbix, confirmar impacto real e registrar a ação técnica executada antes do fechamento.'
+}
+
 export function buildTicketSummary(detail) {
   const ticket = detail?.ticket || detail || {}
   const content = cleanHtml(detail?.content || '')
@@ -53,6 +91,24 @@ export function buildSuggestedResolution(detail) {
   const last = lastUsefulFollowup(detail)
   const lastText = cleanHtml(last?.content || '')
   const category = categoryFromTicket(ticket, `${content} ${lastText}`)
+
+  if (isAutomaticZabbixTicket(ticket, content) && !hasTechnicalAction(lastText)) {
+    const host = fieldFromText(content, 'Host') || 'não identificado'
+    const alert = fieldFromText(content, 'Alerta') || ticket.title || 'alerta Zabbix não identificado'
+    const severity = fieldFromText(content, 'Severidade') || ticket.priorityLabel || '—'
+    const eventId = fieldFromText(content, 'Event ID Zabbix') || fieldFromText(content, 'ZABBIX_EVENT_ID') || '—'
+    return [
+      'Tipo: alerta automático do Zabbix.',
+      `Host afetado: ${host}`,
+      `Alerta: ${alert}`,
+      `Severidade: ${severity}`,
+      `Event ID Zabbix: ${eventId}`,
+      'Resolução pendente: ainda não há ação técnica registrada neste chamado.',
+      `Próxima ação sugerida: ${zabbixNextAction(alert)}`,
+      'Observação: não fechar como resolvido até registrar a ação executada e confirmar normalização ou justificativa operacional.',
+    ].join('\n')
+  }
+
   const causeByCategory = {
     Rede: 'instabilidade física ou lógica na conexão de rede',
     'Acesso e Permissões': 'necessidade de ajuste de permissão/acesso do usuário',
@@ -61,7 +117,7 @@ export function buildSuggestedResolution(detail) {
     Sistemas: 'instabilidade ou inconsistência no sistema utilizado',
     Procedimentos: 'solicitação operacional tratada conforme procedimento de TI',
   }
-  const action = lastText || content || 'Ação técnica executada conforme análise do chamado.'
+  const action = hasTechnicalAction(lastText) ? lastText : (content || 'Ação técnica executada conforme análise do chamado.')
   return [
     `Causa provável: ${causeByCategory[category]}.`,
     `Ação executada: ${action}`,
