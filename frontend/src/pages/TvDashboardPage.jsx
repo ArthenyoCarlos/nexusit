@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { getHosts, getProblems } from '../services/monitoring'
 import { getTickets } from '../services/glpi'
 
@@ -63,6 +63,23 @@ const PRI = {
   1: { label: 'M. Baixa',   color: '#64748b', border: 'rgba(100,116,139,.2)' },
 }
 const PRI_ORDER = [6, 5, 4, 3, 2, 1]
+const TV_HOST_FILTER_KEY = 'nexusit.tv.hostFilter.v1'
+
+function hostKey(host) {
+  return String(host?.id ?? host?.hostid ?? host?.name ?? host?.ip ?? '')
+}
+
+function loadHostFilter() {
+  try {
+    const raw = localStorage.getItem(TV_HOST_FILTER_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.map(String) : []
+  } catch { return [] }
+}
+
+function saveHostFilter(keys) {
+  try { localStorage.setItem(TV_HOST_FILTER_KEY, JSON.stringify([...keys])) } catch {}
+}
 
 /* ─── Helpers ────────────────────────────────────────────────────────────── */
 function formatUptime(sec) {
@@ -78,6 +95,38 @@ function timeActive(clockSec) {
   if (diff < 3600)  return `${Math.floor(diff/60)}min`
   if (diff < 86400) return `${Math.floor(diff/3600)}h ${Math.floor((diff%3600)/60)}min`
   return `${Math.floor(diff/86400)}d`
+}
+
+function parseDateTime(value) {
+  if (!value) return null
+  const parsed = new Date(String(value).replace(' ', 'T'))
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
+function timeUntil(value) {
+  const date = parseDateTime(value)
+  if (!date) return null
+  const diffMs = date.getTime() - Date.now()
+  const abs = Math.abs(diffMs)
+  const mins = Math.round(abs / 60000)
+  const hours = Math.floor(mins / 60)
+  const days = Math.floor(hours / 24)
+  const remHours = hours % 24
+  const remMins = mins % 60
+  let text
+  if (days > 0) text = `${days}d ${remHours}h`
+  else if (hours > 0) text = `${hours}h ${remMins}min`
+  else text = `${Math.max(mins, 0)}min`
+  return { overdue: diffMs < 0, text, date }
+}
+
+function slaInfo(ticket) {
+  const resolve = timeUntil(ticket?.timeToResolve)
+  const own = timeUntil(ticket?.timeToOwn)
+  const baseName = ticket?.slaTtrName || ticket?.slaTtoName || ''
+  if (resolve) return { ...resolve, label: resolve.overdue ? `SLA vencido ${resolve.text}` : `SLA ${resolve.text}`, name: baseName }
+  if (own) return { ...own, label: own.overdue ? `TTO vencido ${own.text}` : `TTO ${own.text}`, name: ticket?.slaTtoName || baseName }
+  return baseName ? { overdue: false, text: '', label: baseName, name: baseName } : null
 }
 
 /* ─── Event detection ────────────────────────────────────────────────────── */
@@ -254,7 +303,7 @@ function HostChip({ host }) {
   const up = host.available
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 9, padding: '8px 12px', borderRadius: 13,
+      display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 12, maxWidth: 184,
       border: `1px solid ${up ? 'rgba(194,239,78,.24)' : 'rgba(248,113,113,.42)'}`,
       background: up ? 'linear-gradient(135deg, rgba(194,239,78,.10), rgba(255,255,255,.045))' : 'linear-gradient(135deg, rgba(127,29,29,.55), rgba(31,22,51,.62))',
       boxShadow: up ? 'inset 0 1px 0 rgba(255,255,255,.05)' : '0 0 18px rgba(239,68,68,.18), inset 0 1px 0 rgba(255,255,255,.06)',
@@ -265,15 +314,54 @@ function HostChip({ host }) {
         boxShadow: up ? '0 0 8px #c2ef4e' : '0 0 8px #f87171',
         animation: up ? 'none' : 'pulse 1.5s infinite',
       }} />
-      <div>
-        <p style={{ fontSize: 12.5, fontWeight: 700, color: '#f7f2ff', lineHeight: 1.2 }}>{host.name}</p>
-        {host.ip && <p style={{ fontSize: 11, color: '#9c8bb5', lineHeight: 1.2 }}>{host.ip}</p>}
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontSize: 12, fontWeight: 750, color: '#f7f2ff', lineHeight: 1.15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host.name}</p>
+        {host.ip && <p style={{ fontSize: 10.5, color: '#9c8bb5', lineHeight: 1.15 }}>{host.ip}</p>}
       </div>
       {host.uptimeSeconds != null && (
         <span style={{ fontSize: 10.5, color: up ? '#4ade80' : '#f87171', marginLeft: 4, fontWeight: 500 }}>
           {formatUptime(host.uptimeSeconds)}
         </span>
       )}
+    </div>
+  )
+}
+
+function HostSettingsOverlay({ hosts, selectedKeys, onToggle, onSelectAll, onClear, onClose }) {
+  const selectedCount = selectedKeys.size
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(2,8,23,.72)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ width: 'min(980px, 92vw)', maxHeight: '86vh', display: 'flex', flexDirection: 'column', borderRadius: 24, border: '1px solid rgba(255,255,255,.14)', background: 'linear-gradient(180deg, rgba(31,22,51,.98), rgba(15,23,42,.98))', boxShadow: '0 24px 90px rgba(0,0,0,.45)', padding: 22 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
+          <div>
+            <p style={{ fontSize: 12, color: '#c2ef4e', letterSpacing: '.16em', fontWeight: 900, textTransform: 'uppercase' }}>Configuração da TV</p>
+            <h2 style={{ fontSize: 28, fontWeight: 900, color: '#fff', marginTop: 4 }}>Hosts exibidos no card</h2>
+            <p style={{ color: '#a99ac0', fontSize: 13, marginTop: 4 }}>Selecione os hosts fixos. Hosts offline sempre aparecem mesmo fora da seleção.</p>
+          </div>
+          <button onClick={onClose} style={{ border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.08)', color: '#fff', borderRadius: 14, padding: '10px 14px', cursor: 'pointer', fontWeight: 800 }}>Fechar</button>
+        </div>
+        <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+          <button onClick={onSelectAll} style={{ border: '1px solid rgba(194,239,78,.26)', background: 'rgba(194,239,78,.10)', color: '#c2ef4e', borderRadius: 12, padding: '8px 12px', cursor: 'pointer', fontWeight: 800 }}>Selecionar todos</button>
+          <button onClick={onClear} style={{ border: '1px solid rgba(255,255,255,.14)', background: 'rgba(255,255,255,.06)', color: '#d9cced', borderRadius: 12, padding: '8px 12px', cursor: 'pointer', fontWeight: 800 }}>Mostrar todos automaticamente</button>
+          <span style={{ alignSelf: 'center', fontSize: 12, color: '#9c8bb5' }}>{selectedCount === 0 ? 'Sem filtro: exibindo todos' : `${selectedCount} selecionado(s)`}</span>
+        </div>
+        <div className="tv-panel-scroll" style={{ overflow: 'auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: 8, paddingRight: 4 }}>
+          {hosts.map(host => {
+            const key = hostKey(host)
+            const checked = selectedKeys.has(key)
+            return (
+              <label key={key} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 14, border: `1px solid ${checked ? 'rgba(194,239,78,.36)' : 'rgba(255,255,255,.08)'}`, background: checked ? 'rgba(194,239,78,.10)' : 'rgba(255,255,255,.04)', cursor: 'pointer' }}>
+                <input type="checkbox" checked={checked} onChange={() => onToggle(key)} />
+                <span style={{ width: 8, height: 8, borderRadius: 99, background: host.available ? '#c2ef4e' : '#f87171', boxShadow: host.available ? '0 0 8px rgba(194,239,78,.6)' : '0 0 8px rgba(248,113,113,.6)' }} />
+                <span style={{ minWidth: 0 }}>
+                  <span style={{ display: 'block', fontSize: 13, fontWeight: 800, color: '#fff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host.name}</span>
+                  {host.ip && <span style={{ display: 'block', fontSize: 11, color: '#9c8bb5' }}>{host.ip}</span>}
+                </span>
+              </label>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }
@@ -307,15 +395,22 @@ function ProblemRow({ p }) {
 
 function TicketRow({ t }) {
   const p = PRI[t.priority] || PRI[3]
+  const sla = slaInfo(t)
+  const slaColor = sla?.overdue ? '#f87171' : '#c2ef4e'
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 14,
-      border: `1px solid ${p.border}`, background: 'rgba(255,255,255,.055)',
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,.05)'
+      display: 'grid', gridTemplateColumns: 'auto minmax(0,1fr) auto', alignItems: 'center', gap: 10,
+      padding: '10px 14px', borderRadius: 14,
+      border: `1px solid ${sla?.overdue ? 'rgba(248,113,113,.45)' : p.border}`,
+      background: sla?.overdue ? 'linear-gradient(135deg, rgba(127,29,29,.48), rgba(255,255,255,.045))' : 'rgba(255,255,255,.055)',
+      boxShadow: sla?.overdue ? '0 0 18px rgba(248,113,113,.16), inset 0 1px 0 rgba(255,255,255,.05)' : 'inset 0 1px 0 rgba(255,255,255,.05)'
     }}>
       <span style={{ fontSize: 11, fontWeight: 850, color: p.color, flexShrink: 0 }}>#{t.id}</span>
-      <p style={{ flex: 1, fontSize: 12.5, color: '#f7f2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>{t.name ?? t.title}</p>
-      <span style={{ fontSize: 11, fontWeight: 600, color: p.color, flexShrink: 0 }}>{p.label}</span>
+      <div style={{ minWidth: 0 }}>
+        <p style={{ fontSize: 12.5, color: '#f7f2ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 650 }}>{t.name ?? t.title}</p>
+        {sla && <p title={sla.name || ''} style={{ fontSize: 10.5, color: slaColor, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 750 }}>{sla.label}</p>}
+      </div>
+      <span style={{ fontSize: 11, fontWeight: 700, color: p.color, flexShrink: 0 }}>{p.label}</span>
     </div>
   )
 }
@@ -364,6 +459,8 @@ export default function TvDashboardPage() {
   const { play, muted } = useAlertSound()
   const [isMuted, setIsMuted] = useState(false)
   const [activeEvent, setActiveEvent] = useState(null)
+  const [manageHosts, setManageHosts] = useState(false)
+  const [selectedHostKeys, setSelectedHostKeys] = useState(() => new Set(loadHostFilter()))
   const overlayTimer = useRef(null)
   const toggleMute = () => { muted.current = !muted.current; setIsMuted(muted.current) }
 
@@ -383,9 +480,32 @@ export default function TvDashboardPage() {
   const { hosts, problems, tickets, lastUpdate, stale } = useDashboardData(showDashboardEvents)
   const clock = useClock()
 
-  const online  = hosts.filter(h => h.available)
-  const offline = hosts.filter(h => !h.available)
-  const pctOnline = hosts.length ? Math.round((online.length / hosts.length) * 100) : 100
+  const updateHostSelection = useCallback((updater) => {
+    setSelectedHostKeys(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater
+      saveHostFilter(next)
+      return new Set(next)
+    })
+  }, [])
+
+  const toggleHostSelection = useCallback((key) => {
+    updateHostSelection(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }, [updateHostSelection])
+
+  const filteredHosts = useMemo(() => {
+    if (selectedHostKeys.size === 0) return hosts
+    return hosts.filter(h => h.available === false || selectedHostKeys.has(hostKey(h)))
+  }, [hosts, selectedHostKeys])
+  const hiddenHostCount = Math.max(0, hosts.length - filteredHosts.length)
+
+  const online  = filteredHosts.filter(h => h.available)
+  const offline = filteredHosts.filter(h => !h.available)
+  const allOnline  = hosts.filter(h => h.available)
+  const pctOnline = hosts.length ? Math.round((allOnline.length / hosts.length) * 100) : 100
 
   const bySev = SEV_ORDER.reduce((a, s) => { a[s] = problems.filter(p => p.severity === s).length; return a }, {})
   const byPri = PRI_ORDER.reduce((a, p) => { a[p] = tickets.filter(t => t.priority === p).length;  return a }, {})
@@ -417,6 +537,16 @@ export default function TvDashboardPage() {
       `}</style>
 
       <EventOverlay event={activeEvent} />
+      {manageHosts && (
+        <HostSettingsOverlay
+          hosts={hosts}
+          selectedKeys={selectedHostKeys}
+          onToggle={toggleHostSelection}
+          onSelectAll={() => updateHostSelection(new Set(hosts.map(hostKey)))}
+          onClear={() => updateHostSelection(new Set())}
+          onClose={() => setManageHosts(false)}
+        />
+      )}
 
       {/* ── Header ── */}
       <header style={{
@@ -458,7 +588,7 @@ export default function TvDashboardPage() {
               background: 'rgba(255,255,255,.07)', border: '1px solid rgba(255,255,255,.11)',
               boxShadow: 'inset 0 1px 0 rgba(255,255,255,.06)'
             }}>
-              <span style={{ fontSize: 12, color: '#c7badb', fontWeight: 650 }}>{online.length}/{hosts.length} hosts</span>
+              <span style={{ fontSize: 12, color: '#c7badb', fontWeight: 650 }}>{allOnline.length}/{hosts.length} hosts</span>
               <div style={{ width: 138, height: 8, borderRadius: 99, background: 'rgba(0,0,0,.28)', overflow: 'hidden', border: '1px solid rgba(255,255,255,.08)' }}>
                 <div style={{ height: '100%', width: `${pctOnline}%`, background: pctOnline === 100 ? 'linear-gradient(90deg,#86efac,#c2ef4e)' : pctOnline >= 80 ? 'linear-gradient(90deg,#fbbf24,#ffb287)' : 'linear-gradient(90deg,#fb7185,#ef4444)', borderRadius: 99, transition: 'width .6s', boxShadow: pctOnline === 100 ? '0 0 12px rgba(194,239,78,.5)' : '' }} />
               </div>
@@ -495,7 +625,10 @@ export default function TvDashboardPage() {
 
           {/* Hosts */}
           <section style={{ borderRadius: 18, padding: 14, background: 'rgba(21,15,35,.36)', border: '1px solid rgba(255,255,255,.06)' }}>
-            <SectionTitle>Status dos Hosts <Chip>{online.length} online {offline.length > 0 ? `· ${offline.length} offline` : ''}</Chip></SectionTitle>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 12 }}>
+              <SectionTitle>Status dos Hosts <Chip>{allOnline.length}/{hosts.length} online {hiddenHostCount > 0 ? `· ${hiddenHostCount} oculto(s)` : ''}</Chip></SectionTitle>
+              <button onClick={() => setManageHosts(true)} style={{ border: '1px solid rgba(194,239,78,.24)', background: 'rgba(194,239,78,.09)', color: '#c2ef4e', borderRadius: 10, padding: '6px 9px', cursor: 'pointer', fontSize: 11, fontWeight: 850 }}>⚙ Hosts</button>
+            </div>
             {offline.length > 0 && (
               <div style={{ marginBottom: 10 }}>
                 <p style={{ fontSize: 10, fontWeight: 700, color: '#f87171', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Offline</p>
@@ -568,7 +701,7 @@ export default function TvDashboardPage() {
             <SectionTitle>Resumo</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
               {[
-                { label: 'Hosts online',   value: `${online.length} / ${hosts.length}`, color: pctOnline === 100 ? '#4ade80' : '#fbbf24' },
+                { label: 'Hosts online',   value: `${allOnline.length} / ${hosts.length}`, color: pctOnline === 100 ? '#4ade80' : '#fbbf24' },
                 { label: 'Alertas ativos', value: problems.length, color: problems.length > 0 ? '#f87171' : '#4ade80' },
                 { label: 'Críticos/High',  value: (bySev[5] || 0) + (bySev[4] || 0), color: (bySev[5] || 0) + (bySev[4] || 0) > 0 ? '#f87171' : '#4ade80' },
                 { label: 'Chamados',       value: tickets.length, color: tickets.length > 0 ? '#fbbf24' : '#4ade80' },

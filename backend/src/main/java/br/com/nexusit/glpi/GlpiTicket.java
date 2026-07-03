@@ -11,5 +11,10 @@ public record GlpiTicket(
         String assignedTo,
         String openedAt,
         String solvedAt,
-        int ticketType
+        int ticketType,
+        String slaTtoName,
+        String slaTtrName,
+        String timeToOwn,
+        String timeToResolve,
+        int slaWaitingDuration
 ) {}

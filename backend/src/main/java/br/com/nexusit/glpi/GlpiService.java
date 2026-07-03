@@ -145,7 +145,12 @@ public class GlpiService {
                 assignedTo,
                 str(t, "date"),
                 str(t, "solvedate"),
-                type
+                type,
+                str(t, "slas_id_tto"),
+                str(t, "slas_id_ttr"),
+                str(t, "time_to_own"),
+                str(t, "time_to_resolve"),
+                intVal(t, "sla_waiting_duration")
         );
     }
 
