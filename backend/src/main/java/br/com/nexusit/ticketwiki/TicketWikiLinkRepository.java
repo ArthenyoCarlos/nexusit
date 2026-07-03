@@ -10,6 +10,7 @@ import java.util.UUID;
 
 public interface TicketWikiLinkRepository extends JpaRepository<TicketWikiLink, UUID> {
     List<TicketWikiLink> findByGlpiTicketIdOrderByCreatedAtDesc(Long glpiTicketId);
+    List<TicketWikiLink> findByWikiArticleIdOrderByCreatedAtDesc(UUID wikiArticleId);
     Optional<TicketWikiLink> findByGlpiTicketIdAndWikiArticleId(Long glpiTicketId, UUID wikiArticleId);
 
     long countByWikiArticleId(UUID wikiArticleId);

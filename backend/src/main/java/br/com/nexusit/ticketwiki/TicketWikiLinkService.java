@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 @Service @RequiredArgsConstructor
 public class TicketWikiLinkService {
@@ -33,6 +34,13 @@ public class TicketWikiLinkService {
     public List<TicketWikiLinkResponse> findByTicket(Long glpiTicketId) {
         if (glpiTicketId == null || glpiTicketId <= 0) return List.of();
         return repo.findByGlpiTicketIdOrderByCreatedAtDesc(glpiTicketId).stream()
+                .map(TicketWikiLinkResponse::from)
+                .toList();
+    }
+
+    public List<TicketWikiLinkResponse> findByArticle(UUID wikiArticleId) {
+        if (wikiArticleId == null) return List.of();
+        return repo.findByWikiArticleIdOrderByCreatedAtDesc(wikiArticleId).stream()
                 .map(TicketWikiLinkResponse::from)
                 .toList();
     }

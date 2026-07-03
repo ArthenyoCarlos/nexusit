@@ -6,6 +6,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/ticket-wiki-links")
@@ -21,5 +22,10 @@ public class TicketWikiLinkController {
     @GetMapping("/glpi/{glpiTicketId}")
     public List<TicketWikiLinkResponse> byTicket(@PathVariable Long glpiTicketId) {
         return service.findByTicket(glpiTicketId);
+    }
+
+    @GetMapping("/wiki/{wikiArticleId}")
+    public List<TicketWikiLinkResponse> byArticle(@PathVariable UUID wikiArticleId) {
+        return service.findByArticle(wikiArticleId);
     }
 }
