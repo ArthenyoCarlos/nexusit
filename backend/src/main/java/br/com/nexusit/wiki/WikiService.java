@@ -1,24 +1,46 @@
 package br.com.nexusit.wiki;
 
 import br.com.nexusit.user.User;
+import br.com.nexusit.ticketwiki.TicketWikiLinkRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service @RequiredArgsConstructor
 public class WikiService {
     private final WikiRepository repo;
+    private final TicketWikiLinkRepository ticketWikiLinkRepository;
+
+    private List<WikiResponse> withUsageCounts(List<WikiArticle> articles) {
+        if (articles == null || articles.isEmpty()) return List.of();
+        Map<UUID, Long> counts = ticketWikiLinkRepository.countByWikiArticleIds(
+                articles.stream().map(WikiArticle::getId).toList()
+        ).stream().collect(Collectors.toMap(
+                TicketWikiLinkRepository.WikiArticleLinkCount::getWikiArticleId,
+                TicketWikiLinkRepository.WikiArticleLinkCount::getLinkedTicketCount,
+                Long::sum
+        ));
+        return articles.stream()
+                .map(article -> WikiResponse.from(article, counts.getOrDefault(article.getId(), 0L)))
+                .toList();
+    }
 
     public List<WikiResponse> findAll(String category) {
         if (category != null && !category.isBlank())
-            return repo.findByCategoryOrderByUpdatedAtDesc(category).stream().map(WikiResponse::from).toList();
-        return repo.findAllByOrderByUpdatedAtDesc().stream().map(WikiResponse::from).toList();
+            return withUsageCounts(repo.findByCategoryOrderByUpdatedAtDesc(category));
+        return withUsageCounts(repo.findAllByOrderByUpdatedAtDesc());
     }
 
-    public WikiResponse findById(UUID id) { return WikiResponse.from(repo.findById(id).orElseThrow()); }
+    public WikiResponse findById(UUID id) {
+        WikiArticle article = repo.findById(id).orElseThrow();
+        long count = ticketWikiLinkRepository.countByWikiArticleId(id);
+        return WikiResponse.from(article, count);
+    }
 
-    public List<WikiResponse> search(String q) { return repo.search(q).stream().map(WikiResponse::from).toList(); }
+    public List<WikiResponse> search(String q) { return withUsageCounts(repo.search(q)); }
 
     public WikiResponse create(WikiRequest req, User user) {
         WikiArticle a = WikiArticle.builder()
