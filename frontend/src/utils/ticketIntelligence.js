@@ -143,6 +143,50 @@ export function buildWikiLinkFollowup(article, origin = '') {
   ].join('\n')
 }
 
+export function buildWikiSearchQueries(detail) {
+  const ticket = detail?.ticket || detail || {}
+  const content = cleanHtml(detail?.content || '')
+  const title = cleanHtml(ticket.title || '')
+  const host = fieldFromText(content, 'Host')
+  const alert = fieldFromText(content, 'Alerta').replace(/^Network Generic Device:\s*/i, '')
+  const queries = []
+
+  if (host) queries.push(host)
+  if (alert) queries.push(alert)
+  if (/link down/i.test(`${title} ${content}`)) queries.push('Link down')
+  if (host && /link down/i.test(`${title} ${content}`)) queries.push(`${host} Link down`)
+
+  const cleanedTitle = title
+    .replace(/^\[?zabbix\]?\s*/i, '')
+    .replace(/\bpor mais de \d+h\b/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (cleanedTitle) queries.push(cleanedTitle)
+
+  const requester = cleanHtml(ticket.requester || '')
+  if (requester && !/zabbix|sistema/i.test(requester)) queries.push(requester)
+
+  return [...new Set(queries.map(q => q.trim()).filter(q => q.length >= 3))].slice(0, 6)
+}
+
+export function mergeWikiSuggestions(resultGroups = []) {
+  const byId = new Map()
+  resultGroups.flat().filter(Boolean).forEach(article => {
+    const id = article.id
+    if (!id) return
+    const current = byId.get(id)
+    if (current) {
+      current.matchCount += 1
+      return
+    }
+    byId.set(id, { ...article, matchCount: 1 })
+  })
+  return [...byId.values()].sort((a, b) => {
+    if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount
+    return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
+  }).slice(0, 6)
+}
+
 export function buildWikiArticleFromTicket(detail, resolutionText = '') {
   const ticket = detail?.ticket || detail || {}
   const content = cleanHtml(detail?.content || '')

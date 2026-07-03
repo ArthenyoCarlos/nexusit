@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft } from './ticketIntelligence.js'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions } from './ticketIntelligence.js'
 
 const detail = {
   ticket: {
@@ -73,5 +73,23 @@ const wikiFollowup = buildWikiLinkFollowup({ title: article.title, id: 'abc-123'
 assert.match(wikiFollowup, /Documentação gerada automaticamente na Wiki do NexusIT/)
 assert.match(wikiFollowup, /Chamado #25: Sistema lento/)
 assert.match(wikiFollowup, /https:\/\/nexus.local\/wiki\/abc-123/)
+
+const searchQueries = buildWikiSearchQueries(zabbixAutoTicket)
+assert.deepEqual(searchQueries.slice(0, 4), [
+  'Switch US-24 PoE 250W',
+  'Interface 0/5(Port 5): Link down por mais de 12h',
+  'Link down',
+  'Switch US-24 PoE 250W Link down',
+])
+assert.equal(new Set(searchQueries).size, searchQueries.length)
+assert.ok(searchQueries.length <= 6)
+
+const merged = mergeWikiSuggestions([
+  [{ id: '1', title: 'Link down porta switch', updatedAt: '2026-07-03T10:00:00' }],
+  [{ id: '1', title: 'Link down porta switch', updatedAt: '2026-07-03T10:00:00' }, { id: '2', title: 'VPN caiu', updatedAt: '2026-07-02T10:00:00' }],
+])
+assert.equal(merged.length, 2)
+assert.equal(merged[0].matchCount, 2)
+assert.equal(merged[0].id, '1')
 
 console.log('ticketIntelligence tests passed')

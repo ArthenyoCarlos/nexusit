@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTickets, getTicket, addFollowup, closeTicket, assignTicket } from '../services/glpi'
-import { createArticle } from '../services/wiki'
+import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft } from '../utils/ticketIntelligence'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
@@ -79,6 +79,9 @@ export default function TicketsPage() {
   const [assistantDraft, setAssistantDraft] = useState(null)
   const [wikiCreating, setWikiCreating] = useState(false)
   const [wikiLinks, setWikiLinks] = useState([])
+  const [wikiSuggestions, setWikiSuggestions] = useState([])
+  const [wikiSuggestionQueries, setWikiSuggestionQueries] = useState([])
+  const [wikiSuggestionsLoading, setWikiSuggestionsLoading] = useState(false)
 
   const fetchTickets = useCallback(async () => {
     setLoading(true)
@@ -92,8 +95,26 @@ export default function TicketsPage() {
 
   useEffect(() => { fetchTickets() }, [fetchTickets])
 
+  const loadWikiSuggestions = async (ticketDetail, links = []) => {
+    const queries = buildWikiSearchQueries(ticketDetail)
+    setWikiSuggestionQueries(queries)
+    setWikiSuggestions([])
+    if (queries.length === 0) return
+
+    setWikiSuggestionsLoading(true)
+    try {
+      const groups = await Promise.all(queries.map(q => searchWiki(q).catch(() => [])))
+      const linkedIds = new Set((links || []).map(link => link.wikiArticleId))
+      setWikiSuggestions(mergeWikiSuggestions(groups).filter(article => !linkedIds.has(article.id)))
+    } catch {
+      setWikiSuggestions([])
+    } finally {
+      setWikiSuggestionsLoading(false)
+    }
+  }
+
   const openDetail = async (ticket) => {
-    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null); setAssistantDraft(null); setWikiLinks([])
+    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null); setAssistantDraft(null); setWikiLinks([]); setWikiSuggestions([]); setWikiSuggestionQueries([])
     setDetailLoading(true)
     try {
       const [ticketRes, links] = await Promise.all([
@@ -102,8 +123,9 @@ export default function TicketsPage() {
       ])
       setDetail(ticketRes.data)
       setWikiLinks(links)
+      loadWikiSuggestions(ticketRes.data, links)
     }
-    catch { setDetail(null); setWikiLinks([]) }
+    catch { setDetail(null); setWikiLinks([]); setWikiSuggestions([]) }
     finally { setDetailLoading(false) }
   }
 
@@ -178,7 +200,10 @@ export default function TicketsPage() {
     try {
       const created = await createArticle(article)
       const link = await createTicketWikiLink({ glpiTicketId: selected.id, wikiArticleId: created.id }).catch(() => null)
-      if (link) setWikiLinks(prev => [link, ...prev.filter(x => x.id !== link.id)])
+      if (link) {
+        setWikiLinks(prev => [link, ...prev.filter(x => x.id !== link.id)])
+        setWikiSuggestions(prev => prev.filter(article => article.id !== link.wikiArticleId))
+      }
       setActionMsg({ type: 'success', text: 'Artigo criado na Wiki e vinculado ao chamado.' })
       setAssistantDraft({
         type: 'wiki',
@@ -190,6 +215,21 @@ export default function TicketsPage() {
       setActionMsg({ type: 'error', text: 'Erro ao criar artigo na Wiki.' })
     } finally {
       setWikiCreating(false)
+    }
+  }
+
+  const handleLinkExistingArticle = async (article) => {
+    if (!selected || !article?.id) return
+    setActionLoading(true)
+    try {
+      const link = await createTicketWikiLink({ glpiTicketId: selected.id, wikiArticleId: article.id })
+      setWikiLinks(prev => [link, ...prev.filter(x => x.id !== link.id)])
+      setWikiSuggestions(prev => prev.filter(item => item.id !== article.id))
+      setActionMsg({ type: 'success', text: 'Artigo existente vinculado ao chamado.' })
+    } catch {
+      setActionMsg({ type: 'error', text: 'Erro ao vincular artigo existente ao chamado.' })
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -209,7 +249,10 @@ export default function TicketsPage() {
       const article = buildWikiArticleFromTicket(detail, resolution)
       const created = await createArticle(article)
       const link = await createTicketWikiLink({ glpiTicketId: selected.id, wikiArticleId: created.id }).catch(() => null)
-      if (link) setWikiLinks(prev => [link, ...prev.filter(x => x.id !== link.id)])
+      if (link) {
+        setWikiLinks(prev => [link, ...prev.filter(x => x.id !== link.id)])
+        setWikiSuggestions(prev => prev.filter(article => article.id !== link.wikiArticleId))
+      }
       const wikiFollowup = buildWikiLinkFollowup(created, window.location.origin)
       await addFollowup(selected.id, `${resolution}\n\n${wikiFollowup}`)
       await closeTicket(selected.id)
@@ -385,6 +428,45 @@ export default function TicketsPage() {
                     </div>
                   </div>
                   <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans leading-relaxed">{assistantDraft.text}</pre>
+                </div>
+              )}
+            </div>
+
+            {/* Wiki Suggestions */}
+            <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <div>
+                  <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Sugestões da Wiki</p>
+                  <p className="text-sm text-slate-600">Artigos parecidos encontrados automaticamente antes de documentar.</p>
+                </div>
+                <span className="badge bg-amber-100 text-amber-700">{wikiSuggestionsLoading ? 'buscando' : wikiSuggestions.length}</span>
+              </div>
+              {wikiSuggestionQueries.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-3">
+                  {wikiSuggestionQueries.map(q => <span key={q} className="badge bg-white text-slate-500 border border-amber-100">{q}</span>)}
+                </div>
+              )}
+              {wikiSuggestionsLoading ? (
+                <p className="text-sm text-slate-400 italic">Buscando artigos relacionados...</p>
+              ) : wikiSuggestions.length === 0 ? (
+                <p className="text-sm text-slate-400 italic">Nenhum artigo parecido encontrado ainda.</p>
+              ) : (
+                <div className="space-y-2">
+                  {wikiSuggestions.map(article => (
+                    <div key={article.id} className="rounded-xl border border-amber-100 bg-white p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-slate-800">{article.title}</p>
+                          <p className="text-xs text-slate-500">{article.category || 'Wiki'} · {article.matchCount} ocorrência(s) nas buscas</p>
+                        </div>
+                        <div className="flex gap-2">
+                          <a href={`/wiki/${article.id}`} target="_blank" rel="noreferrer" className="btn btn-default text-xs">Abrir</a>
+                          <button onClick={() => handleLinkExistingArticle(article)} disabled={actionLoading}
+                            className="btn btn-primary text-xs">Vincular ao chamado</button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
