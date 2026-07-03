@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle } from './ticketIntelligence.js'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from './ticketIntelligence.js'
 
 const detail = {
   ticket: {
@@ -101,5 +101,20 @@ assert.ok(merged[0].scoreReasons.includes('Uso'))
 assert.equal(shouldWarnBeforeCreatingWikiArticle(merged), true)
 assert.equal(shouldWarnBeforeCreatingWikiArticle([]), false)
 assert.equal(shouldWarnBeforeCreatingWikiArticle(null), false)
+
+const duplicateTickets = [
+  { id: 101, title: 'Acesso ao fornecedor', requester: 'Idalina', status: 1, openedAt: '2026-07-03T10:00:00' },
+  { id: 102, title: 'Acesso ao fornecedor', requester: 'Idalina', status: 2, openedAt: '2026-07-03T10:02:00' },
+  { id: 103, title: 'Acesso ao Fornecedor 6172', requester: 'Idalina', status: 1, openedAt: '2026-07-03T10:04:00' },
+  { id: 104, title: 'Acesso ao fornecedor', requester: 'Maria', status: 1, openedAt: '2026-07-03T10:06:00' },
+  { id: 105, title: 'Acesso ao fornecedor', requester: 'Idalina', status: 6, openedAt: '2026-07-03T09:00:00' },
+]
+const duplicateGroups = detectDuplicateTicketGroups(duplicateTickets)
+assert.equal(duplicateGroups.length, 1)
+assert.equal(duplicateGroups[0].count, 3)
+assert.deepEqual(duplicateGroups[0].tickets.map(t => t.id).sort(), [101, 102, 103])
+const duplicatesFor101 = findDuplicateTicketsFor(duplicateTickets[0], duplicateTickets)
+assert.deepEqual(duplicatesFor101.map(t => t.id).sort(), [102, 103])
+assert.deepEqual(findDuplicateTicketsFor(duplicateTickets[3], duplicateTickets), [])
 
 console.log('ticketIntelligence tests passed')

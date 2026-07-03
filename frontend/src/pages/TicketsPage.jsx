@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getTickets, getTicket, addFollowup, closeTicket, assignTicket } from '../services/glpi'
 import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle } from '../utils/ticketIntelligence'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
@@ -194,6 +194,10 @@ export default function TicketsPage() {
 
   const handleCreateWikiArticle = async () => {
     if (!detail) return
+    if (selectedDuplicates.length > 0) {
+      const proceed = window.confirm(`Este chamado possui ${selectedDuplicates.length} possível(is) duplicado(s). Deseja documentar apenas este chamado mesmo assim?`)
+      if (!proceed) return
+    }
     if (shouldWarnBeforeCreatingWikiArticle(wikiSuggestions)) {
       const proceed = window.confirm(`Encontramos ${wikiSuggestions.length} artigo(s) parecido(s) na Wiki. Deseja criar um novo artigo mesmo assim?`)
       if (!proceed) return
@@ -246,6 +250,10 @@ export default function TicketsPage() {
     } else if (!window.confirm('Fechar este chamado e documentar a resolução na Wiki?')) {
       return
     }
+    if (selectedDuplicates.length > 0) {
+      const proceed = window.confirm(`Este chamado possui ${selectedDuplicates.length} possível(is) duplicado(s). Deseja fechar e documentar apenas este chamado mesmo assim?`)
+      if (!proceed) return
+    }
     if (shouldWarnBeforeCreatingWikiArticle(wikiSuggestions)) {
       const proceed = window.confirm(`Encontramos ${wikiSuggestions.length} artigo(s) parecido(s) na Wiki. Deseja criar um novo artigo mesmo assim?`)
       if (!proceed) return
@@ -290,6 +298,10 @@ export default function TicketsPage() {
     }
     return true
   })
+
+  const duplicateGroups = detectDuplicateTicketGroups(tickets)
+  const duplicateCountsById = new Map(duplicateGroups.flatMap(group => group.tickets.map(ticket => [ticket.id, group.count])))
+  const selectedDuplicates = selected ? findDuplicateTicketsFor(selected, tickets) : []
 
   return (
     <Layout>
@@ -351,7 +363,12 @@ export default function TicketsPage() {
                 ) : filtered.map(t => (
                   <tr key={t.id} onClick={() => openDetail(t)} style={{ cursor: 'pointer' }}>
                     <td className="mono">{t.id}</td>
-                    <td><p style={{ fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 280 }}>{t.title || '(sem título)'}</p></td>
+                    <td>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 360 }}>
+                        <p style={{ fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 280 }}>{t.title || '(sem título)'}</p>
+                        {duplicateCountsById.has(t.id) && <span className="badge bg-amber-100 text-amber-700">duplicado x{duplicateCountsById.get(t.id)}</span>}
+                      </div>
+                    </td>
                     <td><PriorityBadge priority={t.priority} /></td>
                     <td><StatusBadge status={t.status} label={t.statusLabel} /></td>
                     <td className="muted">{t.requester || '—'}</td>
@@ -394,6 +411,32 @@ export default function TicketsPage() {
             {detail.content && (
               <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600 whitespace-pre-wrap border border-slate-200">
                 {detail.content}
+              </div>
+            )}
+
+            {selectedDuplicates.length > 0 && (
+              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div>
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Possíveis chamados duplicados</p>
+                    <p className="text-sm text-amber-800">Encontramos chamados abertos com mesmo assunto e solicitante. Revise antes de documentar ou fechar individualmente.</p>
+                  </div>
+                  <span className="badge bg-amber-100 text-amber-700">{selectedDuplicates.length + 1} similares</span>
+                </div>
+                <div className="space-y-2">
+                  {selectedDuplicates.map(ticket => (
+                    <button key={ticket.id} onClick={() => openDetail(ticket)}
+                      className="w-full text-left rounded-xl border border-amber-100 bg-white p-3 hover:bg-amber-50 transition">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-800">#{ticket.id} · {ticket.title || '(sem título)'}</p>
+                          <p className="text-xs text-slate-500">{ticket.requester || '—'} · {ticket.statusLabel || 'Status não informado'} · {formatDate(ticket.openedAt)}</p>
+                        </div>
+                        <span className="text-xs font-semibold text-amber-700">Abrir</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
 

@@ -258,6 +258,48 @@ export function shouldWarnBeforeCreatingWikiArticle(suggestions = []) {
   return Array.isArray(suggestions) && suggestions.length > 0
 }
 
+function duplicateTicketSignature(ticket = {}) {
+  const title = normalizeText(ticket.title || ticket.name || '')
+    .split(' ')
+    .filter(token => token.length >= 3 && !/^\d+$/.test(token) && !['para', 'com', 'dos', 'das', 'uma', 'sem', 'por', 'mais'].includes(token))
+    .join(' ')
+  const requester = normalizeText(ticket.requester || ticket.requesterName || '')
+  if (!title || !requester) return ''
+  return `${requester}|${title}`
+}
+
+function isOpenDuplicateCandidate(ticket = {}) {
+  const status = Number(ticket.status)
+  return ![5, 6].includes(status)
+}
+
+export function detectDuplicateTicketGroups(tickets = []) {
+  const groups = new Map()
+  ;(tickets || []).filter(isOpenDuplicateCandidate).forEach(ticket => {
+    const key = duplicateTicketSignature(ticket)
+    if (!key) return
+    const list = groups.get(key) || []
+    list.push(ticket)
+    groups.set(key, list)
+  })
+  return [...groups.entries()]
+    .filter(([, items]) => items.length > 1)
+    .map(([key, items]) => ({
+      key,
+      count: items.length,
+      tickets: [...items].sort((a, b) => String(b.openedAt || '').localeCompare(String(a.openedAt || ''))),
+    }))
+    .sort((a, b) => b.count - a.count)
+}
+
+export function findDuplicateTicketsFor(ticket, tickets = []) {
+  if (!ticket || !isOpenDuplicateCandidate(ticket)) return []
+  const key = duplicateTicketSignature(ticket)
+  if (!key) return []
+  const group = detectDuplicateTicketGroups(tickets).find(item => item.key === key)
+  return group ? group.tickets.filter(item => item.id !== ticket.id) : []
+}
+
 export function buildWikiArticleFromTicket(detail, resolutionText = '') {
   const ticket = detail?.ticket || detail || {}
   const content = cleanHtml(detail?.content || '')
