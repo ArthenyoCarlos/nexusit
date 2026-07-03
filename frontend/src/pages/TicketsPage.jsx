@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getTickets, getTicket, addFollowup, closeTicket, assignTicket } from '../services/glpi'
 import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions } from '../utils/ticketIntelligence'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
@@ -194,6 +194,10 @@ export default function TicketsPage() {
 
   const handleCreateWikiArticle = async () => {
     if (!detail) return
+    if (shouldWarnBeforeCreatingWikiArticle(wikiSuggestions)) {
+      const proceed = window.confirm(`Encontramos ${wikiSuggestions.length} artigo(s) parecido(s) na Wiki. Deseja criar um novo artigo mesmo assim?`)
+      if (!proceed) return
+    }
     const resolution = assistantDraft?.type === 'resolution' ? assistantDraft.text : buildSuggestedResolution(detail)
     const article = buildWikiArticleFromTicket(detail, resolution)
     setWikiCreating(true)
@@ -241,6 +245,10 @@ export default function TicketsPage() {
       if (!proceed) return
     } else if (!window.confirm('Fechar este chamado e documentar a resolução na Wiki?')) {
       return
+    }
+    if (shouldWarnBeforeCreatingWikiArticle(wikiSuggestions)) {
+      const proceed = window.confirm(`Encontramos ${wikiSuggestions.length} artigo(s) parecido(s) na Wiki. Deseja criar um novo artigo mesmo assim?`)
+      if (!proceed) return
     }
 
     setActionLoading(true)
@@ -444,6 +452,11 @@ export default function TicketsPage() {
               {wikiSuggestionQueries.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
                   {wikiSuggestionQueries.map(q => <span key={q} className="badge bg-white text-slate-500 border border-amber-100">{q}</span>)}
+                </div>
+              )}
+              {!wikiSuggestionsLoading && wikiSuggestions.length > 0 && (
+                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-100/60 px-3 py-2 text-sm text-amber-800">
+                  Possível duplicidade: revise as sugestões ou vincule um artigo existente antes de criar nova documentação.
                 </div>
               )}
               {wikiSuggestionsLoading ? (

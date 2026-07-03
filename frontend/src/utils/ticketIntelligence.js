@@ -187,6 +187,10 @@ export function mergeWikiSuggestions(resultGroups = []) {
   }).slice(0, 6)
 }
 
+export function shouldWarnBeforeCreatingWikiArticle(suggestions = []) {
+  return Array.isArray(suggestions) && suggestions.length > 0
+}
+
 export function buildWikiArticleFromTicket(detail, resolutionText = '') {
   const ticket = detail?.ticket || detail || {}
   const content = cleanHtml(detail?.content || '')

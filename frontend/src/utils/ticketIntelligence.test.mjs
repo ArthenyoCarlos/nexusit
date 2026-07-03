@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions } from './ticketIntelligence.js'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle } from './ticketIntelligence.js'
 
 const detail = {
   ticket: {
@@ -91,5 +91,8 @@ const merged = mergeWikiSuggestions([
 assert.equal(merged.length, 2)
 assert.equal(merged[0].matchCount, 2)
 assert.equal(merged[0].id, '1')
+assert.equal(shouldWarnBeforeCreatingWikiArticle(merged), true)
+assert.equal(shouldWarnBeforeCreatingWikiArticle([]), false)
+assert.equal(shouldWarnBeforeCreatingWikiArticle(null), false)
 
 console.log('ticketIntelligence tests passed')
