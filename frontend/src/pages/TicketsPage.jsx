@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { getTickets, getTicket, addFollowup, closeTicket, assignTicket } from '../services/glpi'
 import { createArticle } from '../services/wiki'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket } from '../utils/ticketIntelligence'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
@@ -182,6 +182,42 @@ export default function TicketsPage() {
     }
   }
 
+  const handleCloseAndDocument = async () => {
+    if (!detail || !selected) return
+    const resolution = followupText.trim() || (assistantDraft?.type === 'resolution' ? assistantDraft.text : buildSuggestedResolution(detail))
+    if (isPendingResolutionDraft(resolution)) {
+      const proceed = window.confirm('Este chamado ainda parece não ter uma ação técnica registrada. Deseja fechar e documentar mesmo assim?')
+      if (!proceed) return
+    } else if (!window.confirm('Fechar este chamado e documentar a resolução na Wiki?')) {
+      return
+    }
+
+    setActionLoading(true)
+    setWikiCreating(true)
+    try {
+      const article = buildWikiArticleFromTicket(detail, resolution)
+      const created = await createArticle(article)
+      const wikiFollowup = buildWikiLinkFollowup(created, window.location.origin)
+      await addFollowup(selected.id, `${resolution}\n\n${wikiFollowup}`)
+      await closeTicket(selected.id)
+      setFollowupText('')
+      setActionMsg({ type: 'success', text: 'Chamado fechado e documentado na Wiki.' })
+      setAssistantDraft({
+        type: 'wiki',
+        title: 'Chamado fechado e documentado',
+        text: `${created.title}\n\n${window.location.origin}/wiki/${created.id}`,
+        url: `/wiki/${created.id}`,
+      })
+      await fetchTickets()
+      const res = await getTicket(selected.id); setDetail(res.data)
+    } catch {
+      setActionMsg({ type: 'error', text: 'Erro ao fechar e documentar chamado. Verifique se o chamado foi parcialmente atualizado.' })
+    } finally {
+      setActionLoading(false)
+      setWikiCreating(false)
+    }
+  }
+
   const filtered = tickets.filter(t => {
     if (priorityFilter && t.priority !== parseInt(priorityFilter)) return false
     if (search) {
@@ -319,6 +355,12 @@ export default function TicketsPage() {
                   className="btn btn-default text-xs">
                   {wikiCreating ? 'Criando...' : 'Documentar na Wiki'}
                 </button>
+                {isAdmin && (
+                  <button onClick={handleCloseAndDocument} disabled={actionLoading || wikiCreating || detail.ticket.status === 6}
+                    className="btn btn-primary text-xs">
+                    {actionLoading || wikiCreating ? 'Processando...' : 'Fechar e documentar'}
+                  </button>
+                )}
               </div>
               {assistantDraft && (
                 <div className="mt-4 rounded-xl bg-white border border-indigo-100 p-3">

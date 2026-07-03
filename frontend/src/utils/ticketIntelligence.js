@@ -126,6 +126,23 @@ export function buildSuggestedResolution(detail) {
   ].join('\n')
 }
 
+export function isPendingResolutionDraft(text = '') {
+  return /Resolução pendente:/i.test(cleanHtml(text))
+}
+
+export function buildWikiLinkFollowup(article, origin = '') {
+  const title = article?.title || 'Artigo da Wiki'
+  const id = article?.id || ''
+  const base = String(origin || '').replace(/\/$/, '')
+  const url = id ? `${base}/wiki/${id}` : base
+  return [
+    'Documentação gerada automaticamente na Wiki do NexusIT.',
+    '',
+    `Artigo: ${title}`,
+    `Link: ${url}`,
+  ].join('\n')
+}
+
 export function buildWikiArticleFromTicket(detail, resolutionText = '') {
   const ticket = detail?.ticket || detail || {}
   const content = cleanHtml(detail?.content || '')

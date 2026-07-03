@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket } from './ticketIntelligence.js'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft } from './ticketIntelligence.js'
 
 const detail = {
   ticket: {
@@ -65,6 +65,13 @@ assert.match(zabbixResolution, /Alerta: Network Generic Device: Interface 0\/5\(
 assert.match(zabbixResolution, /Resolução pendente: ainda não há ação técnica registrada/)
 assert.match(zabbixResolution, /Próxima ação sugerida: verificar fisicamente/)
 assert.doesNotMatch(zabbixResolution, /Ação executada: Chamado aberto automaticamente/)
-assert.doesNotMatch(zabbixResolution, /Resultado: atendimento registrado e validado/)
+assert.doesNotMatch(zabbixResolution, /Resultado: atendimento registrado/)
+assert.equal(isPendingResolutionDraft(zabbixResolution), true)
+assert.equal(isPendingResolutionDraft(resolution), false)
+
+const wikiFollowup = buildWikiLinkFollowup({ title: article.title, id: 'abc-123' }, 'https://nexus.local')
+assert.match(wikiFollowup, /Documentação gerada automaticamente na Wiki do NexusIT/)
+assert.match(wikiFollowup, /Chamado #25: Sistema lento/)
+assert.match(wikiFollowup, /https:\/\/nexus.local\/wiki\/abc-123/)
 
 console.log('ticketIntelligence tests passed')
