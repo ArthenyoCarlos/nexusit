@@ -105,7 +105,7 @@ export default function TicketsPage() {
     try {
       const groups = await Promise.all(queries.map(q => searchWiki(q).catch(() => [])))
       const linkedIds = new Set((links || []).map(link => link.wikiArticleId))
-      setWikiSuggestions(mergeWikiSuggestions(groups).filter(article => !linkedIds.has(article.id)))
+      setWikiSuggestions(mergeWikiSuggestions(groups, { detail: ticketDetail, queries }).filter(article => !linkedIds.has(article.id)))
     } catch {
       setWikiSuggestions([])
     } finally {
@@ -470,7 +470,12 @@ export default function TicketsPage() {
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-slate-800">{article.title}</p>
-                          <p className="text-xs text-slate-500">{article.category || 'Wiki'} · {article.matchCount} ocorrência(s) nas buscas</p>
+                          <p className="text-xs text-slate-500">{article.category || 'Wiki'} · score {article.score || 0} · {article.matchCount} ocorrência(s) nas buscas</p>
+                          {article.scoreReasons?.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {article.scoreReasons.map(reason => <span key={reason} className="badge bg-amber-50 text-amber-700 border border-amber-100">{reason}</span>)}
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-2">
                           <a href={`/wiki/${article.id}`} target="_blank" rel="noreferrer" className="btn btn-default text-xs">Abrir</a>

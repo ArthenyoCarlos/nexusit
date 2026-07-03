@@ -85,12 +85,19 @@ assert.equal(new Set(searchQueries).size, searchQueries.length)
 assert.ok(searchQueries.length <= 6)
 
 const merged = mergeWikiSuggestions([
-  [{ id: '1', title: 'Link down porta switch', updatedAt: '2026-07-03T10:00:00' }],
-  [{ id: '1', title: 'Link down porta switch', updatedAt: '2026-07-03T10:00:00' }, { id: '2', title: 'VPN caiu', updatedAt: '2026-07-02T10:00:00' }],
-])
-assert.equal(merged.length, 2)
+  [{ id: '1', title: 'Link down porta switch', category: 'Rede', tags: 'switch,link-down,zabbix', updatedAt: '2026-07-03T10:00:00', linkedTicketCount: 3 }],
+  [{ id: '1', title: 'Link down porta switch', category: 'Rede', tags: 'switch,link-down,zabbix', updatedAt: '2026-07-03T10:00:00', linkedTicketCount: 3 }, { id: '2', title: 'VPN caiu', category: 'Rede', tags: 'vpn', updatedAt: '2026-07-02T10:00:00' }],
+  [{ id: '3', title: 'Nota fiscal indisponível', category: 'Sistemas', tags: 'sefaz,nfe', updatedAt: '2026-07-04T10:00:00' }],
+], { detail: zabbixAutoTicket, queries: searchQueries })
+assert.equal(merged.length, 3)
 assert.equal(merged[0].matchCount, 2)
 assert.equal(merged[0].id, '1')
+assert.ok(merged[0].score > merged[1].score)
+assert.ok(merged[0].scoreReasons.includes('Título'))
+assert.ok(merged[0].scoreReasons.includes('Categoria'))
+assert.ok(merged[0].scoreReasons.includes('Tags'))
+assert.ok(merged[0].scoreReasons.includes('Termos'))
+assert.ok(merged[0].scoreReasons.includes('Uso'))
 assert.equal(shouldWarnBeforeCreatingWikiArticle(merged), true)
 assert.equal(shouldWarnBeforeCreatingWikiArticle([]), false)
 assert.equal(shouldWarnBeforeCreatingWikiArticle(null), false)

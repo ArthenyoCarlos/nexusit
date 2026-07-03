@@ -169,7 +169,69 @@ export function buildWikiSearchQueries(detail) {
   return [...new Set(queries.map(q => q.trim()).filter(q => q.length >= 3))].slice(0, 6)
 }
 
-export function mergeWikiSuggestions(resultGroups = []) {
+function normalizeText(value = '') {
+  return cleanHtml(value)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function scoreWikiSuggestion(article, { detail = null, queries = [] } = {}) {
+  const ticket = detail?.ticket || detail || {}
+  const ticketText = normalizeText(`${ticket.title || ''} ${detail?.content || ''}`)
+  const inferredCategory = categoryFromTicket(ticket, detail?.content || '')
+  const haystack = normalizeText(`${article.title || ''} ${article.category || ''} ${article.tags || ''} ${article.content || ''}`)
+  const title = normalizeText(article.title || '')
+  const tags = normalizeText(article.tags || '')
+  const category = normalizeText(article.category || '')
+  const queryTokens = queries
+    .flatMap(q => normalizeText(q).split(' '))
+    .filter(t => t.length >= 4)
+  const uniqueTokens = [...new Set(queryTokens)]
+  const tokenHits = uniqueTokens.filter(token => haystack.includes(token)).length
+  const usageCount = Number(article.linkedTicketCount ?? article.ticketLinkCount ?? article.usageCount ?? 0)
+  const updatedAt = article.updatedAt || article.createdAt
+  const ageDays = updatedAt ? Math.max(0, (Date.now() - new Date(updatedAt).getTime()) / 86400000) : null
+  const reasons = []
+  let score = 0
+
+  score += (article.matchCount || 1) * 12
+  if (tokenHits > 0) {
+    score += tokenHits * 4
+    reasons.push('Termos')
+  }
+  if (title && uniqueTokens.some(token => title.includes(token))) {
+    score += 10
+    reasons.push('Título')
+  }
+  if (category && normalizeText(inferredCategory) === category) {
+    score += 8
+    reasons.push('Categoria')
+  }
+  if (tags && uniqueTokens.some(token => tags.includes(token))) {
+    score += 6
+    reasons.push('Tags')
+  }
+  if (usageCount > 0) {
+    score += Math.min(usageCount, 5) * 3
+    reasons.push('Uso')
+  }
+  if (ageDays != null && ageDays <= 30) {
+    score += 4
+    reasons.push('Recente')
+  }
+  if (ticketText && title && ticketText.includes(title)) {
+    score += 12
+    if (!reasons.includes('Título')) reasons.push('Título')
+  }
+
+  return { score, reasons: [...new Set(reasons)] }
+}
+
+export function mergeWikiSuggestions(resultGroups = [], context = {}) {
   const byId = new Map()
   resultGroups.flat().filter(Boolean).forEach(article => {
     const id = article.id
@@ -177,11 +239,16 @@ export function mergeWikiSuggestions(resultGroups = []) {
     const current = byId.get(id)
     if (current) {
       current.matchCount += 1
+      current.searchHits = [...(current.searchHits || []), article]
       return
     }
-    byId.set(id, { ...article, matchCount: 1 })
+    byId.set(id, { ...article, matchCount: 1, searchHits: [article] })
   })
-  return [...byId.values()].sort((a, b) => {
+  return [...byId.values()].map(article => {
+    const { score, reasons } = scoreWikiSuggestion(article, context)
+    return { ...article, score, scoreReasons: reasons }
+  }).sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score
     if (b.matchCount !== a.matchCount) return b.matchCount - a.matchCount
     return String(b.updatedAt || b.createdAt || '').localeCompare(String(a.updatedAt || a.createdAt || ''))
   }).slice(0, 6)
