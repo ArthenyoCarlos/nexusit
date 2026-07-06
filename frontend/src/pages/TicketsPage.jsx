@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTickets, getTicket, addFollowup, closeTicket, assignTicket } from '../services/glpi'
+import { getTickets, getTicket, addFollowup, closeTicket, assignTicket, getTechnicians } from '../services/glpi'
 import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
 import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from '../utils/ticketIntelligence'
@@ -55,6 +55,11 @@ function StatusBadge({ status, label }) {
   return <span className={`badge ${STATUS_COLOR[status] ?? STATUS_COLOR[1]}`}>{label}</span>
 }
 
+function describeGlpiError(err, fallback) {
+  const detail = err?.response?.data?.error
+  return detail ? `${fallback} (${detail})` : fallback
+}
+
 function formatDate(s) {
   if (!s) return '—'
   return new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -82,6 +87,12 @@ export default function TicketsPage() {
   const [wikiSuggestions, setWikiSuggestions] = useState([])
   const [wikiSuggestionQueries, setWikiSuggestionQueries] = useState([])
   const [wikiSuggestionsLoading, setWikiSuggestionsLoading] = useState(false)
+  const [technicians, setTechnicians] = useState([])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    getTechnicians().then(res => setTechnicians(res.data)).catch(() => setTechnicians([]))
+  }, [isAdmin])
 
   const fetchTickets = useCallback(async () => {
     setLoading(true)
@@ -137,7 +148,7 @@ export default function TicketsPage() {
       setFollowupText('')
       setActionMsg({ type: 'success', text: 'Resposta adicionada.' })
       const res = await getTicket(selected.id); setDetail(res.data)
-    } catch { setActionMsg({ type: 'error', text: 'Erro ao adicionar resposta.' }) }
+    } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao adicionar resposta.') }) }
     finally { setActionLoading(false) }
   }
 
@@ -148,7 +159,7 @@ export default function TicketsPage() {
       await closeTicket(selected.id)
       setActionMsg({ type: 'success', text: 'Chamado fechado.' })
       await fetchTickets(); const res = await getTicket(selected.id); setDetail(res.data)
-    } catch { setActionMsg({ type: 'error', text: 'Erro ao fechar chamado.' }) }
+    } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao fechar chamado.') }) }
     finally { setActionLoading(false) }
   }
 
@@ -159,7 +170,7 @@ export default function TicketsPage() {
       await assignTicket(selected.id, uid)
       setActionMsg({ type: 'success', text: 'Técnico atribuído.' })
       setAssignUserId(''); const res = await getTicket(selected.id); setDetail(res.data)
-    } catch { setActionMsg({ type: 'error', text: 'Erro ao atribuir técnico.' }) }
+    } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao atribuir técnico.') }) }
     finally { setActionLoading(false) }
   }
 
@@ -608,9 +619,11 @@ export default function TicketsPage() {
                     className="btn btn-default text-xs">
                     Fechar chamado
                   </button>
-                  <input type="number" placeholder="ID do técnico (GLPI)" value={assignUserId}
-                    onChange={e => setAssignUserId(e.target.value)}
-                    className="input w-44 text-xs" />
+                  <select value={assignUserId} onChange={e => setAssignUserId(e.target.value)}
+                    className="input w-56 text-xs">
+                    <option value="">Selecione um técnico...</option>
+                    {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
                   <button onClick={handleAssign} disabled={!assignUserId || actionLoading}
                     className="btn btn-primary text-xs">
                     Atribuir técnico

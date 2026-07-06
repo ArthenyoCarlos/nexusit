@@ -96,32 +96,59 @@ public class GlpiService {
     // ── Actions ───────────────────────────────────────────────────────────
 
     public void addFollowup(int ticketId, String content) {
-        safeCall(() -> {
-            Map<String, Object> body = Map.of(
-                    "input", Map.of("tickets_id", ticketId, "content", content));
-            client.post("/Ticket/" + ticketId + "/ITILFollowup", body);
-            return null;
-        }, null);
+        Map<String, Object> body = Map.of(
+                "input", Map.of(
+                        "itemtype", "Ticket",
+                        "items_id", ticketId,
+                        "content", content));
+        client.post("/Ticket/" + ticketId + "/ITILFollowup", body);
     }
 
     public void closeTicket(int ticketId) {
-        safeCall(() -> {
-            Map<String, Object> body = Map.of("input", Map.of("status", 6));
-            client.put("/Ticket/" + ticketId, body);
-            return null;
-        }, null);
+        Map<String, Object> body = Map.of("input", Map.of("status", 6));
+        client.put("/Ticket/" + ticketId, body);
     }
 
     public void assignTicket(int ticketId, int glpiUserId) {
-        safeCall(() -> {
-            // Add assignment (type 2 = assigned tech)
-            Map<String, Object> body = Map.of("input", Map.of(
-                    "tickets_id", ticketId,
-                    "users_id", glpiUserId,
-                    "type", 2));
-            client.post("/Ticket_User", body);
-            return null;
-        }, null);
+        // Add assignment (type 2 = assigned tech)
+        Map<String, Object> body = Map.of("input", Map.of(
+                "tickets_id", ticketId,
+                "users_id", glpiUserId,
+                "type", 2));
+        client.post("/Ticket_User", body);
+    }
+
+    // ── Technicians ───────────────────────────────────────────────────────
+
+    public List<Map<String, Object>> getTechnicians() {
+        return safeCall(() -> {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("range", "0-299");
+            params.put("expand_dropdowns", "false");
+
+            List<Map<String, Object>> raw = client.getList("/User", params);
+            if (raw == null) return List.<Map<String, Object>>of();
+
+            return raw.stream()
+                    .filter(u -> intVal(u, "is_deleted") == 0)
+                    .map(u -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("id", intVal(u, "id"));
+                        m.put("name", technicianDisplayName(u));
+                        return m;
+                    })
+                    .filter(m -> !String.valueOf(m.get("name")).isBlank())
+                    .sorted(Comparator.comparing(m -> String.valueOf(m.get("name")).toLowerCase()))
+                    .toList();
+        }, List.of());
+    }
+
+    private String technicianDisplayName(Map<String, Object> u) {
+        String first = str(u, "firstname");
+        String last = str(u, "realname");
+        String login = str(u, "name");
+        String full = (first + " " + last).trim();
+        return full.isBlank() ? login : full + " (" + login + ")";
     }
 
     // ── Parsing ───────────────────────────────────────────────────────────

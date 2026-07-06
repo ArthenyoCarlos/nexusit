@@ -14,3 +14,6 @@ export const closeTicket = (id) =>
 
 export const assignTicket = (id, userId) =>
   api.put(`/glpi/tickets/${id}/assign`, { userId })
+
+export const getTechnicians = () =>
+  api.get('/glpi/technicians')
