@@ -186,76 +186,67 @@ export default function SystemsPage() {
 
       {/* Modal form */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Sistema' : 'Novo Sistema'} size="lg">
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
-              <input required value={form.name} onChange={f('name')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">Nome *</label>
+              <input required value={form.name} onChange={f('name')} className="input"
                 placeholder="Nome do sistema" />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">URL</label>
-              <input value={form.url} onChange={f('url')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">URL</label>
+              <input value={form.url} onChange={f('url')} className="input"
                 placeholder="https://..." />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Categoria *</label>
-              <select value={form.category} onChange={f('category')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Categoria *</label>
+              <select value={form.category} onChange={f('category')} className="input">
                 {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <select value={form.status} onChange={f('status')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Status</label>
+              <select value={form.status} onChange={f('status')} className="input">
                 <option value="ACTIVE">Ativo</option>
                 <option value="INACTIVE">Inativo</option>
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-              <select value={form.responsibleId} onChange={f('responsibleId')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Responsável</label>
+              <select value={form.responsibleId} onChange={f('responsibleId')} className="input">
                 <option value="">— Nenhum —</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Servidor (inventário)</label>
-              <select value={form.serverId} onChange={f('serverId')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Servidor (inventário)</label>
+              <select value={form.serverId} onChange={f('serverId')} className="input">
                 <option value="">— Nenhum —</option>
                 {servers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
               </select>
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-              <textarea value={form.description} onChange={f('description')} rows={3}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">Descrição</label>
+              <textarea value={form.description} onChange={f('description')} rows={3} className="input"
                 placeholder="Breve descrição do sistema" />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Documentação</label>
-              <textarea value={form.documentation} onChange={f('documentation')} rows={4}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono"
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">Documentação</label>
+              <textarea value={form.documentation} onChange={f('documentation')} rows={4} className="input"
+                style={{ fontFamily: 'var(--font-mono)' }}
                 placeholder="Documentação em texto livre..." />
             </div>
           </div>
 
           {formError && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{formError}</p>
+            <div className="alert alert-red"><p>{formError}</p></div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)}
-              className="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-default">
               Cancelar
             </button>
-            <button type="submit" disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg font-medium">
+            <button type="submit" disabled={saving} className="btn btn-primary">
               {saving ? 'Salvando...' : (editing ? 'Salvar' : 'Criar')}
             </button>
           </div>

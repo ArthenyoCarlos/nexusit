@@ -19,7 +19,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
       style={{
         position: 'fixed', inset: 0, zIndex: 50,
         overflowY: 'auto',
-        background: 'rgba(10,14,30,0.55)',
+        background: 'rgba(0,0,0,0.55)',
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
         padding: '32px 16px',
@@ -33,7 +33,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
           width: '100%',
           maxWidth: SIZE_MAP[size] ?? 520,
           margin: '0 auto',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.18), 0 4px 16px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)',
+          boxShadow: 'var(--shadow-xl)',
         }}
       >
         {/* Header */}

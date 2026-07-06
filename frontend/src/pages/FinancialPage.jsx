@@ -12,11 +12,11 @@ const BRL = v => v != null ? new Intl.NumberFormat('pt-BR',{style:'currency',cur
 const DATE = v => v ? new Date(v+'T00:00').toLocaleDateString('pt-BR') : '—'
 
 const STATUS_CFG = {
-  OVERDUE:  { label: 'Vencida',    color: '#dc2626', bg: '#fef2f2' },
-  DUE_SOON: { label: 'Vence hoje/amanhã', color: '#ea580c', bg: '#fff7ed' },
-  UPCOMING: { label: 'Esta semana', color: '#d97706', bg: '#fffbeb' },
-  OK:       { label: 'Em dia',     color: '#0e9f6e', bg: '#f0fdf4' },
-  PAID:     { label: 'Pago',       color: '#64748b', bg: '#f8fafc' },
+  OVERDUE:  { label: 'Vencida',           color: 'var(--red)',    bg: 'var(--red-bg)'    },
+  DUE_SOON: { label: 'Vence hoje/amanhã', color: 'var(--orange)', bg: 'var(--orange-bg)' },
+  UPCOMING: { label: 'Esta semana',       color: 'var(--amber)',  bg: 'var(--amber-bg)'  },
+  OK:       { label: 'Em dia',            color: 'var(--green)',  bg: 'var(--green-bg)'  },
+  PAID:     { label: 'Pago',              color: 'var(--text-tertiary)', bg: 'var(--bg-muted)' },
 }
 
 export default function FinancialPage() {
@@ -73,10 +73,10 @@ export default function FinancialPage() {
         {/* KPI Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 14, marginBottom: 24 }}>
           {[
-            { label: 'Total em Ativos',    value: BRL(summary.totalAssets),    color: '#1a56db', bg: 'var(--accent-light)', icon: '🖥️' },
-            { label: 'Total em Licenças',  value: BRL(summary.totalLicenses),  color: '#7c3aed', bg: 'var(--purple-bg)',    icon: '📋' },
-            { label: 'Total em Contratos', value: BRL(summary.totalContracts), color: '#0891b2', bg: 'var(--cyan-bg,#ecfeff)', icon: '📄' },
-            { label: 'Contas a Pagar',     value: BRL(summary.pendingBills),   color: summary.overdueBills > 0 ? '#e02424' : '#d97706', bg: summary.overdueBills > 0 ? 'var(--red-bg)' : 'var(--amber-bg)', icon: '💳' },
+            { label: 'Total em Ativos',    value: BRL(summary.totalAssets),    color: 'var(--accent-text)', bg: 'var(--accent-light)', icon: '🖥️' },
+            { label: 'Total em Licenças',  value: BRL(summary.totalLicenses),  color: 'var(--purple)', bg: 'var(--purple-bg)',    icon: '📋' },
+            { label: 'Total em Contratos', value: BRL(summary.totalContracts), color: 'var(--cyan)', bg: 'var(--cyan-bg)', icon: '📄' },
+            { label: 'Contas a Pagar',     value: BRL(summary.pendingBills),   color: summary.overdueBills > 0 ? 'var(--red)' : 'var(--amber)', bg: summary.overdueBills > 0 ? 'var(--red-bg)' : 'var(--amber-bg)', icon: '💳' },
           ].map(k => (
             <div key={k.label} className="stat-card" style={{ display: 'flex', alignItems: 'flex-start', gap: 14 }}>
               <div className="stat-icon" style={{ background: k.bg, color: k.color, fontSize: 20 }}>{k.icon}</div>
@@ -90,13 +90,13 @@ export default function FinancialPage() {
 
         {/* Alertas */}
         {overdueBills.length > 0 && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
-            <p style={{ fontWeight: 600, color: '#991b1b', fontSize: 13 }}>🔴 {overdueBills.length} conta(s) vencida(s): {overdueBills.map(b => b.title).join(', ')}</p>
+          <div className="alert alert-red">
+            <p style={{ fontWeight: 600, fontSize: 13 }}>{overdueBills.length} conta(s) vencida(s): {overdueBills.map(b => b.title).join(', ')}</p>
           </div>
         )}
         {dueSoonBills.length > 0 && (
-          <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px', marginBottom: 14 }}>
-            <p style={{ fontWeight: 600, color: '#92400e', fontSize: 13 }}>⚠ {dueSoonBills.length} conta(s) vencendo em breve</p>
+          <div className="alert alert-amber">
+            <p style={{ fontWeight: 600, fontSize: 13 }}>{dueSoonBills.length} conta(s) vencendo em breve</p>
           </div>
         )}
 
@@ -133,9 +133,9 @@ export default function FinancialPage() {
                     <td style={{ padding: '11px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>{b.vendor ?? '—'}</td>
                     <td style={{ padding: '11px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>{b.category}</td>
                     <td style={{ padding: '11px 14px', fontSize: 13.5, fontWeight: 700, color: b.paid ? 'var(--text-tertiary)' : 'var(--text-primary)' }}>{BRL(b.amount)}</td>
-                    <td style={{ padding: '11px 14px', fontSize: 13, color: b.status === 'OVERDUE' ? '#dc2626' : 'var(--text-secondary)' }}>
+                    <td style={{ padding: '11px 14px', fontSize: 13, color: b.status === 'OVERDUE' ? 'var(--red)' : 'var(--text-secondary)' }}>
                       {DATE(b.dueDate)}
-                      {b.paid && b.paidAt && <p style={{ fontSize: 11, color: '#0e9f6e' }}>Pago em {DATE(b.paidAt)}</p>}
+                      {b.paid && b.paidAt && <p style={{ fontSize: 11, color: 'var(--green)' }}>Pago em {DATE(b.paidAt)}</p>}
                     </td>
                     <td style={{ padding: '11px 14px' }}>
                       {isAdmin && (

@@ -482,9 +482,9 @@ export default function HermesPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{
                 width: 36, height: 36, borderRadius: 10, flexShrink: 0,
-                background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+                background: 'var(--accent)',
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 12px rgba(79,70,229,0.35)',
+                boxShadow: '0 4px 12px var(--accent-glow)',
               }}>
                 <HermesIcon />
               </div>
@@ -494,7 +494,7 @@ export default function HermesPage() {
               </div>
             </div>
           </div>
-          <span className="badge" style={{ background: 'linear-gradient(135deg,#818cf8,#4f46e5)', color: '#fff', padding: '3px 10px', fontSize: 11 }}>
+          <span className="badge" style={{ background: 'var(--accent)', color: 'var(--text-inverse)', padding: '3px 10px', fontSize: 11 }}>
             NexusAI
           </span>
         </div>
@@ -509,7 +509,7 @@ export default function HermesPage() {
                 disabled={loading}
                 style={{
                   padding: '5px 12px', borderRadius: 20, fontSize: 12, fontWeight: 500,
-                  border: '1px solid var(--border)', background: 'var(--card-bg)',
+                  border: '1px solid var(--border)', background: 'var(--bg-surface)',
                   color: 'var(--text-secondary)', cursor: loading ? 'not-allowed' : 'pointer',
                   display: 'flex', alignItems: 'center', gap: 5,
                   transition: 'all 0.15s',
@@ -535,7 +535,7 @@ export default function HermesPage() {
               {msg.role === 'hermes' && (
                 <div style={{
                   width: 26, height: 26, borderRadius: 8, flexShrink: 0, marginRight: 8, marginTop: 2,
-                  background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+                  background: 'var(--accent)',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   <HermesIcon size={13} />
@@ -544,13 +544,13 @@ export default function HermesPage() {
               <div style={{
                 maxWidth: '78%',
                 background: msg.role === 'user'
-                  ? 'linear-gradient(135deg, #4f46e5, #6366f1)'
-                  : 'var(--card-bg)',
-                color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
+                  ? 'var(--accent)'
+                  : 'var(--bg-surface)',
+                color: msg.role === 'user' ? 'var(--text-inverse)' : 'var(--text-primary)',
                 border: msg.role === 'user' ? 'none' : '1px solid var(--border)',
                 borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
                 padding: '10px 14px',
-                boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                boxShadow: 'var(--shadow-xs)',
               }}>
                 {msg.loading ? (
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '2px 0' }}>
@@ -565,7 +565,7 @@ export default function HermesPage() {
                   <pre style={{
                     margin: 0, fontSize: 13, lineHeight: 1.65,
                     fontFamily: 'inherit', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-                    color: msg.role === 'user' ? '#fff' : 'var(--text-primary)',
+                    color: msg.role === 'user' ? 'var(--text-inverse)' : 'var(--text-primary)',
                   }}>
                     {msg.text}
                   </pre>
@@ -592,7 +592,7 @@ export default function HermesPage() {
             style={{
               flex: 1, resize: 'none', padding: '10px 14px',
               borderRadius: 12, border: '1px solid var(--border)',
-              background: 'var(--card-bg)', color: 'var(--text-primary)',
+              background: 'var(--bg-surface)', color: 'var(--text-primary)',
               fontSize: 13, lineHeight: 1.5, outline: 'none',
               fontFamily: 'inherit',
               maxHeight: 120, overflow: 'auto',

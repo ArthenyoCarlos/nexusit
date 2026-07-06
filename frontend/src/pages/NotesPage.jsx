@@ -6,9 +6,9 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 
 const TAG_COLORS = [
-  'bg-blue-100 text-blue-700', 'bg-purple-100 text-purple-700',
-  'bg-green-100 text-green-700', 'bg-yellow-100 text-yellow-700',
-  'bg-pink-100 text-pink-700', 'bg-orange-100 text-orange-700',
+  'bg-[var(--accent-light)] text-[var(--accent-text)]', 'bg-[var(--purple-bg)] text-[var(--purple)]',
+  'bg-[var(--green-bg)] text-[var(--green)]', 'bg-[var(--amber-bg)] text-[var(--amber)]',
+  'bg-[var(--red-bg)] text-[var(--red)]', 'bg-[var(--orange-bg)] text-[var(--orange)]',
 ]
 function tagColor(tag) {
   let h = 0

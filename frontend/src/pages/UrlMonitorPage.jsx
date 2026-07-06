@@ -84,7 +84,7 @@ export default function UrlMonitorPage() {
               const isDown = !m.up && hasCheck
               return (
                 <div key={m.id} className="card" style={{ padding: '14px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
-                  <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: !hasCheck ? '#94a3b8' : isUp ? '#10b981' : '#ef4444', animation: isDown ? 'pulse 2s infinite' : 'none' }} />
+                  <div style={{ width: 10, height: 10, borderRadius: '50%', flexShrink: 0, background: !hasCheck ? 'var(--text-tertiary)' : isUp ? 'var(--green)' : 'var(--red)', animation: isDown ? 'pulse 2s infinite' : 'none' }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>{m.name}</p>
@@ -92,7 +92,7 @@ export default function UrlMonitorPage() {
                     </div>
                     <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 2 }} className="truncate">{m.url}</p>
                     <div style={{ display: 'flex', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
-                      {hasCheck && <span style={{ fontSize: 11, color: isUp ? '#059669' : '#dc2626', fontWeight: 600 }}>{isUp ? 'UP' : 'DOWN'} {m.lastStatus ? `(${m.lastStatus})` : ''}</span>}
+                      {hasCheck && <span style={{ fontSize: 11, color: isUp ? 'var(--green)' : 'var(--red)', fontWeight: 600 }}>{isUp ? 'UP' : 'DOWN'} {m.lastStatus ? `(${m.lastStatus})` : ''}</span>}
                       {m.uptimePct != null && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Uptime: {m.uptimePct}%</span>}
                       {m.lastCheck && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Última: {new Date(m.lastCheck).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
                     </div>
@@ -109,17 +109,17 @@ export default function UrlMonitorPage() {
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Monitor' : 'Adicionar URL'}>
-        <form onSubmit={handleSave} className="space-y-4">
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label><input required value={form.name} onChange={f('name')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="ERP Interno" /></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">URL *</label><input required value={form.url} onChange={f('url')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="https://erp.local" /></div>
-          <div><label className="block text-sm font-medium text-slate-700 mb-1">Intervalo (segundos)</label><input type="number" min="60" value={form.intervalSec} onChange={f('intervalSec')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" /></div>
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div><label className="input-label">Nome *</label><input required value={form.name} onChange={f('name')} className="input" placeholder="ERP Interno" /></div>
+          <div><label className="input-label">URL *</label><input required value={form.url} onChange={f('url')} className="input" placeholder="https://erp.local" /></div>
+          <div><label className="input-label">Intervalo (segundos)</label><input type="number" min="60" value={form.intervalSec} onChange={f('intervalSec')} className="input" /></div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <input type="checkbox" id="enabled" checked={form.enabled} onChange={f('enabled')} />
-            <label htmlFor="enabled" className="text-sm text-slate-700">Monitoramento ativo</label>
+            <label htmlFor="enabled" style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Monitoramento ativo</label>
           </div>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg font-medium">{saving ? 'Salvando...' : editing ? 'Salvar' : 'Adicionar'}</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-default">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn btn-primary">{saving ? 'Salvando...' : editing ? 'Salvar' : 'Adicionar'}</button>
           </div>
         </form>
       </Modal>

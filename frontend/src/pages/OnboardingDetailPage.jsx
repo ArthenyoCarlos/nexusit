@@ -42,7 +42,7 @@ export default function OnboardingDetailPage() {
         <div className="card" style={{ padding: '20px 24px', marginBottom: 16 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: isOn ? '#dbeafe' : '#fce7f3', color: isOn ? '#1d4ed8' : '#be185d', display: 'inline-block', marginBottom: 8 }}>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: isOn ? 'var(--accent-light)' : 'var(--purple-bg)', color: isOn ? 'var(--accent-text)' : 'var(--purple)', display: 'inline-block', marginBottom: 8 }}>
                 {isOn ? '👋 ONBOARDING' : '🚪 OFFBOARDING'}
               </span>
               <h1 style={{ fontSize: 20, fontWeight: 700, color: 'var(--text-primary)' }}>{checklist.employeeName}</h1>

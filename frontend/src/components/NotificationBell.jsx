@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { getProblems } from '../services/monitoring'
 import { getTickets } from '../services/glpi'
+import { severityOf } from '../utils/severity'
 
 export default function NotificationBell() {
   const [alerts, setAlerts]   = useState([])
@@ -31,14 +32,6 @@ export default function NotificationBell() {
   const totalCount = criticalAlerts.length + (tickets.length > 0 ? 1 : 0)
   const hasCritical = criticalAlerts.length > 0
 
-  const SEVERITY = {
-    5: { label: 'Disaster', color: '#dc2626', bg: '#fef2f2' },
-    4: { label: 'High',     color: '#ea580c', bg: '#fff7ed' },
-    3: { label: 'Average',  color: '#d97706', bg: '#fffbeb' },
-    2: { label: 'Warning',  color: '#2563eb', bg: '#eff6ff' },
-    1: { label: 'Info',     color: '#64748b', bg: '#f8fafc' },
-  }
-
   return (
     <div ref={bellRef} style={{ position: 'relative' }}>
       <button
@@ -62,8 +55,8 @@ export default function NotificationBell() {
           <span style={{
             position: 'absolute', top: -4, right: -4,
             minWidth: 17, height: 17, borderRadius: 99,
-            background: hasCritical ? '#dc2626' : '#d97706',
-            color: 'white', fontSize: 10, fontWeight: 700,
+            background: hasCritical ? 'var(--red)' : 'var(--amber)',
+            color: '#fff', fontSize: 10, fontWeight: 700,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             padding: '0 4px', border: '2px solid var(--bg-page)',
           }}>
@@ -75,7 +68,7 @@ export default function NotificationBell() {
       {open && (
         <div className="fade-in" style={{
           position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-          width: 340, background: 'var(--bg-surface)',
+          width: 340, maxWidth: 'calc(100vw - 24px)', background: 'var(--bg-surface)',
           border: '1px solid var(--border)', borderRadius: 'var(--r-xl)',
           boxShadow: 'var(--shadow-xl)', zIndex: 1000, overflow: 'hidden',
         }}>
@@ -96,7 +89,7 @@ export default function NotificationBell() {
               </div>
             )}
             {criticalAlerts.map(a => {
-              const s = SEVERITY[a.severity] ?? SEVERITY[1]
+              const s = severityOf(a.severity)
               return (
                 <div key={a.id} style={{ padding: '12px 18px', borderBottom: '1px solid var(--border-muted)', display: 'flex', gap: 12, alignItems: 'flex-start', background: s.bg }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', background: s.color, marginTop: 5, flexShrink: 0, boxShadow: `0 0 6px ${s.color}` }} />
@@ -110,7 +103,7 @@ export default function NotificationBell() {
             })}
             {tickets.length > 0 && (
               <div style={{ padding: '12px 18px', display: 'flex', gap: 12, alignItems: 'center' }}>
-                <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#d97706', flexShrink: 0 }} />
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--amber)', flexShrink: 0 }} />
                 <p style={{ fontSize: 13, color: 'var(--text-primary)' }}><strong>{tickets.length}</strong> chamado(s) GLPI aberto(s)</p>
               </div>
             )}

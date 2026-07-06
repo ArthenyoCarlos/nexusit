@@ -10,10 +10,10 @@ import { downloadWeeklyReport } from '../services/reports'
 const EMPTY = { name: '', vendor: '', product: '', licenseKey: '', seatsTotal: '', seatsUsed: '', purchaseDate: '', expiryDate: '', value: '', notes: '' }
 
 const STATUS_CONFIG = {
-  EXPIRED:       { label: 'Vencida',          bg: 'var(--red-bg)',    color: '#dc2626' },
-  EXPIRING_SOON: { label: 'Vence em breve',   bg: 'var(--amber-bg)',  color: '#d97706' },
-  EXPIRING:      { label: 'Vencendo',         bg: 'var(--amber-bg)',  color: '#d97706' },
-  OK:            { label: 'Válida',           bg: 'var(--green-bg)',  color: '#059669' },
+  EXPIRED:       { label: 'Vencida',          bg: 'var(--red-bg)',    color: 'var(--red)'    },
+  EXPIRING_SOON: { label: 'Vence em breve',   bg: 'var(--orange-bg)', color: 'var(--orange)' },
+  EXPIRING:      { label: 'Vencendo',         bg: 'var(--amber-bg)',  color: 'var(--amber)'  },
+  OK:            { label: 'Válida',           bg: 'var(--green-bg)',  color: 'var(--green)'  },
 }
 
 export default function LicensesPage() {
@@ -89,9 +89,9 @@ export default function LicensesPage() {
         </div>
 
         {expiring.length > 0 && (
-          <div style={{ background: '#fef3c7', border: '1px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-            <p style={{ fontWeight: 600, color: '#92400e', fontSize: 13 }}>⚠️ {expiring.length} licença(s) vencida(s) ou a vencer em breve</p>
-            <p style={{ fontSize: 12, color: '#b45309', marginTop: 4 }}>{expiring.map(l => l.name).join(', ')}</p>
+          <div className="alert alert-amber" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            <p style={{ fontWeight: 600, fontSize: 13 }}>{expiring.length} licença(s) vencida(s) ou a vencer em breve</p>
+            <p style={{ fontSize: 12 }}>{expiring.map(l => l.name).join(', ')}</p>
           </div>
         )}
 
@@ -135,23 +135,23 @@ export default function LicensesPage() {
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Licença' : 'Nova Licença'} size="lg">
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2"><label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label><input required value={form.name} onChange={f('name')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: Microsoft 365 Business" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Fornecedor</label><input value={form.vendor} onChange={f('vendor')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Microsoft" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Produto</label><input value={form.product} onChange={f('product')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Office 365" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Assentos Total</label><input type="number" value={form.seatsTotal} onChange={f('seatsTotal')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Assentos Em Uso</label><input type="number" value={form.seatsUsed} onChange={f('seatsUsed')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Data de Compra</label><input type="date" value={form.purchaseDate} onChange={f('purchaseDate')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Vencimento</label><input type="date" value={form.expiryDate} onChange={f('expiryDate')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label><input type="number" step="0.01" value={form.value} onChange={f('value')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" /></div>
-            <div><label className="block text-sm font-medium text-slate-700 mb-1">Chave de Licença</label><input value={form.licenseKey} onChange={f('licenseKey')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono" placeholder="XXXXX-XXXXX-XXXXX" /></div>
-            <div className="col-span-2"><label className="block text-sm font-medium text-slate-700 mb-1">Observações</label><textarea value={form.notes} onChange={f('notes')} rows={2} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none" /></div>
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+            <div style={{ gridColumn: 'span 2' }}><label className="input-label">Nome *</label><input required value={form.name} onChange={f('name')} className="input" placeholder="Ex: Microsoft 365 Business" /></div>
+            <div><label className="input-label">Fornecedor</label><input value={form.vendor} onChange={f('vendor')} className="input" placeholder="Microsoft" /></div>
+            <div><label className="input-label">Produto</label><input value={form.product} onChange={f('product')} className="input" placeholder="Office 365" /></div>
+            <div><label className="input-label">Assentos Total</label><input type="number" value={form.seatsTotal} onChange={f('seatsTotal')} className="input" /></div>
+            <div><label className="input-label">Assentos Em Uso</label><input type="number" value={form.seatsUsed} onChange={f('seatsUsed')} className="input" /></div>
+            <div><label className="input-label">Data de Compra</label><input type="date" value={form.purchaseDate} onChange={f('purchaseDate')} className="input" /></div>
+            <div><label className="input-label">Vencimento</label><input type="date" value={form.expiryDate} onChange={f('expiryDate')} className="input" /></div>
+            <div><label className="input-label">Valor (R$)</label><input type="number" step="0.01" value={form.value} onChange={f('value')} className="input" /></div>
+            <div><label className="input-label">Chave de Licença</label><input value={form.licenseKey} onChange={f('licenseKey')} className="input" style={{ fontFamily: 'var(--font-mono)' }} placeholder="XXXXX-XXXXX-XXXXX" /></div>
+            <div style={{ gridColumn: 'span 2' }}><label className="input-label">Observações</label><textarea value={form.notes} onChange={f('notes')} rows={2} className="input" /></div>
           </div>
-          {formError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{formError}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg font-medium">{saving ? 'Salvando...' : editing ? 'Salvar' : 'Criar'}</button>
+          {formError && <div className="alert alert-red"><p>{formError}</p></div>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-default">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn btn-primary">{saving ? 'Salvando...' : editing ? 'Salvar' : 'Criar'}</button>
           </div>
         </form>
       </Modal>

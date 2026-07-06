@@ -50,7 +50,7 @@ export default function GlobalSearch() {
   const handleSelect = (hit) => { navigate(hit.path); setOpen(false); setQuery('') }
 
   return (
-    <div style={{ position: 'relative', width: 280 }}>
+    <div style={{ position: 'relative', width: 280, maxWidth: 'calc(100vw - 160px)' }}>
       <div style={{ position: 'relative' }}>
         <svg style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)', pointerEvents: 'none' }}
           width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

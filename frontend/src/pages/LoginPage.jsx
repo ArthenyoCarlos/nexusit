@@ -42,47 +42,47 @@ export default function LoginPage() {
         position: 'relative', overflow: 'hidden',
       }}>
         {/* Decorative gradient orb */}
-        <div style={{ position: 'absolute', top: -80, right: -80, width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, rgba(99,102,241,0.18) 0%, transparent 70%)', pointerEvents: 'none' }} />
-        <div style={{ position: 'absolute', bottom: -60, left: -60, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', top: -80, right: -80, width: 340, height: 340, borderRadius: '50%', background: 'radial-gradient(circle, var(--accent-glow) 0%, transparent 70%)', pointerEvents: 'none' }} />
+        <div style={{ position: 'absolute', bottom: -60, left: -60, width: 260, height: 260, borderRadius: '50%', background: 'radial-gradient(circle, var(--accent-ring) 0%, transparent 70%)', pointerEvents: 'none' }} />
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg, #818cf8, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px rgba(79,70,229,0.45)' }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px var(--accent-glow)' }}>
+            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-inverse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
-          <span style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 19, letterSpacing: '-0.02em' }}>NexusIT</span>
+          <span style={{ color: 'var(--sidebar-text-hover)', fontWeight: 700, fontSize: 19, letterSpacing: '-0.02em', fontFamily: 'var(--font-mono)' }}>NexusIT</span>
         </div>
 
         {/* Hero text */}
         <div style={{ position: 'relative', zIndex: 1 }}>
-          <h1 style={{ color: '#f1f5f9', fontSize: 38, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.03em', marginBottom: 16 }}>
+          <h1 style={{ color: 'var(--sidebar-text-hover)', fontSize: 38, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.03em', marginBottom: 16 }}>
             Infraestrutura<br />sob controle.
           </h1>
-          <p style={{ color: '#4b5563', fontSize: 15, lineHeight: 1.7, marginBottom: 44, maxWidth: 340 }}>
+          <p style={{ color: 'var(--sidebar-text)', fontSize: 15, lineHeight: 1.7, marginBottom: 44, maxWidth: 340 }}>
             Centralize monitoramento, inventário, chamados e documentação da sua equipe de TI.
           </p>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
             {[
-              { label: 'Monitoramento Zabbix',  desc: 'Hosts e alertas em tempo real', color: '#818cf8' },
-              { label: 'Chamados GLPI',          desc: 'Gestão completa de tickets',    color: '#6ee7b7' },
-              { label: 'Inventário e Sistemas',  desc: 'Controle de equipamentos',      color: '#fcd34d' },
-              { label: 'Planejamento Kanban',    desc: 'Tarefas organizadas por sprint', color: '#f9a8d4' },
+              { label: 'Monitoramento Zabbix',  desc: 'Hosts e alertas em tempo real', color: 'var(--accent)' },
+              { label: 'Chamados GLPI',          desc: 'Gestão completa de tickets',    color: 'var(--green)' },
+              { label: 'Inventário e Sistemas',  desc: 'Controle de equipamentos',      color: 'var(--amber)' },
+              { label: 'Planejamento Kanban',    desc: 'Tarefas organizadas por sprint', color: 'var(--purple)' },
             ].map(f => (
               <div key={f.label} style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{ width: 8, height: 8, borderRadius: '50%', background: f.color, flexShrink: 0, boxShadow: `0 0 8px ${f.color}` }} />
                 <div>
-                  <p style={{ color: '#cbd5e1', fontSize: 13.5, fontWeight: 500, lineHeight: 1 }}>{f.label}</p>
-                  <p style={{ color: '#374151', fontSize: 12, marginTop: 3 }}>{f.desc}</p>
+                  <p style={{ color: 'var(--sidebar-text-hover)', fontSize: 13.5, fontWeight: 500, lineHeight: 1 }}>{f.label}</p>
+                  <p style={{ color: 'var(--sidebar-label)', fontSize: 12, marginTop: 3 }}>{f.desc}</p>
                 </div>
               </div>
             ))}
           </div>
         </div>
 
-        <p style={{ color: '#1f2937', fontSize: 12, position: 'relative', zIndex: 1 }}>© 2026 NexusIT · Painel Interno de TI</p>
+        <p style={{ color: 'var(--sidebar-label)', fontSize: 12, position: 'relative', zIndex: 1 }}>© 2026 NexusIT · Painel Interno de TI</p>
       </div>
 
       {/* Right — form */}
@@ -91,8 +91,8 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="lg-hide" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'linear-gradient(135deg, #818cf8, #4f46e5)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px rgba(79,70,229,0.4)' }}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px var(--accent-glow)' }}>
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--text-inverse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
               </svg>
             </div>

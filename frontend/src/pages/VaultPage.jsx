@@ -127,28 +127,29 @@ export default function VaultPage() {
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Credencial' : 'Nova Credencial'} size="lg">
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Título *</label>
-              <input required value={form.title} onChange={f('title')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Ex: VPN Corporativa" />
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">Título *</label>
+              <input required value={form.title} onChange={f('title')} className="input" placeholder="Ex: VPN Corporativa" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tipo</label>
-              <select value={form.type} onChange={f('type')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Tipo</label>
+              <select value={form.type} onChange={f('type')} className="input">
                 {TYPES.map(t => <option key={t} value={t}>{t}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Usuário / Login</label>
-              <input value={form.username} onChange={f('username')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="admin" />
+              <label className="input-label">Usuário / Login</label>
+              <input value={form.username} onChange={f('username')} className="input" placeholder="admin" />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Senha / Chave / Token *</label>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">Senha / Chave / Token *</label>
               <div style={{ position: 'relative' }}>
                 <input required={!editing} value={form.secret} onChange={f('secret')}
                   type={showSecret ? 'text' : 'password'}
-                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 pr-20"
+                  className="input"
+                  style={{ paddingRight: 64 }}
                   placeholder={editing ? 'Deixe em branco para manter a atual' : 'Senha ou chave...'} />
                 <button type="button" onClick={() => setShowSecret(s => !s)}
                   style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', fontSize: 12, color: 'var(--text-tertiary)', background: 'none', border: 'none', cursor: 'pointer' }}>
@@ -156,23 +157,23 @@ export default function VaultPage() {
                 </button>
               </div>
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">URL</label>
-              <input value={form.url} onChange={f('url')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="https://..." />
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">URL</label>
+              <input value={form.url} onChange={f('url')} className="input" placeholder="https://..." />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tags</label>
-              <input value={form.tags} onChange={f('tags')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="vpn, produção, rede" />
+              <label className="input-label">Tags</label>
+              <input value={form.tags} onChange={f('tags')} className="input" placeholder="vpn, produção, rede" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Descrição</label>
-              <input value={form.description} onChange={f('description')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="input-label">Descrição</label>
+              <input value={form.description} onChange={f('description')} className="input" />
             </div>
           </div>
-          {formError && <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{formError}</p>}
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg font-medium">{saving ? 'Salvando...' : editing ? 'Salvar' : 'Criar'}</button>
+          {formError && <div className="alert alert-red"><p>{formError}</p></div>}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-default">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn btn-primary">{saving ? 'Salvando...' : editing ? 'Salvar' : 'Criar'}</button>
           </div>
         </form>
       </Modal>

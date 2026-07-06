@@ -9,6 +9,7 @@ import { getLicenses } from '../services/licenses'
 import { getContracts } from '../services/contracts'
 import { getMonitors } from '../services/urlmonitor'
 import { getInventory } from '../services/inventory'
+import { severityOf } from '../utils/severity'
 
 function greet(name) {
   const h = new Date().getHours()
@@ -16,19 +17,11 @@ function greet(name) {
   return `${s}, ${name?.split(' ')[0] ?? 'usuário'}`
 }
 
-const SEV = {
-  5: { label: 'Disaster', color: '#dc2626', bg: '#fef2f2' },
-  4: { label: 'High',     color: '#ea580c', bg: '#fff7ed' },
-  3: { label: 'Average',  color: '#d97706', bg: '#fffbeb' },
-  2: { label: 'Warning',  color: '#2563eb', bg: '#eff6ff' },
-  1: { label: 'Info',     color: '#64748b', bg: '#f8fafc' },
-}
-
 const LIC_STATUS = {
-  EXPIRED:       { label: 'Vencida',        color: '#dc2626' },
-  EXPIRING_SOON: { label: 'Vence em breve', color: '#ea580c' },
-  EXPIRING:      { label: 'A vencer',       color: '#d97706' },
-  OK:            { label: 'OK',             color: '#0e9f6e' },
+  EXPIRED:       { label: 'Vencida',        color: 'var(--red)'    },
+  EXPIRING_SOON: { label: 'Vence em breve', color: 'var(--orange)' },
+  EXPIRING:      { label: 'A vencer',       color: 'var(--amber)'  },
+  OK:            { label: 'OK',             color: 'var(--green)'  },
 }
 
 function computeHealthScore({ problems, tickets, licenses, contracts, monitors }) {
@@ -104,16 +97,16 @@ export default function DashboardPage() {
     contracts: data.contracts, monitors: data.monitors,
   })
 
-  const scoreColor = healthScore == null ? '#64748b'
-    : healthScore >= 80 ? '#0e9f6e'
-    : healthScore >= 60 ? '#d97706'
-    : healthScore >= 40 ? '#ea580c'
-    : '#dc2626'
+  const scoreColor = healthScore == null ? 'var(--text-tertiary)'
+    : healthScore >= 80 ? 'var(--green)'
+    : healthScore >= 60 ? 'var(--amber)'
+    : healthScore >= 40 ? 'var(--orange)'
+    : 'var(--red)'
   const scoreBg = healthScore == null ? 'var(--bg-muted)'
-    : healthScore >= 80 ? '#f0fdf4'
-    : healthScore >= 60 ? '#fffbeb'
-    : healthScore >= 40 ? '#fff7ed'
-    : '#fef2f2'
+    : healthScore >= 80 ? 'var(--green-bg)'
+    : healthScore >= 60 ? 'var(--amber-bg)'
+    : healthScore >= 40 ? 'var(--orange-bg)'
+    : 'var(--red-bg)'
   const scoreLabel = healthScore == null ? '—'
     : healthScore >= 80 ? 'Operação saudável'
     : healthScore >= 60 ? 'Atenção necessária'
@@ -131,7 +124,7 @@ export default function DashboardPage() {
             <p style={{ textTransform: 'capitalize' }}>{dateStr}</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
-            <Link to="/hermes" className="btn btn-primary btn-sm" style={{ background: 'linear-gradient(135deg,#818cf8,#4f46e5)', border: 'none' }}>
+            <Link to="/hermes" className="btn btn-primary btn-sm">
               <IcoHermes /> Perguntar ao Hermes
             </Link>
             <a href="/dashboard/tv" target="_blank" rel="noopener noreferrer" className="btn btn-default btn-sm">
@@ -146,7 +139,7 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
               <div style={{
                 width: 56, height: 56, borderRadius: '50%', flexShrink: 0,
-                background: 'white', border: `3px solid ${scoreColor}`,
+                background: 'var(--bg-surface)', border: `3px solid ${scoreColor}`,
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 flexDirection: 'column',
               }}>
@@ -176,13 +169,13 @@ export default function DashboardPage() {
 
         {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 12, marginBottom: 24 }}>
-          <KpiCard icon={<IcoHosts />}    label="Hosts monitorados" value={data.hosts ?? '—'}  color="#1a56db" bg="var(--accent-light)"  to="/monitoring" />
-          <KpiCard icon={<IcoOnline />}   label="Hosts online"      value={data.online ?? '—'} color="#0e9f6e" bg="var(--green-bg)"      to="/monitoring"
+          <KpiCard icon={<IcoHosts />}    label="Hosts monitorados" value={data.hosts ?? '—'}  color="var(--accent-text)" bg="var(--accent-light)"  to="/monitoring" />
+          <KpiCard icon={<IcoOnline />}   label="Hosts online"      value={data.online ?? '—'} color="var(--green)" bg="var(--green-bg)"      to="/monitoring"
             sub={availPct !== null ? `${availPct}% disponíveis` : undefined} />
-          <KpiCard icon={<IcoAlert />}    label="Alertas ativos"    value={data.problems.length ?? '—'} color={data.problems.length > 0 ? '#e02424' : '#0e9f6e'} bg={data.problems.length > 0 ? 'var(--red-bg)' : 'var(--green-bg)'} to="/monitoring" />
-          <KpiCard icon={<IcoTicket />}   label="Chamados abertos"  value={openTickets.length ?? '—'} color="#d97706" bg="var(--amber-bg)" to="/tickets" />
-          <KpiCard icon={<IcoSystem />}   label="Sistemas"          value={data.systems ?? '—'} color="#7c3aed" bg="var(--purple-bg)"    to="/systems" />
-          <KpiCard icon={<IcoInventory/>} label="Inventário"        value={data.inventory.length ?? '—'} color="#0891b2" bg="var(--cyan-bg,#ecfeff)" to="/inventory"
+          <KpiCard icon={<IcoAlert />}    label="Alertas ativos"    value={data.problems.length ?? '—'} color={data.problems.length > 0 ? 'var(--red)' : 'var(--green)'} bg={data.problems.length > 0 ? 'var(--red-bg)' : 'var(--green-bg)'} to="/monitoring" />
+          <KpiCard icon={<IcoTicket />}   label="Chamados abertos"  value={openTickets.length ?? '—'} color="var(--amber)" bg="var(--amber-bg)" to="/tickets" />
+          <KpiCard icon={<IcoSystem />}   label="Sistemas"          value={data.systems ?? '—'} color="var(--purple)" bg="var(--purple-bg)"    to="/systems" />
+          <KpiCard icon={<IcoInventory/>} label="Inventário"        value={data.inventory.length ?? '—'} color="var(--cyan)" bg="var(--cyan-bg)" to="/inventory"
             sub={invMaint > 0 ? `${invMaint} em manutenção` : undefined} />
         </div>
 
@@ -191,21 +184,21 @@ export default function DashboardPage() {
           <div style={{ marginBottom: 16, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {urlsDown > 0 && (
               <Link to="/url-monitor" style={{ textDecoration: 'none', flex: '1 1 180px' }}>
-                <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>🔴</span>
+                <div style={{ background: 'var(--red-bg)', border: '1px solid var(--red-border)', borderRadius: 'var(--r-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--red)', flexShrink: 0 }} />
                   <div>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: '#dc2626', margin: 0 }}>{urlsDown} URL(s) com falha</p>
-                    <p style={{ fontSize: 11, color: '#9b1c1c', margin: 0 }}>Monitor de URLs</p>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: 'var(--red)', margin: 0 }}>{urlsDown} URL(s) com falha</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: 0 }}>Monitor de URLs</p>
                   </div>
                 </div>
               </Link>
             )}
             {expiringCtrs.filter(c => c.status === 'EXPIRED' || c.status === 'EXPIRING_SOON').map(c => (
               <Link key={c.id} to="/contracts" style={{ textDecoration: 'none', flex: '1 1 220px' }}>
-                <div style={{ background: c.status === 'EXPIRED' ? '#fef2f2' : '#fff7ed', border: `1px solid ${c.status === 'EXPIRED' ? '#fecaca' : '#fed7aa'}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>{c.status === 'EXPIRED' ? '🔴' : '🟡'}</span>
+                <div style={{ background: c.status === 'EXPIRED' ? 'var(--red-bg)' : 'var(--amber-bg)', border: `1px solid ${c.status === 'EXPIRED' ? 'var(--red-border)' : 'var(--amber-border)'}`, borderRadius: 'var(--r-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: c.status === 'EXPIRED' ? 'var(--red)' : 'var(--amber)', flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: c.status === 'EXPIRED' ? '#dc2626' : '#d97706', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: c.status === 'EXPIRED' ? 'var(--red)' : 'var(--amber)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       Contrato: {c.name}
                     </p>
                     <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: 0 }}>
@@ -217,10 +210,10 @@ export default function DashboardPage() {
             ))}
             {expiringLics.filter(l => l.status === 'EXPIRED' || l.status === 'EXPIRING_SOON').slice(0, 2).map(l => (
               <Link key={l.id} to="/licenses" style={{ textDecoration: 'none', flex: '1 1 220px' }}>
-                <div style={{ background: l.status === 'EXPIRED' ? '#fef2f2' : '#fff7ed', border: `1px solid ${l.status === 'EXPIRED' ? '#fecaca' : '#fed7aa'}`, borderRadius: 10, padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <span style={{ fontSize: 18 }}>{l.status === 'EXPIRED' ? '🔴' : '🟡'}</span>
+                <div style={{ background: l.status === 'EXPIRED' ? 'var(--red-bg)' : 'var(--amber-bg)', border: `1px solid ${l.status === 'EXPIRED' ? 'var(--red-border)' : 'var(--amber-border)'}`, borderRadius: 'var(--r-md)', padding: '10px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 8, height: 8, borderRadius: '50%', background: l.status === 'EXPIRED' ? 'var(--red)' : 'var(--amber)', flexShrink: 0 }} />
                   <div style={{ minWidth: 0 }}>
-                    <p style={{ fontSize: 12, fontWeight: 700, color: l.status === 'EXPIRED' ? '#dc2626' : '#d97706', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <p style={{ fontSize: 12, fontWeight: 700, color: l.status === 'EXPIRED' ? 'var(--red)' : 'var(--amber)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       Licença: {l.name}
                     </p>
                     <p style={{ fontSize: 11, color: 'var(--text-secondary)', margin: 0 }}>
@@ -242,7 +235,7 @@ export default function DashboardPage() {
             {/* Alertas Zabbix */}
             <Section title="Alertas Zabbix" count={allAlerts.length} to="/monitoring" emptyMsg="Nenhum alerta ativo">
               {allAlerts.slice(0, 6).map(p => {
-                const s   = SEV[p.severity] ?? SEV[1]
+                const s   = severityOf(p.severity)
                 const ago = p.clock ? timeAgo(Number(p.clock)) : null
                 return (
                   <div key={p.problemid} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 0', borderBottom: '1px solid var(--border-muted)' }}>
@@ -286,9 +279,9 @@ export default function DashboardPage() {
               </div>
               <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
                 {[
-                  { label: 'Ativos',     value: invActive, color: '#0e9f6e' },
-                  { label: 'Manutenção', value: invMaint,  color: '#d97706' },
-                  { label: 'Inativos',   value: invInact,  color: '#94a3b8' },
+                  { label: 'Ativos',     value: invActive, color: 'var(--green)' },
+                  { label: 'Manutenção', value: invMaint,  color: 'var(--amber)' },
+                  { label: 'Inativos',   value: invInact,  color: 'var(--text-tertiary)' },
                 ].map(s => (
                   <div key={s.label} style={{ flex: 1, textAlign: 'center', background: 'var(--bg-muted)', borderRadius: 8, padding: '10px 4px' }}>
                     <p style={{ fontSize: 20, fontWeight: 700, color: s.color, lineHeight: 1 }}>{s.value}</p>
@@ -298,9 +291,9 @@ export default function DashboardPage() {
               </div>
               {data.inventory.length > 0 && (
                 <div style={{ height: 6, borderRadius: 99, background: 'var(--bg-muted)', overflow: 'hidden', display: 'flex' }}>
-                  {invActive > 0 && <div style={{ flex: invActive, background: '#0e9f6e' }} />}
-                  {invMaint  > 0 && <div style={{ flex: invMaint,  background: '#d97706' }} />}
-                  {invInact  > 0 && <div style={{ flex: invInact,  background: '#94a3b8' }} />}
+                  {invActive > 0 && <div style={{ flex: invActive, background: 'var(--green)' }} />}
+                  {invMaint  > 0 && <div style={{ flex: invMaint,  background: 'var(--amber)' }} />}
+                  {invInact  > 0 && <div style={{ flex: invInact,  background: 'var(--text-tertiary)' }} />}
                 </div>
               )}
             </div>
@@ -313,9 +306,9 @@ export default function DashboardPage() {
                   <Link to="/url-monitor" style={{ fontSize: 11.5, color: 'var(--accent)', textDecoration: 'none' }}>Ver tudo →</Link>
                 </div>
                 {urlsDown > 0 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: '#fef2f2', borderRadius: 8, marginBottom: 10 }}>
-                    <span style={{ fontSize: 14 }}>⚠️</span>
-                    <p style={{ fontSize: 12.5, color: '#dc2626', fontWeight: 600 }}>{urlsDown} URL(s) com falha</p>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', background: 'var(--red-bg)', borderRadius: 'var(--r-sm)', marginBottom: 10 }}>
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--red)', flexShrink: 0 }} />
+                    <p style={{ fontSize: 12.5, color: 'var(--red)', fontWeight: 600 }}>{urlsDown} URL(s) com falha</p>
                   </div>
                 )}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -324,7 +317,7 @@ export default function DashboardPage() {
                     const noCheck = m.lastStatus == null
                     return (
                       <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: noCheck ? '#94a3b8' : ok ? '#0e9f6e' : '#dc2626' }} />
+                        <div style={{ width: 7, height: 7, borderRadius: '50%', flexShrink: 0, background: noCheck ? 'var(--text-tertiary)' : ok ? 'var(--green)' : 'var(--red)' }} />
                         <p style={{ flex: 1, fontSize: 12.5, color: 'var(--text-primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.name}</p>
                         <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', flexShrink: 0 }}>
                           {noCheck ? '—' : ok ? `${m.uptimePct ?? '—'}%` : m.lastStatus}
@@ -372,7 +365,7 @@ export default function DashboardPage() {
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                   {expiringCtrs.map(c => {
-                    const color = c.status === 'EXPIRED' ? '#dc2626' : c.status === 'EXPIRING_SOON' ? '#ea580c' : '#d97706'
+                    const color = c.status === 'EXPIRED' ? 'var(--red)' : c.status === 'EXPIRING_SOON' ? 'var(--orange)' : 'var(--amber)'
                     return (
                       <div key={c.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <div style={{ flex: 1, minWidth: 0 }}>
@@ -432,8 +425,8 @@ function KpiCard({ icon, label, value, sub, color, bg, to }) {
 }
 
 function TicketStatusDot({ status }) {
-  const colors = { new: '#dc2626', assigned: '#d97706', pending: '#2563eb', solved: '#0e9f6e', closed: '#94a3b8' }
-  return <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors[status] ?? '#94a3b8', flexShrink: 0 }} />
+  const colors = { new: 'var(--red)', assigned: 'var(--amber)', pending: 'var(--accent)', solved: 'var(--green)', closed: 'var(--text-tertiary)' }
+  return <div style={{ width: 8, height: 8, borderRadius: '50%', background: colors[status] ?? 'var(--text-tertiary)', flexShrink: 0 }} />
 }
 
 function ticketStatusLabel(s) {

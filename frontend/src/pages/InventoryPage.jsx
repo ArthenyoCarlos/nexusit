@@ -203,95 +203,81 @@ export default function InventoryPage() {
 
       {/* Modal form */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Item' : 'Novo Item'} size="lg">
-        <form onSubmit={handleSave} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Nome *</label>
-              <input required value={form.name} onChange={f('name')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">Nome *</label>
+              <input required value={form.name} onChange={f('name')} className="input"
                 placeholder="Ex: Dell PowerEdge R740" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Tipo *</label>
-              <select value={form.type} onChange={f('type')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Tipo *</label>
+              <select value={form.type} onChange={f('type')} className="input">
                 {TYPES.map(t => <option key={t} value={t}>{typeLabel[t]}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Status</label>
-              <select value={form.status} onChange={f('status')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Status</label>
+              <select value={form.status} onChange={f('status')} className="input">
                 {STATUSES.map(s => <option key={s} value={s}>{statusLabel[s]}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Marca</label>
-              <input value={form.brand} onChange={f('brand')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <label className="input-label">Marca</label>
+              <input value={form.brand} onChange={f('brand')} className="input"
                 placeholder="Ex: Dell, HP, Cisco" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Modelo</label>
-              <input value={form.model} onChange={f('model')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <label className="input-label">Modelo</label>
+              <input value={form.model} onChange={f('model')} className="input"
                 placeholder="Ex: PowerEdge R740" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Número de Série</label>
-              <input value={form.serialNumber} onChange={f('serialNumber')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <label className="input-label">Número de Série</label>
+              <input value={form.serialNumber} onChange={f('serialNumber')} className="input"
                 placeholder="SN..." />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Localização</label>
-              <input value={form.location} onChange={f('location')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <label className="input-label">Localização</label>
+              <input value={form.location} onChange={f('location')} className="input"
                 placeholder="Ex: Rack A, Sala TI" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Responsável</label>
-              <select value={form.responsibleId} onChange={f('responsibleId')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <label className="input-label">Responsável</label>
+              <select value={form.responsibleId} onChange={f('responsibleId')} className="input">
                 <option value="">— Nenhum —</option>
                 {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Data de Compra</label>
-              <input type="date" value={form.purchaseDate} onChange={f('purchaseDate')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="input-label">Data de Compra</label>
+              <input type="date" value={form.purchaseDate} onChange={f('purchaseDate')} className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Garantia até</label>
-              <input type="date" value={form.warrantyUntil} onChange={f('warrantyUntil')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500" />
+              <label className="input-label">Garantia até</label>
+              <input type="date" value={form.warrantyUntil} onChange={f('warrantyUntil')} className="input" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Valor (R$)</label>
-              <input type="number" step="0.01" min="0" value={form.value} onChange={f('value')}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              <label className="input-label">Valor (R$)</label>
+              <input type="number" step="0.01" min="0" value={form.value} onChange={f('value')} className="input"
                 placeholder="0,00" />
             </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-              <textarea value={form.notes} onChange={f('notes')} rows={3}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            <div style={{ gridColumn: 'span 2' }}>
+              <label className="input-label">Observações</label>
+              <textarea value={form.notes} onChange={f('notes')} rows={3} className="input"
                 placeholder="Observações adicionais..." />
             </div>
           </div>
 
           {formError && (
-            <p className="text-sm text-red-600 bg-red-50 border border-red-200 px-3 py-2 rounded-lg">{formError}</p>
+            <div className="alert alert-red"><p>{formError}</p></div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)}
-              className="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-default">
               Cancelar
             </button>
-            <button type="submit" disabled={saving}
-              className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg font-medium">
+            <button type="submit" disabled={saving} className="btn btn-primary">
               {saving ? 'Salvando...' : (editing ? 'Salvar' : 'Criar')}
             </button>
           </div>

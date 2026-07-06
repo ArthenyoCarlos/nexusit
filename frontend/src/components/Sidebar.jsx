@@ -42,13 +42,13 @@ const NAV = [
   },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ onNavigate }) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
   const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() ?? 'U'
 
   return (
-    <aside style={{
+    <aside onClick={onNavigate} style={{
       width: 'var(--sidebar-w)',
       background: 'var(--sidebar-bg)',
       borderRight: '1px solid var(--sidebar-border)',
@@ -60,18 +60,18 @@ export default function Sidebar() {
       <div style={{ padding: '14px 12px 12px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
           <div style={{
-            width: 30, height: 30, borderRadius: 9, flexShrink: 0,
-            background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+            width: 30, height: 30, borderRadius: 'var(--r-md)', flexShrink: 0,
+            background: 'var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 10px rgba(79,70,229,0.4)',
+            boxShadow: '0 4px 10px var(--accent-glow)',
           }}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text-inverse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
           </div>
           <div>
-            <p style={{ color: '#f1f5f9', fontWeight: 700, fontSize: 14, lineHeight: 1, letterSpacing: '-0.01em' }}>NexusIT</p>
-            <p style={{ color: '#4b5563', fontSize: 10.5, marginTop: 2.5 }}>Painel de TI</p>
+            <p style={{ color: 'var(--sidebar-text-hover)', fontWeight: 700, fontSize: 14, lineHeight: 1, letterSpacing: '-0.01em', fontFamily: 'var(--font-mono)' }}>NexusIT</p>
+            <p style={{ color: 'var(--sidebar-label)', fontSize: 10.5, marginTop: 2.5 }}>Painel de TI</p>
           </div>
         </div>
       </div>
@@ -82,7 +82,7 @@ export default function Sidebar() {
           <div key={group.section} style={{ marginBottom: 10 }}>
             <p style={{
               fontSize: 9.5, fontWeight: 700, letterSpacing: '0.10em',
-              textTransform: 'uppercase', color: '#2d3748',
+              textTransform: 'uppercase', color: 'var(--sidebar-label)',
               padding: '0 6px', marginBottom: 2,
             }}>
               {group.section}
@@ -114,15 +114,15 @@ export default function Sidebar() {
           style={{ marginTop: 2 }}>
           <div style={{
             width: 24, height: 24, borderRadius: '50%', flexShrink: 0,
-            background: 'linear-gradient(135deg, #818cf8, #4f46e5)',
+            background: 'var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 9.5, fontWeight: 700, color: '#fff',
+            fontSize: 9.5, fontWeight: 700, color: 'var(--text-inverse)', fontFamily: 'var(--font-mono)',
           }}>
             {initials}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            <p style={{ fontSize: 12, fontWeight: 500, color: '#cbd5e1', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1 }}>{user?.name}</p>
-            <p style={{ fontSize: 10, color: '#374151', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
+            <p style={{ fontSize: 12, fontWeight: 500, color: 'var(--sidebar-text-hover)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: 1 }}>{user?.name}</p>
+            <p style={{ fontSize: 10, color: 'var(--sidebar-label)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</p>
           </div>
         </NavLink>
 

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import ReactMarkdown from 'react-markdown'
 import Layout from '../components/Layout'
+import { SkeletonLine } from '../components/Skeleton'
 import { getArticle } from '../services/wiki'
 import { getWikiArticleTicketLinks } from '../services/ticketWikiLinks'
 
@@ -26,7 +27,7 @@ export default function WikiArticlePage() {
     }).finally(() => setLoading(false))
   }, [id])
 
-  if (loading) return <Layout><div className="page"><p style={{ color: 'var(--text-tertiary)' }}>Carregando...</p></div></Layout>
+  if (loading) return <Layout><div className="page" style={{display:'flex',flexDirection:'column',gap:12}}><SkeletonLine className="h-6 w-1/3"/><SkeletonLine className="h-4 w-full"/><SkeletonLine className="h-4 w-5/6"/><SkeletonLine className="h-48 w-full"/></div></Layout>
   if (!article) return <Layout><div className="page"><p>Artigo não encontrado.</p></div></Layout>
 
   return (

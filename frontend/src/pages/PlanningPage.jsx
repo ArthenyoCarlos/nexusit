@@ -10,10 +10,10 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 
 const COLUMNS = [
-  { id: 'Backlog',       label: 'Backlog',       color: '#64748b', bg: '#f1f5f9' },
-  { id: 'Em andamento',  label: 'Em andamento',  color: '#1a56db', bg: '#eef4ff' },
-  { id: 'Em revisão',    label: 'Em revisão',    color: '#d97706', bg: '#fffbeb' },
-  { id: 'Concluído',     label: 'Concluído',     color: '#0e9f6e', bg: '#f0fdf8' },
+  { id: 'Backlog',       label: 'Backlog',       color: 'var(--text-tertiary)', bg: 'var(--bg-muted)' },
+  { id: 'Em andamento',  label: 'Em andamento',  color: 'var(--accent-text)',   bg: 'var(--accent-light)' },
+  { id: 'Em revisão',    label: 'Em revisão',    color: 'var(--amber)',        bg: 'var(--amber-bg)' },
+  { id: 'Concluído',     label: 'Concluído',     color: 'var(--green)',        bg: 'var(--green-bg)' },
 ]
 
 const EMPTY_FORM = { title: '', description: '', columnName: 'Backlog', dueDate: '', assigneeId: '' }
@@ -85,11 +85,11 @@ function DraggableCard({ task, onEdit, onDelete }) {
 function CardOverlay({ task }) {
   const overdue = isOverdue(task.dueDate, task.columnName)
   return (
-    <div className="bg-white border-2 border-blue-400 rounded-lg p-3 shadow-xl w-56">
-      <p className="text-sm font-medium text-slate-800">{task.title}</p>
+    <div className="bg-[var(--bg-surface)] border-2 border-[var(--accent)] rounded-lg p-3 shadow-xl w-56">
+      <p className="text-sm font-medium text-[var(--text-primary)]">{task.title}</p>
       {task.dueDate && (
         <span className={`text-xs px-1.5 py-0.5 rounded font-medium mt-1 inline-block ${
-          overdue ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-600'
+          overdue ? 'bg-[var(--red-bg)] text-[var(--red)]' : 'bg-[var(--bg-muted)] text-[var(--text-secondary)]'
         }`}>
           {new Date(task.dueDate + 'T00:00:00').toLocaleDateString('pt-BR')}
         </span>
@@ -141,7 +141,7 @@ function MiniCalendar({ tasks }) {
 
       <div className="grid grid-cols-7 gap-0.5 mb-2">
         {WEEK_DAYS.map((d, i) => (
-          <div key={i} className="text-center text-xs font-medium text-slate-400 py-1">{d}</div>
+          <div key={i} className="text-center text-xs font-medium text-[var(--text-tertiary)] py-1">{d}</div>
         ))}
         {cells.map((d, i) => {
           if (!d) return <div key={i} />
@@ -152,16 +152,16 @@ function MiniCalendar({ tasks }) {
           return (
             <div key={i}
               className={`relative text-center text-xs py-1 rounded cursor-default ${
-                isToday ? 'bg-blue-600 text-white font-bold' :
-                isOverdueDate ? 'bg-red-50 text-red-700 font-medium' :
-                hasTasks ? 'bg-blue-50 text-blue-700 font-medium' :
-                'text-slate-600 hover:bg-slate-50'
+                isToday ? 'bg-[var(--accent)] text-[var(--text-inverse)] font-bold' :
+                isOverdueDate ? 'bg-[var(--red-bg)] text-[var(--red)] font-medium' :
+                hasTasks ? 'bg-[var(--accent-light)] text-[var(--accent-text)] font-medium' :
+                'text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]'
               }`}
             >
               {d}
               {hasTasks && !isToday && (
                 <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
-                  isOverdueDate ? 'bg-red-400' : 'bg-blue-400'
+                  isOverdueDate ? 'bg-[var(--red)]' : 'bg-[var(--accent)]'
                 }`} />
               )}
             </div>
@@ -170,17 +170,17 @@ function MiniCalendar({ tasks }) {
       </div>
 
       {upcoming.length > 0 && (
-        <div className="mt-3 border-t border-slate-100 pt-3">
-          <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Este mês</p>
+        <div className="mt-3 border-t border-[var(--border-muted)] pt-3">
+          <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wide mb-2">Este mês</p>
           <div className="space-y-1">
             {upcoming.map(t => (
               <div key={t.id} className="flex items-center gap-2 text-xs">
                 <span className={`flex-shrink-0 font-medium ${
-                  isOverdue(t.dueDate, t.columnName) ? 'text-red-600' : 'text-slate-500'
+                  isOverdue(t.dueDate, t.columnName) ? 'text-[var(--red)]' : 'text-[var(--text-tertiary)]'
                 }`}>
                   {new Date(t.dueDate + 'T00:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                 </span>
-                <span className="text-slate-700 truncate">{t.title}</span>
+                <span className="text-[var(--text-secondary)] truncate">{t.title}</span>
               </div>
             ))}
           </div>
@@ -355,51 +355,49 @@ export default function PlanningPage() {
         title={editingTask ? 'Editar Tarefa' : 'Nova Tarefa'}
         size="md"
       >
-        <div className="space-y-4">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <input
             type="text" placeholder="Título *" value={form.title}
             onChange={e => setForm(f => ({ ...f, title: e.target.value }))}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input"
           />
           <textarea
             placeholder="Descrição (opcional)" value={form.description}
             onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
             rows={3}
-            className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+            className="input"
           />
-          <div className="grid grid-cols-2 gap-3">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Coluna</label>
+              <label className="input-label">Coluna</label>
               <select value={form.columnName}
                 onChange={e => setForm(f => ({ ...f, columnName: e.target.value }))}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+                className="input">
                 {COLUMNS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-600 mb-1">Data limite</label>
+              <label className="input-label">Data limite</label>
               <input type="date" value={form.dueDate}
                 onChange={e => setForm(f => ({ ...f, dueDate: e.target.value }))}
-                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="input"
               />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-medium text-slate-600 mb-1">Responsável</label>
+            <label className="input-label">Responsável</label>
             <select value={form.assigneeId}
               onChange={e => setForm(f => ({ ...f, assigneeId: e.target.value }))}
-              className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
+              className="input">
               <option value="">Sem responsável</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
           </div>
-          <div className="flex justify-end gap-2 pt-2">
-            <button onClick={() => setModalOpen(false)}
-              className="px-4 py-2 text-sm text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50">
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button onClick={() => setModalOpen(false)} className="btn btn-default">
               Cancelar
             </button>
-            <button onClick={handleSave} disabled={!form.title.trim() || saving}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors">
+            <button onClick={handleSave} disabled={!form.title.trim() || saving} className="btn btn-primary">
               {saving ? 'Salvando...' : editingTask ? 'Salvar' : 'Criar'}
             </button>
           </div>

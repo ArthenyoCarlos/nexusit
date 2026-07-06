@@ -8,12 +8,12 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 
 const PRIORITY = {
-  6: { label: 'Crítica',     bg: 'bg-red-100 text-red-700',       dot: 'bg-red-500'    },
-  5: { label: 'Muito Alta',  bg: 'bg-red-50 text-red-600',         dot: 'bg-red-400'    },
-  4: { label: 'Alta',        bg: 'bg-orange-100 text-orange-700',  dot: 'bg-orange-500' },
-  3: { label: 'Média',       bg: 'bg-yellow-100 text-yellow-700',  dot: 'bg-yellow-500' },
-  2: { label: 'Baixa',       bg: 'bg-blue-100 text-blue-700',      dot: 'bg-blue-400'   },
-  1: { label: 'Muito Baixa', bg: 'bg-slate-100 text-slate-600',    dot: 'bg-slate-400'  },
+  6: { label: 'Crítica',     bg: 'bg-[var(--red-bg)] text-[var(--red)]',       dot: 'bg-[var(--red)]'    },
+  5: { label: 'Muito Alta',  bg: 'bg-[var(--red-bg)] text-[var(--red)]',       dot: 'bg-[var(--red)]'    },
+  4: { label: 'Alta',        bg: 'bg-[var(--orange-bg)] text-[var(--orange)]', dot: 'bg-[var(--orange)]' },
+  3: { label: 'Média',       bg: 'bg-[var(--amber-bg)] text-[var(--amber)]',   dot: 'bg-[var(--amber)]'  },
+  2: { label: 'Baixa',       bg: 'bg-[var(--accent-light)] text-[var(--accent-text)]', dot: 'bg-[var(--accent)]' },
+  1: { label: 'Muito Baixa', bg: 'bg-[var(--bg-muted)] text-[var(--text-secondary)]',  dot: 'bg-[var(--text-tertiary)]'  },
 }
 const STATUS_OPTIONS = [
   { value: '',  label: 'Todos os status' },
@@ -33,12 +33,12 @@ const PRIORITY_OPTIONS = [
   { value: '1', label: 'Muito Baixa' },
 ]
 const STATUS_COLOR = {
-  1: 'bg-blue-100 text-blue-700',
-  2: 'bg-amber-100 text-amber-700',
-  3: 'bg-amber-100 text-amber-700',
-  4: 'bg-slate-100 text-slate-600',
-  5: 'bg-emerald-100 text-emerald-700',
-  6: 'bg-slate-100 text-slate-500',
+  1: 'bg-[var(--accent-light)] text-[var(--accent-text)]',
+  2: 'bg-[var(--amber-bg)] text-[var(--amber)]',
+  3: 'bg-[var(--amber-bg)] text-[var(--amber)]',
+  4: 'bg-[var(--bg-muted)] text-[var(--text-secondary)]',
+  5: 'bg-[var(--green-bg)] text-[var(--green)]',
+  6: 'bg-[var(--bg-muted)] text-[var(--text-tertiary)]',
 }
 
 function PriorityBadge({ priority }) {
@@ -377,7 +377,7 @@ export default function TicketsPage() {
                     <td>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 360 }}>
                         <p style={{ fontWeight: 500, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', maxWidth: 280 }}>{t.title || '(sem título)'}</p>
-                        {duplicateCountsById.has(t.id) && <span className="badge bg-amber-100 text-amber-700">duplicado x{duplicateCountsById.get(t.id)}</span>}
+                        {duplicateCountsById.has(t.id) && <span className="badge bg-[var(--amber-bg)] text-[var(--amber)]">duplicado x{duplicateCountsById.get(t.id)}</span>}
                       </div>
                     </td>
                     <td><PriorityBadge priority={t.priority} /></td>
@@ -404,46 +404,46 @@ export default function TicketsPage() {
         {detail && (
           <div className="space-y-5">
             <div>
-              <h3 className="font-semibold text-slate-900 mb-2">{detail.ticket.title}</h3>
+              <h3 className="font-semibold text-[var(--text-primary)] mb-2">{detail.ticket.title}</h3>
               <div className="flex flex-wrap gap-2 mb-3">
                 <PriorityBadge priority={detail.ticket.priority} />
                 <StatusBadge status={detail.ticket.status} label={detail.ticket.statusLabel} />
               </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-slate-600">
-                <div><span className="text-slate-400 text-xs block">Solicitante</span>{detail.ticket.requester || '—'}</div>
-                <div><span className="text-slate-400 text-xs block">Atribuído</span>{detail.ticket.assignedTo || '—'}</div>
-                <div><span className="text-slate-400 text-xs block">Abertura</span>{formatDate(detail.ticket.openedAt)}</div>
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-[var(--text-secondary)]">
+                <div><span className="text-[var(--text-tertiary)] text-xs block">Solicitante</span>{detail.ticket.requester || '—'}</div>
+                <div><span className="text-[var(--text-tertiary)] text-xs block">Atribuído</span>{detail.ticket.assignedTo || '—'}</div>
+                <div><span className="text-[var(--text-tertiary)] text-xs block">Abertura</span>{formatDate(detail.ticket.openedAt)}</div>
                 {detail.ticket.solvedAt && (
-                  <div><span className="text-slate-400 text-xs block">Resolução</span>{formatDate(detail.ticket.solvedAt)}</div>
+                  <div><span className="text-[var(--text-tertiary)] text-xs block">Resolução</span>{formatDate(detail.ticket.solvedAt)}</div>
                 )}
               </div>
             </div>
 
             {detail.content && (
-              <div className="bg-slate-50 rounded-xl p-4 text-sm text-slate-600 whitespace-pre-wrap border border-slate-200">
+              <div className="bg-[var(--bg-subtle)] rounded-xl p-4 text-sm text-[var(--text-secondary)] whitespace-pre-wrap border border-[var(--border)]">
                 {detail.content}
               </div>
             )}
 
             {selectedDuplicates.length > 0 && (
-              <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-4">
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div>
-                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wider">Possíveis chamados duplicados</p>
-                    <p className="text-sm text-amber-800">Encontramos chamados abertos com mesmo assunto e solicitante. Revise antes de documentar ou fechar individualmente.</p>
+                    <p className="text-xs font-semibold text-[var(--amber)] uppercase tracking-wider">Possíveis chamados duplicados</p>
+                    <p className="text-sm text-[var(--amber)]">Encontramos chamados abertos com mesmo assunto e solicitante. Revise antes de documentar ou fechar individualmente.</p>
                   </div>
-                  <span className="badge bg-amber-100 text-amber-700">{selectedDuplicates.length + 1} similares</span>
+                  <span className="badge bg-[var(--amber-bg)] text-[var(--amber)]">{selectedDuplicates.length + 1} similares</span>
                 </div>
                 <div className="space-y-2">
                   {selectedDuplicates.map(ticket => (
                     <button key={ticket.id} onClick={() => openDetail(ticket)}
-                      className="w-full text-left rounded-xl border border-amber-100 bg-white p-3 hover:bg-amber-50 transition">
+                      className="w-full text-left rounded-xl border border-[var(--amber-border)] bg-[var(--bg-surface)] p-3 hover:bg-[var(--amber-bg)] transition">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">#{ticket.id} · {ticket.title || '(sem título)'}</p>
-                          <p className="text-xs text-slate-500">{ticket.requester || '—'} · {ticket.statusLabel || 'Status não informado'} · {formatDate(ticket.openedAt)}</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">#{ticket.id} · {ticket.title || '(sem título)'}</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">{ticket.requester || '—'} · {ticket.statusLabel || 'Status não informado'} · {formatDate(ticket.openedAt)}</p>
                         </div>
-                        <span className="text-xs font-semibold text-amber-700">Abrir</span>
+                        <span className="text-xs font-semibold text-[var(--amber)]">Abrir</span>
                       </div>
                     </button>
                   ))}
@@ -452,13 +452,13 @@ export default function TicketsPage() {
             )}
 
             {/* Hermes Actions */}
-            <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-purple-50 p-4">
+            <div className="rounded-2xl border border-[var(--accent-ring)] bg-[var(--accent-light)] p-4">
               <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                 <div>
-                  <p className="text-xs font-semibold text-indigo-500 uppercase tracking-wider">Hermes no chamado</p>
-                  <p className="text-sm text-slate-600">Gere resumo, resolução base ou artigo da Wiki a partir do histórico do GLPI.</p>
+                  <p className="text-xs font-semibold text-[var(--accent-text)] uppercase tracking-wider">Hermes no chamado</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Gere resumo, resolução base ou artigo da Wiki a partir do histórico do GLPI.</p>
                 </div>
-                <span className="badge bg-indigo-100 text-indigo-700">NexusAI</span>
+                <span className="badge badge-blue">NexusAI</span>
               </div>
               <div className="flex flex-wrap gap-2">
                 <button onClick={handleSmartSummary} disabled={actionLoading || wikiCreating}
@@ -481,53 +481,53 @@ export default function TicketsPage() {
                 )}
               </div>
               {assistantDraft && (
-                <div className="mt-4 rounded-xl bg-white border border-indigo-100 p-3">
+                <div className="mt-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--accent-ring)] p-3">
                   <div className="flex items-center justify-between gap-2 mb-2">
-                    <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">{assistantDraft.title}</p>
+                    <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">{assistantDraft.title}</p>
                     <div className="flex gap-2">
                       <button onClick={() => copyToClipboard(assistantDraft.text)} className="btn btn-default text-xs">Copiar</button>
                       {assistantDraft.url && <a href={assistantDraft.url} className="btn btn-primary text-xs" target="_blank" rel="noreferrer">Abrir Wiki</a>}
                     </div>
                   </div>
-                  <pre className="whitespace-pre-wrap text-sm text-slate-700 font-sans leading-relaxed">{assistantDraft.text}</pre>
+                  <pre className="whitespace-pre-wrap text-sm text-[var(--text-secondary)] font-sans leading-relaxed">{assistantDraft.text}</pre>
                 </div>
               )}
             </div>
 
             {/* Wiki Suggestions */}
-            <div className="rounded-2xl border border-amber-100 bg-amber-50/40 p-4">
+            <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-4">
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div>
-                  <p className="text-xs font-semibold text-amber-600 uppercase tracking-wider">Sugestões da Wiki</p>
-                  <p className="text-sm text-slate-600">Artigos parecidos encontrados automaticamente antes de documentar.</p>
+                  <p className="text-xs font-semibold text-[var(--amber)] uppercase tracking-wider">Sugestões da Wiki</p>
+                  <p className="text-sm text-[var(--text-secondary)]">Artigos parecidos encontrados automaticamente antes de documentar.</p>
                 </div>
-                <span className="badge bg-amber-100 text-amber-700">{wikiSuggestionsLoading ? 'buscando' : wikiSuggestions.length}</span>
+                <span className="badge bg-[var(--amber-bg)] text-[var(--amber)]">{wikiSuggestionsLoading ? 'buscando' : wikiSuggestions.length}</span>
               </div>
               {wikiSuggestionQueries.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {wikiSuggestionQueries.map(q => <span key={q} className="badge bg-white text-slate-500 border border-amber-100">{q}</span>)}
+                  {wikiSuggestionQueries.map(q => <span key={q} className="badge bg-[var(--bg-surface)] text-[var(--text-tertiary)] border border-[var(--amber-border)]">{q}</span>)}
                 </div>
               )}
               {!wikiSuggestionsLoading && wikiSuggestions.length > 0 && (
-                <div className="mb-3 rounded-xl border border-amber-200 bg-amber-100/60 px-3 py-2 text-sm text-amber-800">
+                <div className="mb-3 rounded-xl border border-[var(--amber-border)] bg-[var(--amber-bg)] px-3 py-2 text-sm text-[var(--amber)]">
                   Possível duplicidade: revise as sugestões ou vincule um artigo existente antes de criar nova documentação.
                 </div>
               )}
               {wikiSuggestionsLoading ? (
-                <p className="text-sm text-slate-400 italic">Buscando artigos relacionados...</p>
+                <p className="text-sm text-[var(--text-tertiary)] italic">Buscando artigos relacionados...</p>
               ) : wikiSuggestions.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">Nenhum artigo parecido encontrado ainda.</p>
+                <p className="text-sm text-[var(--text-tertiary)] italic">Nenhum artigo parecido encontrado ainda.</p>
               ) : (
                 <div className="space-y-2">
                   {wikiSuggestions.map(article => (
-                    <div key={article.id} className="rounded-xl border border-amber-100 bg-white p-3">
+                    <div key={article.id} className="rounded-xl border border-[var(--amber-border)] bg-[var(--bg-surface)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <p className="text-sm font-semibold text-slate-800">{article.title}</p>
-                          <p className="text-xs text-slate-500">{article.category || 'Wiki'} · score {article.score || 0} · {article.matchCount} ocorrência(s) nas buscas</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{article.title}</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">{article.category || 'Wiki'} · score {article.score || 0} · {article.matchCount} ocorrência(s) nas buscas</p>
                           {article.scoreReasons?.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {article.scoreReasons.map(reason => <span key={reason} className="badge bg-amber-50 text-amber-700 border border-amber-100">{reason}</span>)}
+                              {article.scoreReasons.map(reason => <span key={reason} className="badge bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber-border)]">{reason}</span>)}
                             </div>
                           )}
                         </div>
@@ -544,24 +544,24 @@ export default function TicketsPage() {
             </div>
 
             {/* Linked Wiki Articles */}
-            <div className="rounded-2xl border border-slate-200 bg-white p-4">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
               <div className="flex items-center justify-between gap-2 mb-3">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Artigos relacionados na Wiki</p>
-                <span className="badge bg-slate-100 text-slate-600">{wikiLinks.length}</span>
+                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Artigos relacionados na Wiki</p>
+                <span className="badge bg-[var(--bg-muted)] text-[var(--text-secondary)]">{wikiLinks.length}</span>
               </div>
               {wikiLinks.length === 0 ? (
-                <p className="text-sm text-slate-400 italic">Nenhum artigo vinculado a este chamado ainda.</p>
+                <p className="text-sm text-[var(--text-tertiary)] italic">Nenhum artigo vinculado a este chamado ainda.</p>
               ) : (
                 <div className="space-y-2">
                   {wikiLinks.map(link => (
                     <a key={link.id} href={`/wiki/${link.wikiArticleId}`} target="_blank" rel="noreferrer"
-                      className="block rounded-xl border border-slate-100 p-3 hover:bg-slate-50 transition">
+                      className="block rounded-xl border border-[var(--border-muted)] p-3 hover:bg-[var(--bg-subtle)] transition">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-800">{link.wikiTitle}</p>
-                          <p className="text-xs text-slate-500">{link.wikiCategory || 'Wiki'} · criado por {link.createdByName || 'Sistema'}</p>
+                          <p className="text-sm font-semibold text-[var(--text-primary)]">{link.wikiTitle}</p>
+                          <p className="text-xs text-[var(--text-tertiary)]">{link.wikiCategory || 'Wiki'} · criado por {link.createdByName || 'Sistema'}</p>
                         </div>
-                        <span className="text-xs text-slate-400 whitespace-nowrap">{formatDate(link.createdAt)}</span>
+                        <span className="text-xs text-[var(--text-tertiary)] whitespace-nowrap">{formatDate(link.createdAt)}</span>
                       </div>
                     </a>
                   ))}
@@ -571,20 +571,20 @@ export default function TicketsPage() {
 
             {/* Followups */}
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">
+              <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
                 Histórico ({detail.followups.length})
               </p>
               {detail.followups.length === 0 ? (
-                <p className="text-slate-400 text-sm italic">Nenhum acompanhamento ainda.</p>
+                <p className="text-[var(--text-tertiary)] text-sm italic">Nenhum acompanhamento ainda.</p>
               ) : (
                 <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                   {detail.followups.map(f => (
-                    <div key={f.id} className="bg-white border border-slate-200 rounded-lg p-3">
-                      <div className="flex justify-between text-xs text-slate-400 mb-1">
-                        <span className="font-medium text-slate-700">{f.author || 'Sistema'}</span>
+                    <div key={f.id} className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-3">
+                      <div className="flex justify-between text-xs text-[var(--text-tertiary)] mb-1">
+                        <span className="font-medium text-[var(--text-secondary)]">{f.author || 'Sistema'}</span>
                         <span>{formatDate(f.date)}</span>
                       </div>
-                      <p className="text-sm text-slate-600 whitespace-pre-wrap">{f.content}</p>
+                      <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{f.content}</p>
                     </div>
                   ))}
                 </div>
@@ -592,14 +592,12 @@ export default function TicketsPage() {
             </div>
 
             {actionMsg && (
-              <div className={`text-sm px-3 py-2.5 rounded-lg ${
-                actionMsg.type === 'success' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-red-50 text-red-700 border border-red-200'
-              }`}>{actionMsg.text}</div>
+              <div className={`alert ${actionMsg.type === 'success' ? 'alert-green' : 'alert-red'}`}>{actionMsg.text}</div>
             )}
 
             {/* Add Followup */}
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Adicionar resposta</p>
+              <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Adicionar resposta</p>
               <textarea value={followupText} onChange={e => setFollowupText(e.target.value)}
                 placeholder="Digite sua resposta..." rows={3}
                 className="input resize-none" />
@@ -612,8 +610,8 @@ export default function TicketsPage() {
             </div>
 
             {isAdmin && (
-              <div className="border-t border-slate-100 pt-4">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Ações de Admin</p>
+              <div className="border-t border-[var(--border-muted)] pt-4">
+                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-3">Ações de Admin</p>
                 <div className="flex flex-wrap gap-2">
                   <button onClick={handleClose} disabled={actionLoading || detail.ticket.status === 6}
                     className="btn btn-default text-xs">

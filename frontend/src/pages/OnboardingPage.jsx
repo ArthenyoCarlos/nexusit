@@ -89,7 +89,7 @@ export default function OnboardingPage() {
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: isOn ? '#dbeafe' : '#fce7f3', color: isOn ? '#1d4ed8' : '#be185d' }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: isOn ? 'var(--accent-light)' : 'var(--purple-bg)', color: isOn ? 'var(--accent-text)' : 'var(--purple)' }}>
                           {isOn ? '👋 ONBOARDING' : '🚪 OFFBOARDING'}
                         </span>
                         {l.department && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{l.department}</span>}
@@ -116,38 +116,38 @@ export default function OnboardingPage() {
       </div>
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Novo Checklist">
-        <form onSubmit={handleCreate} className="space-y-4">
+        <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Tipo *</label>
-            <select value={form.type} onChange={f('type')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <label className="input-label">Tipo *</label>
+            <select value={form.type} onChange={f('type')} className="input">
               <option value="ONBOARDING">Onboarding (entrada)</option>
               <option value="OFFBOARDING">Offboarding (saída)</option>
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Nome do Funcionário *</label>
-            <input required value={form.employeeName} onChange={f('employeeName')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Ex: João Silva" />
+            <label className="input-label">Nome do Funcionário *</label>
+            <input required value={form.employeeName} onChange={f('employeeName')} className="input" placeholder="Ex: João Silva" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Setor</label>
-              <input value={form.department} onChange={f('department')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" placeholder="Financeiro" />
+              <label className="input-label">Setor</label>
+              <input value={form.department} onChange={f('department')} className="input" placeholder="Financeiro" />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">Data de Início</label>
-              <input type="date" value={form.startDate} onChange={f('startDate')} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+              <label className="input-label">Data de Início</label>
+              <input type="date" value={form.startDate} onChange={f('startDate')} className="input" />
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">Observações</label>
-            <textarea value={form.notes} onChange={f('notes')} rows={2} className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm resize-none" />
+            <label className="input-label">Observações</label>
+            <textarea value={form.notes} onChange={f('notes')} rows={2} className="input" />
           </div>
           <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
             Um checklist padrão de {form.type === 'ONBOARDING' ? ONBOARDING_ITEMS.length : OFFBOARDING_ITEMS.length} tarefas será gerado automaticamente.
           </p>
-          <div className="flex justify-end gap-3 pt-2">
-            <button type="button" onClick={() => setModalOpen(false)} className="px-4 py-2 text-sm text-slate-700 border border-slate-300 rounded-lg hover:bg-slate-50">Cancelar</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-60 rounded-lg font-medium">{saving ? 'Criando...' : 'Criar Checklist'}</button>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+            <button type="button" onClick={() => setModalOpen(false)} className="btn btn-default">Cancelar</button>
+            <button type="submit" disabled={saving} className="btn btn-primary">{saving ? 'Criando...' : 'Criar Checklist'}</button>
           </div>
         </form>
       </Modal>

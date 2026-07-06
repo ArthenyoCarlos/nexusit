@@ -57,7 +57,7 @@ export default function ProfilePage() {
 
         {/* Avatar card */}
         <div className="card" style={{ padding: '20px 22px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 18 }}>
-          <div style={{ width: 58, height: 58, borderRadius: 14, background: 'linear-gradient(135deg, #2563eb, #1d4ed8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: '#fff', flexShrink: 0 }}>
+          <div style={{ width: 58, height: 58, borderRadius: 14, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 700, color: 'var(--text-inverse)', flexShrink: 0 }}>
             {initials}
           </div>
           <div>

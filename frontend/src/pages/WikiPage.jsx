@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { SkeletonCard } from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
 import { getArticles, createArticle, updateArticle, deleteArticle } from '../services/wiki'
 
@@ -72,7 +73,9 @@ export default function WikiPage() {
           </div>
 
           {loading ? (
-            <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Carregando...</p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+              {[...Array(6)].map((_, i) => <SkeletonCard key={i} />)}
+            </div>
           ) : articles.length === 0 ? (
             <div className="card" style={{ padding: 40, textAlign: 'center' }}>
               <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Nenhum artigo encontrado. Crie o primeiro!</p>

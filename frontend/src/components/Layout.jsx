@@ -1,8 +1,10 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import GlobalSearch from './GlobalSearch'
 import NotificationBell from './NotificationBell'
 import { useToast } from '../contexts/ToastContext'
+import { useTheme } from '../contexts/ThemeContext'
 import { getProblems } from '../services/monitoring'
 import { getTickets } from '../services/glpi'
 import { playAlertSound, unlockAlertSound } from '../utils/alertSound'
@@ -13,8 +15,13 @@ function problemKey(p) {
 
 export default function Layout({ children }) {
   const { add: addToast } = useToast()
+  const { theme, toggleTheme } = useTheme()
+  const location = useLocation()
+  const [isNavOpen, setIsNavOpen] = useState(false)
   const prevProblemIdsRef = useRef(null)
   const prevTicketIdsRef = useRef(null)
+
+  useEffect(() => { setIsNavOpen(false) }, [location.pathname])
 
   useEffect(() => {
     const unlock = () => unlockAlertSound()
@@ -67,26 +74,64 @@ export default function Layout({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>
 
-      {/* Sidebar fixo */}
-      <div style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 10 }}>
-        <Sidebar />
+      {/* Backdrop mobile */}
+      <div className={`nav-backdrop${isNavOpen ? ' open' : ''}`} onClick={() => setIsNavOpen(false)} />
+
+      {/* Sidebar fixo / drawer mobile */}
+      <div className={`app-sidebar-wrap${isNavOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 10 }}>
+        <Sidebar onNavigate={() => setIsNavOpen(false)} />
       </div>
 
       {/* Conteúdo principal */}
-      <div style={{ flex: 1, minWidth: 0, marginLeft: 'var(--sidebar-w)', display: 'flex', flexDirection: 'column' }}>
+      <div className="app-content" style={{ flex: 1, minWidth: 0, marginLeft: 'var(--sidebar-w)', display: 'flex', flexDirection: 'column' }}>
 
         {/* Topbar */}
         <header style={{
           position: 'sticky', top: 0, zIndex: 9,
-          background: 'rgba(244,246,250,0.85)',
+          background: 'color-mix(in srgb, var(--bg-page) 85%, transparent)',
           backdropFilter: 'blur(12px)',
           WebkitBackdropFilter: 'blur(12px)',
           borderBottom: '1px solid var(--border-muted)',
           padding: '0 28px',
           height: 54,
-          display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 10,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         }}>
+          <button
+            className="mobile-nav-toggle"
+            onClick={() => setIsNavOpen(o => !o)}
+            aria-label="Abrir menu"
+            style={{
+              alignItems: 'center', justifyContent: 'center',
+              width: 34, height: 34, borderRadius: 'var(--r-md)',
+              border: '1px solid var(--border)', background: 'var(--bg-surface)',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+          </button>
+
+          <div style={{ flex: 1 }} />
+
           <GlobalSearch />
+
+          <button
+            onClick={toggleTheme}
+            aria-label="Alternar tema claro/escuro"
+            title={theme === 'dark' ? 'Ver no claro' : 'Ver no escuro'}
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 34, height: 34, borderRadius: 'var(--r-md)', flexShrink: 0,
+              border: '1px solid var(--border)', background: 'var(--bg-surface)',
+              color: 'var(--text-secondary)', cursor: 'pointer',
+            }}
+          >
+            {theme === 'dark' ? (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+            ) : (
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></svg>
+            )}
+          </button>
+
           <NotificationBell />
         </header>
 

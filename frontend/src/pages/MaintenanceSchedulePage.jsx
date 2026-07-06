@@ -15,10 +15,10 @@ const RECURRENCES = [
 ]
 
 const STATUS_CFG = {
-  OVERDUE: { label: 'Atrasada', color: '#dc2626', bg: '#fef2f2' },
-  TODAY:   { label: 'Hoje',     color: '#ea580c', bg: '#fff7ed' },
-  SOON:    { label: 'Em breve', color: '#d97706', bg: '#fffbeb' },
-  OK:      { label: 'OK',       color: '#0e9f6e', bg: '#f0fdf4' },
+  OVERDUE: { label: 'Atrasada', color: 'var(--red)',    bg: 'var(--red-bg)'    },
+  TODAY:   { label: 'Hoje',     color: 'var(--orange)', bg: 'var(--orange-bg)' },
+  SOON:    { label: 'Em breve', color: 'var(--amber)',  bg: 'var(--amber-bg)'  },
+  OK:      { label: 'OK',       color: 'var(--green)',  bg: 'var(--green-bg)'  },
 }
 
 const EMPTY = { title: '', description: '', recurrence: 'MONTHLY', nextDue: '', assignedToId: '' }
@@ -65,9 +65,9 @@ export default function MaintenanceSchedulePage() {
         </div>
 
         {(overdue.length > 0 || today.length > 0) && (
-          <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-            <p style={{ fontWeight: 600, color: '#991b1b', fontSize: 13 }}>
-              🔴 {overdue.length} tarefa(s) atrasada(s){today.length > 0 ? ` · ${today.length} para hoje` : ''}
+          <div className="alert alert-red">
+            <p style={{ fontWeight: 600, fontSize: 13 }}>
+              {overdue.length} tarefa(s) atrasada(s){today.length > 0 ? ` · ${today.length} para hoje` : ''}
             </p>
           </div>
         )}

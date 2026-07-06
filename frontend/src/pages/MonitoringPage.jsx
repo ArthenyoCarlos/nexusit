@@ -2,15 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getHosts, getProblems, getHostMetrics } from '../services/monitoring'
 import Layout from '../components/Layout'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts'
-
-const SEV = {
-  5: { label: 'Disaster', pill: 'bg-red-100 text-red-700',     dot: 'bg-red-500',    ring: 'border-red-200 bg-red-50'    },
-  4: { label: 'High',     pill: 'bg-orange-100 text-orange-700', dot: 'bg-orange-500', ring: 'border-orange-200 bg-orange-50' },
-  3: { label: 'Average',  pill: 'bg-yellow-100 text-yellow-700', dot: 'bg-yellow-500', ring: 'border-yellow-200 bg-yellow-50' },
-  2: { label: 'Warning',  pill: 'bg-blue-100 text-blue-700',   dot: 'bg-blue-400',   ring: 'border-blue-200 bg-blue-50'  },
-  1: { label: 'Info',     pill: 'bg-slate-100 text-slate-600',  dot: 'bg-slate-400',  ring: 'border-slate-200 bg-slate-50' },
-  0: { label: 'N/C',      pill: 'bg-slate-100 text-slate-500',  dot: 'bg-slate-300',  ring: 'border-slate-200 bg-slate-50' },
-}
+import { severityOf } from '../utils/severity'
 
 function formatUptime(s) {
   if (!s) return '—'
@@ -76,14 +68,14 @@ export default function MonitoringPage() {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12.5, color: 'var(--text-tertiary)' }}>
             {lastUpdate && <span>Atualizado {lastUpdate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>}
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: loading ? '#f59e0b' : '#10b981', display: 'inline-block', animation: loading ? 'pulse 1.5s infinite' : 'none' }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: loading ? 'var(--amber)' : 'var(--green)', display: 'inline-block', animation: loading ? 'pulse 1.5s infinite' : 'none' }} />
           </div>
         </div>
 
         {/* KPIs */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px,1fr))', gap: 14, marginBottom: 24 }}>
           {[
-            { label: 'Total Hosts',    value: hosts.length,    iconColor: '#1a56db', iconBg: 'var(--accent-light)' },
+            { label: 'Total Hosts',    value: hosts.length,    iconColor: 'var(--accent-text)', iconBg: 'var(--accent-light)' },
             { label: 'Online',         value: online,          iconColor: 'var(--green)',  iconBg: 'var(--green-bg)'  },
             { label: 'Offline',        value: offline,         iconColor: offline > 0 ? 'var(--red)' : 'var(--text-tertiary)', iconBg: offline > 0 ? 'var(--red-bg)' : 'var(--bg-muted)' },
             { label: 'Alertas Ativos', value: problems.length, iconColor: problems.length > 0 ? 'var(--amber)' : 'var(--green)', iconBg: problems.length > 0 ? 'var(--amber-bg)' : 'var(--green-bg)' },
@@ -129,7 +121,7 @@ export default function MonitoringPage() {
                   onMouseEnter={e => { if (host.id !== chartHostId) { e.currentTarget.style.boxShadow = 'var(--shadow-md)'; e.currentTarget.style.transform = 'translateY(-1px)' } }}
                   onMouseLeave={e => { e.currentTarget.style.boxShadow = ''; e.currentTarget.style.transform = '' }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
-                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: host.available ? '#10b981' : '#ef4444', display: 'inline-block' }} />
+                    <span style={{ width: 8, height: 8, borderRadius: '50%', background: host.available ? 'var(--green)' : 'var(--red)', display: 'inline-block' }} />
                     <span className={host.available ? 'badge badge-green' : 'badge badge-red'} style={{ fontSize: 11 }}>
                       {host.available ? 'Online' : 'Offline'}
                     </span>
@@ -147,31 +139,31 @@ export default function MonitoringPage() {
 
         {/* CPU Chart */}
         {metrics && (
-          <section className="card p-5 mb-6">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <section className="card" style={{ padding: 20, marginBottom: 24 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
               <div>
-                <h2 className="text-sm font-semibold text-slate-800">
+                <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                   CPU — {hosts.find(h => h.id === chartHostId)?.name ?? '—'}
                 </h2>
-                <p className="text-xs text-slate-400">Últimas 2 horas</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>Últimas 2 horas</p>
               </div>
-              <div className="flex gap-4 text-sm">
+              <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
                 {metrics.cpuPercent != null && (
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-blue-600">{metrics.cpuPercent.toFixed(1)}%</p>
-                    <p className="text-xs text-slate-400">CPU</p>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--accent-text)', fontFamily: 'var(--font-mono)' }}>{metrics.cpuPercent.toFixed(1)}%</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>CPU</p>
                   </div>
                 )}
                 {metrics.memoryUsedPercent != null && (
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-purple-600">{metrics.memoryUsedPercent.toFixed(1)}%</p>
-                    <p className="text-xs text-slate-400">Memória</p>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--purple)', fontFamily: 'var(--font-mono)' }}>{metrics.memoryUsedPercent.toFixed(1)}%</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Memória</p>
                   </div>
                 )}
                 {metrics.uptimeSeconds != null && (
-                  <div className="text-center">
-                    <p className="text-xl font-bold text-emerald-600">{formatUptime(metrics.uptimeSeconds)}</p>
-                    <p className="text-xs text-slate-400">Uptime</p>
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>{formatUptime(metrics.uptimeSeconds)}</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Uptime</p>
                   </div>
                 )}
               </div>
@@ -179,18 +171,18 @@ export default function MonitoringPage() {
             {cpuData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={cpuData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: '#94a3b8' }} interval="preserveStartEnd" />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: '#94a3b8' }} unit="%" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} unit="%" />
                   <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', boxShadow: '0 4px 12px rgb(0,0,0,0.08)' }}
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
                     formatter={v => [`${v}%`, 'CPU']}
                   />
-                  <Line type="monotone" dataKey="cpu" stroke="#3b82f6" dot={false} strokeWidth={2} />
+                  <Line type="monotone" dataKey="cpu" stroke="var(--accent)" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
-              <p className="text-slate-400 text-sm text-center py-8">Sem dados de histórico disponíveis.</p>
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
             )}
           </section>
         )}
@@ -214,12 +206,12 @@ export default function MonitoringPage() {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {grouped.map(([sev, probs]) => {
-                const s = SEV[sev] ?? SEV[0]
+                const s = severityOf(Number(sev))
                 return (
-                  <div key={sev} className="card" style={{ overflow: 'hidden', border: `1px solid ${s.ring.includes('red') ? 'var(--red-border)' : s.ring.includes('orange') ? 'var(--amber-border)' : 'var(--border)'}` }}>
+                  <div key={sev} className="card" style={{ overflow: 'hidden', border: `1px solid ${s.border}` }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', borderBottom: '1px solid var(--border-muted)', background: 'var(--bg-subtle)' }}>
-                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.dot.includes('red') ? 'var(--red)' : s.dot.includes('orange') ? 'var(--amber)' : s.dot.includes('yellow') ? '#ca8a04' : 'var(--text-tertiary)', display: 'inline-block', flexShrink: 0 }} />
-                      <span className="badge badge-red" style={{ background: 'none', border: 'none', padding: 0, fontWeight: 700, fontSize: 12 }}>{s.label}</span>
+                      <span style={{ width: 10, height: 10, borderRadius: '50%', background: s.color, display: 'inline-block', flexShrink: 0 }} />
+                      <span style={{ fontWeight: 700, fontSize: 12, color: s.color }}>{s.label}</span>
                       <span style={{ fontSize: 12, color: 'var(--text-tertiary)', marginLeft: 'auto' }}>{probs.length} {probs.length === 1 ? 'alerta' : 'alertas'}</span>
                     </div>
                     <div>

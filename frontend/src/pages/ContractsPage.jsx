@@ -9,10 +9,10 @@ const TYPES = ['MENSAL', 'ANUAL', 'UNICO']
 const EMPTY = { name: '', vendor: '', contactName: '', contactEmail: '', contactPhone: '', type: 'ANUAL', value: '', startDate: '', endDate: '', autoRenew: false, notes: '' }
 
 const STATUS_CFG = {
-  EXPIRED:       { label: 'Vencido',       color: '#dc2626', bg: '#fef2f2' },
-  EXPIRING_SOON: { label: 'Vence em breve',color: '#ea580c', bg: '#fff7ed' },
-  EXPIRING:      { label: 'A vencer',      color: '#d97706', bg: '#fffbeb' },
-  OK:            { label: 'Vigente',        color: '#0e9f6e', bg: '#f0fdf4' },
+  EXPIRED:       { label: 'Vencido',        color: 'var(--red)',    bg: 'var(--red-bg)'    },
+  EXPIRING_SOON: { label: 'Vence em breve', color: 'var(--orange)', bg: 'var(--orange-bg)' },
+  EXPIRING:      { label: 'A vencer',       color: 'var(--amber)',  bg: 'var(--amber-bg)'  },
+  OK:            { label: 'Vigente',        color: 'var(--green)',  bg: 'var(--green-bg)'  },
 }
 
 const BRL = v => v != null ? new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(v) : '—'
@@ -61,13 +61,13 @@ export default function ContractsPage() {
         </div>
 
         {expiring.length > 0 && (
-          <div style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
-            <p style={{ fontWeight: 600, color: '#92400e', fontSize: 13 }}>⚠ {expiring.length} contrato(s) vencido(s) ou a vencer em breve</p>
-            <p style={{ fontSize: 12.5, color: '#b45309', marginTop: 4 }}>{expiring.map(c => c.name).join(', ')}</p>
+          <div className="alert alert-amber" style={{ flexDirection: 'column', alignItems: 'flex-start', gap: 4 }}>
+            <p style={{ fontWeight: 600, fontSize: 13 }}>{expiring.length} contrato(s) vencido(s) ou a vencer em breve</p>
+            <p style={{ fontSize: 12.5 }}>{expiring.map(c => c.name).join(', ')}</p>
           </div>
         )}
 
-        <div className="card" style={{ overflow: 'hidden' }}>
+        <div className="card scroll-x" style={{ overflow: 'hidden' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
             <thead>
               <tr style={{ borderBottom: '1px solid var(--border-muted)' }}>
@@ -88,7 +88,7 @@ export default function ContractsPage() {
                     </td>
                     <td style={{ padding: '12px 14px' }}>
                       <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)' }}>{c.name}</p>
-                      {c.autoRenew && <p style={{ fontSize: 11, color: '#0e9f6e' }}>Renovação automática</p>}
+                      {c.autoRenew && <p style={{ fontSize: 11, color: 'var(--green)' }}>Renovação automática</p>}
                     </td>
                     <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>{c.vendor ?? '—'}</td>
                     <td style={{ padding: '12px 14px', fontSize: 13, color: 'var(--text-secondary)' }}>{c.type}</td>

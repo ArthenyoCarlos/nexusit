@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
+import { SkeletonLine } from '../components/Skeleton'
 import { addOcorrencia, getTermo, termoPdfUrl } from '../services/termos'
 
 const DATE = v => v ? new Date(v).toLocaleString('pt-BR') : '—'
@@ -12,7 +13,7 @@ export default function TermoDetalhePage(){
  const {id}=useParams(); const [termo,setTermo]=useState(null); const [modal,setModal]=useState(false); const [occ,setOcc]=useState(OCC_EMPTY); const [saving,setSaving]=useState(false)
  const load=()=>getTermo(id).then(setTermo); useEffect(()=>{load()},[id])
  const saveOcc=async e=>{e.preventDefault(); setSaving(true); try{await addOcorrencia(id,{...occ,custo:occ.custo?Number(occ.custo):null}); setModal(false); setOcc(OCC_EMPTY); load()} finally{setSaving(false)}}
- if(!termo) return <Layout><div className="page">Carregando...</div></Layout>
+ if(!termo) return <Layout><div className="page" style={{display:'flex',flexDirection:'column',gap:12}}><SkeletonLine className="h-6 w-1/3"/><SkeletonLine className="h-32 w-full"/><SkeletonLine className="h-32 w-full"/></div></Layout>
  return <Layout><div className="page fade-up">
   <div className="page-header"><div className="page-header-left"><h1>{termo.numeroTermo}</h1><p>{termo.responsavelNome} · {termo.tombamento}</p></div><div style={{display:'flex',gap:8}}>{!termo.assinado&&<Link className="btn btn-primary" to={`/termos/${id}/assinar`}>Assinar</Link>}{termo.assinado&&<a className="btn btn-primary" href={termoPdfUrl(id)} target="_blank">Download PDF</a>}<button className="btn btn-default" onClick={()=>setModal(true)}>+ Ocorrência</button></div></div>
   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
