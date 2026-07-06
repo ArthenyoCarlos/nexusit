@@ -2,8 +2,8 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { globalSearch } from '../services/search'
 
-const TYPE_ICON  = { system: '🖥️', inventory: '📦', note: '📝', wiki: '📖', contract: '📄' }
-const TYPE_LABEL = { system: 'Sistema', inventory: 'Inventário', note: 'Anotação', wiki: 'Wiki', contract: 'Contrato' }
+const TYPE_ICON  = { system: '🖥️', inventory: '📦', note: '📝', wiki: '📖', contract: '📄', license: '⭐', onboarding: '👤', termo: '📋' }
+const TYPE_LABEL = { system: 'Sistema', inventory: 'Inventário', note: 'Anotação', wiki: 'Wiki', contract: 'Contrato', license: 'Licença', onboarding: 'Onboarding', termo: 'Termo' }
 
 export default function GlobalSearch() {
   const [query, setQuery]     = useState('')

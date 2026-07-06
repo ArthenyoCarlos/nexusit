@@ -31,6 +31,7 @@ import TermoNovoPage from './pages/TermoNovoPage'
 import TermoDetalhePage from './pages/TermoDetalhePage'
 import TermoAssinarPage from './pages/TermoAssinarPage'
 import TermoTemplatePage from './pages/TermoTemplatePage'
+import HermesPage from './pages/HermesPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
 export default function App() {
@@ -46,6 +47,7 @@ export default function App() {
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard"  element={<DashboardPage />} />
+              <Route path="/hermes"     element={<HermesPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
               <Route path="/systems"        element={<SystemsPage />} />
               <Route path="/systems/:id"   element={<SystemDetailPage />} />

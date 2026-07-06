@@ -1,10 +1,13 @@
 package br.com.nexusit.search;
 
-import br.com.nexusit.inventory.InventoryRepository;
-import br.com.nexusit.notes.NoteRepository;
-import br.com.nexusit.system.SystemRepository;
-import br.com.nexusit.wiki.WikiRepository;
 import br.com.nexusit.contracts.ContractRepository;
+import br.com.nexusit.inventory.InventoryRepository;
+import br.com.nexusit.licenses.LicenseRepository;
+import br.com.nexusit.notes.NoteRepository;
+import br.com.nexusit.onboarding.ChecklistRepository;
+import br.com.nexusit.system.SystemRepository;
+import br.com.nexusit.termos.TermoRepository;
+import br.com.nexusit.wiki.WikiRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -25,6 +28,9 @@ public class SearchController {
     private final NoteRepository noteRepo;
     private final WikiRepository wikiRepo;
     private final ContractRepository contractRepo;
+    private final LicenseRepository licenseRepo;
+    private final ChecklistRepository checklistRepo;
+    private final TermoRepository termoRepo;
 
     @GetMapping
     public SearchResult search(
@@ -34,7 +40,6 @@ public class SearchController {
         if (q == null || q.isBlank() || q.length() < 2) return SearchResult.empty();
 
         String term = q.trim().toLowerCase();
-
         List<SearchResult.Hit> hits = new ArrayList<>();
 
         // Systems
@@ -49,7 +54,9 @@ public class SearchController {
         inventoryRepo.findAll().stream()
                 .filter(i -> i.getName().toLowerCase().contains(term)
                         || (i.getSerialNumber() != null && i.getSerialNumber().toLowerCase().contains(term))
-                        || (i.getTombamento() != null && i.getTombamento().toLowerCase().contains(term)))
+                        || (i.getTombamento() != null && i.getTombamento().toLowerCase().contains(term))
+                        || (i.getBrand() != null && i.getBrand().toLowerCase().contains(term))
+                        || (i.getModel() != null && i.getModel().toLowerCase().contains(term)))
                 .limit(5)
                 .forEach(i -> hits.add(new SearchResult.Hit("inventory", i.getId().toString(), i.getName(),
                         i.getTombamento() != null ? i.getTombamento() : i.getType().name(),
@@ -83,6 +90,38 @@ public class SearchController {
                 .limit(3)
                 .forEach(c -> hits.add(new SearchResult.Hit("contract", c.getId().toString(), c.getName(),
                         c.getVendor(), "/contracts")));
+
+        // Licenses
+        licenseRepo.findAll().stream()
+                .filter(l -> l.getName().toLowerCase().contains(term)
+                        || (l.getVendor() != null && l.getVendor().toLowerCase().contains(term))
+                        || (l.getProduct() != null && l.getProduct().toLowerCase().contains(term)))
+                .limit(3)
+                .forEach(l -> hits.add(new SearchResult.Hit("license", l.getId().toString(), l.getName(),
+                        l.getVendor(), "/licenses")));
+
+        // Onboarding / Offboarding
+        checklistRepo.findAll().stream()
+                .filter(c -> c.getEmployeeName().toLowerCase().contains(term)
+                        || (c.getDepartment() != null && c.getDepartment().toLowerCase().contains(term)))
+                .limit(3)
+                .forEach(c -> hits.add(new SearchResult.Hit("onboarding", c.getId().toString(),
+                        c.getEmployeeName(),
+                        c.getType() + (c.getDepartment() != null ? " · " + c.getDepartment() : ""),
+                        "/onboarding/" + c.getId())));
+
+        // Termos de Responsabilidade
+        termoRepo.findAll().stream()
+                .filter(t -> t.getResponsavelNome().toLowerCase().contains(term)
+                        || t.getTombamento().toLowerCase().contains(term)
+                        || (t.getMarca() != null && t.getMarca().toLowerCase().contains(term))
+                        || (t.getModelo() != null && t.getModelo().toLowerCase().contains(term))
+                        || t.getNumeroTermo().toLowerCase().contains(term))
+                .limit(3)
+                .forEach(t -> hits.add(new SearchResult.Hit("termo", t.getId().toString(),
+                        "Termo " + t.getNumeroTermo(),
+                        t.getResponsavelNome() + " · " + t.getTombamento(),
+                        "/termos/" + t.getId())));
 
         return new SearchResult(hits);
     }
