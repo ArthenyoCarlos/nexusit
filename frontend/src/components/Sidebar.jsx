@@ -30,7 +30,7 @@ const NAV = [
   {
     section: 'Ferramentas',
     items: [
-      { label: 'Cofre',         path: '/vault',                Icon: IconVault      },
+      { label: 'Cofre',         path: '/vault',                Icon: IconVault, adminOnly: true },
       { label: 'Licenças',      path: '/licenses',             Icon: IconLicense    },
       { label: 'Contratos',     path: '/contracts',            Icon: IconContract   },
       { label: 'Termos Resp.',   path: '/termos',               Icon: IconContract   },
@@ -87,7 +87,7 @@ export default function Sidebar({ onNavigate }) {
             }}>
               {group.section}
             </p>
-            {group.items.map(({ label, path, Icon }) => (
+            {group.items.filter(item => !item.adminOnly || isAdmin).map(({ label, path, Icon }) => (
               <NavLink
                 key={path}
                 to={path}

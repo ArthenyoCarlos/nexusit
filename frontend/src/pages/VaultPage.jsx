@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
+import { useAuth } from '../contexts/AuthContext'
 import { getCredentials, revealSecret, createCredential, updateCredential, deleteCredential } from '../services/vault'
 
 const TYPES = ['PASSWORD', 'SSH', 'API_KEY', 'CERTIFICATE', 'TOKEN', 'OTHER']
@@ -9,6 +10,8 @@ const TYPE_ICON = { PASSWORD: '🔑', SSH: '🖥️', API_KEY: '🔗', CERTIFICA
 const EMPTY = { title: '', type: 'PASSWORD', username: '', secret: '', url: '', description: '', tags: '' }
 
 export default function VaultPage() {
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
   const [creds, setCreds]           = useState([])
   const [loading, setLoading]       = useState(true)
   const [search, setSearch]         = useState('')
@@ -33,7 +36,7 @@ export default function VaultPage() {
     } finally { setLoading(false) }
   }, [search, filterType])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { if (isAdmin) load() }, [isAdmin, load])
 
   const openCreate = () => { setEditing(null); setForm(EMPTY); setFormError(''); setShowSecret(false); setModalOpen(true) }
   const openEdit   = (c) => { setEditing(c); setForm({ title: c.title, type: c.type, username: c.username ?? '', secret: '••••••••', url: c.url ?? '', description: c.description ?? '', tags: c.tags ?? '' }); setFormError(''); setShowSecret(false); setModalOpen(true) }
@@ -66,6 +69,25 @@ export default function VaultPage() {
   }
 
   const f = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  if (!isAdmin) {
+    return (
+      <Layout>
+        <div className="page fade-up">
+          <div className="page-header">
+            <div className="page-header-left">
+              <h1>Cofre de Credenciais</h1>
+              <p>Acesso restrito a administradores</p>
+            </div>
+          </div>
+          <div className="card empty-state">
+            <h3>Você não tem permissão para acessar o Cofre</h3>
+            <p>Esta área é restrita a administradores. Fale com um admin do NexusIT se precisar de uma credencial.</p>
+          </div>
+        </div>
+      </Layout>
+    )
+  }
 
   return (
     <Layout>
