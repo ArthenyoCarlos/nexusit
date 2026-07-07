@@ -18,7 +18,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
       className="fade-in"
       style={{
         position: 'fixed', inset: 0, zIndex: 50,
-        overflowY: 'auto',
+        overflowY: 'auto', overflowX: 'hidden',
         background: 'rgba(0,0,0,0.55)',
         backdropFilter: 'blur(6px)',
         WebkitBackdropFilter: 'blur(6px)',
@@ -34,6 +34,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
           maxWidth: SIZE_MAP[size] ?? 520,
           margin: '0 auto',
           boxShadow: 'var(--shadow-xl)',
+          overflowX: 'hidden',
         }}
       >
         {/* Header */}

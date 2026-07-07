@@ -45,7 +45,7 @@ export default function WikiPage() {
 
   return (
     <Layout>
-      <div className="page fade-up" style={{ display: 'grid', gridTemplateColumns: '200px 1fr', gap: 20, alignItems: 'start' }}>
+      <div className="page fade-up" style={{ display: 'grid', gridTemplateColumns: '200px minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
 
         {/* Sidebar categorias */}
         <div className="card" style={{ padding: '12px 8px', position: 'sticky', top: 76 }}>

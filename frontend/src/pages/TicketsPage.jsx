@@ -596,12 +596,12 @@ export default function TicketsPage() {
             )}
 
             {/* Add Followup */}
-            <div>
-              <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">Adicionar resposta</p>
+            <div className="card" style={{ padding: 16 }}>
+              <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider" style={{ marginBottom: 10 }}>Adicionar resposta</p>
               <textarea value={followupText} onChange={e => setFollowupText(e.target.value)}
                 placeholder="Digite sua resposta..." rows={3}
                 className="input resize-none" />
-              <div className="flex justify-end mt-2">
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
                 <button onClick={handleAddFollowup} disabled={!followupText.trim() || actionLoading}
                   className="btn btn-primary text-xs">
                   Enviar resposta
@@ -610,20 +610,25 @@ export default function TicketsPage() {
             </div>
 
             {isAdmin && (
-              <div className="border-t border-[var(--border-muted)] pt-4">
-                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-3">Ações de Admin</p>
-                <div className="flex flex-wrap gap-2">
+              <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
+                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Ações de Admin</p>
+
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Encerrar este chamado</span>
                   <button onClick={handleClose} disabled={actionLoading || detail.ticket.status === 6}
                     className="btn btn-default text-xs">
                     Fechar chamado
                   </button>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
                   <select value={assignUserId} onChange={e => setAssignUserId(e.target.value)}
-                    className="input w-56 text-xs">
+                    className="input text-xs" style={{ flex: '1 1 220px' }}>
                     <option value="">Selecione um técnico...</option>
                     {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
                   </select>
                   <button onClick={handleAssign} disabled={!assignUserId || actionLoading}
-                    className="btn btn-primary text-xs">
+                    className="btn btn-primary text-xs" style={{ flexShrink: 0 }}>
                     Atribuir técnico
                   </button>
                 </div>

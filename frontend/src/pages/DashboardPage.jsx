@@ -227,10 +227,10 @@ export default function DashboardPage() {
         )}
 
         {/* Main grid: 2 columns */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 16, alignItems: 'start' }}>
+        <div className="dashboard-grid" style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 360px)', gap: 16, alignItems: 'start' }}>
 
           {/* LEFT COLUMN */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
 
             {/* Alertas Zabbix */}
             <Section title="Alertas Zabbix" count={allAlerts.length} to="/monitoring" emptyMsg="Nenhum alerta ativo">
@@ -269,7 +269,7 @@ export default function DashboardPage() {
           </div>
 
           {/* RIGHT COLUMN */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16, minWidth: 0 }}>
 
             {/* Inventário por status */}
             <div className="card" style={{ padding: '16px 20px' }}>
