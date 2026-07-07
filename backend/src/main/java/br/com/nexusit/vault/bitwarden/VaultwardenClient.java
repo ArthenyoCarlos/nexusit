@@ -58,7 +58,7 @@ class VaultwardenClient {
         form.add("grant_type", "password");
         form.add("username", email);
         form.add("password", masterPasswordHashB64);
-        form.add("scope", "api");
+        form.add("scope", "api offline_access");
         form.add("client_id", "nexusit");
         form.add("deviceType", "21");
         form.add("deviceIdentifier", deviceIdentifier);
