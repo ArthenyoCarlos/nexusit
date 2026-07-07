@@ -29,7 +29,7 @@ public class ZabbixController {
     }
 
     @GetMapping("/hosts/{id}/metrics")
-    public ZabbixMetrics getMetrics(@PathVariable String id) {
-        return service.getHostMetrics(id);
+    public ZabbixMetrics getMetrics(@PathVariable String id, @RequestParam(defaultValue = "2") int hours) {
+        return service.getHostMetrics(id, hours);
     }
 }

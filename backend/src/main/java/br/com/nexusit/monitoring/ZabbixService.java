@@ -152,13 +152,11 @@ public class ZabbixService {
     // ── Host Metrics ──────────────────────────────────────────────────────
 
     @SuppressWarnings("unchecked")
-    public ZabbixMetrics getHostMetrics(String hostId) {
+    public ZabbixMetrics getHostMetrics(String hostId, int hours) {
         return safeCall(() -> {
-            // CPU item
             Double cpuPercent = null;
             Double memPercent = null;
             Long uptimeSeconds = null;
-            List<ZabbixMetrics.CpuDataPoint> cpuHistory = List.of();
 
             Map<String, Object> itemParams = new LinkedHashMap<>();
             itemParams.put("output", List.of("itemid", "key_", "lastvalue"));
@@ -173,6 +171,7 @@ public class ZabbixService {
             List<Map<String, Object>> items = client.call("item.get", itemParams);
 
             String cpuItemId = null;
+            String memItemId = null;
             for (Map<String, Object> item : items) {
                 String key = str(item, "key_");
                 String val = str(item, "lastvalue");
@@ -187,37 +186,43 @@ public class ZabbixService {
                     cpuItemId = str(item, "itemid");
                 } else if (key.equals("vm.memory.size[pavailable]")) {
                     memPercent = 100.0 - dval;
+                    memItemId = str(item, "itemid");
                 } else if (key.equals("vm.memory.size[pused]")) {
                     memPercent = dval;
+                    memItemId = str(item, "itemid");
                 } else if (key.equals("system.uptime")) {
                     uptimeSeconds = (long) dval;
                 }
             }
 
-            // CPU history (last 2h)
-            if (cpuItemId != null) {
-                long timeFrom = System.currentTimeMillis() / 1000 - 7200;
-                Map<String, Object> histParams = new LinkedHashMap<>();
-                histParams.put("itemids", List.of(cpuItemId));
-                histParams.put("history", 0); // float
-                histParams.put("time_from", timeFrom);
-                histParams.put("sortfield", "clock");
-                histParams.put("sortorder", "ASC");
-                histParams.put("limit", 120);
+            long timeFrom = System.currentTimeMillis() / 1000 - (long) hours * 3600;
+            List<ZabbixMetrics.CpuDataPoint> cpuHistory = cpuItemId != null ? fetchItemHistory(cpuItemId, timeFrom) : List.of();
+            List<ZabbixMetrics.CpuDataPoint> memoryHistory = memItemId != null ? fetchItemHistory(memItemId, timeFrom) : List.of();
 
-                try {
-                    List<Map<String, Object>> hist = client.call("history.get", histParams);
-                    cpuHistory = hist.stream().map(h -> new ZabbixMetrics.CpuDataPoint(
-                            longVal(h, "clock"),
-                            parseDouble(str(h, "value"))
-                    )).toList();
-                } catch (Exception e) {
-                    log.debug("CPU history fetch failed: {}", e.getMessage());
-                }
-            }
+            return new ZabbixMetrics(hostId, cpuPercent, memPercent, uptimeSeconds, cpuHistory, memoryHistory);
+        }, new ZabbixMetrics(hostId, null, null, null, List.of(), List.of()));
+    }
 
-            return new ZabbixMetrics(hostId, cpuPercent, memPercent, uptimeSeconds, cpuHistory);
-        }, new ZabbixMetrics(hostId, null, null, null, List.of()));
+    @SuppressWarnings("unchecked")
+    private List<ZabbixMetrics.CpuDataPoint> fetchItemHistory(String itemId, long timeFrom) {
+        try {
+            Map<String, Object> histParams = new LinkedHashMap<>();
+            histParams.put("itemids", List.of(itemId));
+            histParams.put("history", 0); // float
+            histParams.put("time_from", timeFrom);
+            histParams.put("sortfield", "clock");
+            histParams.put("sortorder", "DESC");
+            histParams.put("limit", 1000);
+
+            List<Map<String, Object>> hist = client.call("history.get", histParams);
+            List<ZabbixMetrics.CpuDataPoint> points = hist.stream()
+                    .map(h -> new ZabbixMetrics.CpuDataPoint(longVal(h, "clock"), parseDouble(str(h, "value"))))
+                    .toList();
+            return points.reversed();
+        } catch (Exception e) {
+            log.debug("History fetch failed for item {}: {}", itemId, e.getMessage());
+            return List.of();
+        }
     }
 
     // ── Recent History ────────────────────────────────────────────────────

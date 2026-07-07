@@ -9,15 +9,24 @@ function formatUptime(s) {
   const d = Math.floor(s / 86400), h = Math.floor((s % 86400) / 3600)
   return d > 0 ? `${d}d ${h}h` : `${h}h ${Math.floor((s % 3600) / 60)}m`
 }
-function formatTime(ts) {
-  return new Date(ts * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+function formatTime(ts, hours) {
+  return hours > 2
+    ? new Date(ts * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : new Date(ts * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
+
+const PERIODS = [
+  { label: '2h', hours: 2 },
+  { label: '24h', hours: 24 },
+  { label: '7d', hours: 168 },
+]
 
 export default function MonitoringPage() {
   const [hosts, setHosts]           = useState([])
   const [problems, setProblems]     = useState([])
   const [metrics, setMetrics]       = useState(null)
   const [chartHostId, setChartHostId] = useState(null)
+  const [metricsHours, setMetricsHours] = useState(2)
   const [loading, setLoading]       = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
 
@@ -31,16 +40,16 @@ export default function MonitoringPage() {
   	const first = hostsRes.data.find(h => h.available)
   	if (first) {
     	  setChartHostId(first.id)
-    	  const m = await getHostMetrics(first.id)
+    	  const m = await getHostMetrics(first.id, metricsHours)
     	  setMetrics(m.data)
   	}
   } else {
-  const m = await getHostMetrics(chartHostId)
+  const m = await getHostMetrics(chartHostId, metricsHours)
   setMetrics(m.data)
 }
     } catch {}
     finally { setLoading(false) }
-  }, [chartHostId])
+  }, [chartHostId, metricsHours])
 
   useEffect(() => {
     fetchData()
@@ -54,7 +63,9 @@ export default function MonitoringPage() {
 
   const online = hosts.filter(h => h.available).length
   const offline = hosts.length - online
-  const cpuData = (metrics?.cpuHistory ?? []).map(p => ({ time: formatTime(p.timestamp), cpu: +p.value.toFixed(1) }))
+  const cpuData = (metrics?.cpuHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), cpu: +p.value.toFixed(1) }))
+  const memData = (metrics?.memoryHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), mem: +p.value.toFixed(1) }))
+  const periodLabel = metricsHours <= 2 ? 'Últimas 2 horas' : metricsHours <= 24 ? 'Últimas 24 horas' : 'Últimos 7 dias'
 
   return (
     <Layout>
@@ -113,7 +124,7 @@ export default function MonitoringPage() {
               {hosts.map(host => (
                 <button key={host.id} onClick={async () => {
                   setChartHostId(host.id)
-                  const res = await getHostMetrics(host.id)
+                  const res = await getHostMetrics(host.id, metricsHours)
                   setMetrics(res.data)
                 }}
                   className="card"
@@ -137,15 +148,28 @@ export default function MonitoringPage() {
           )}
         </section>
 
-        {/* CPU Chart */}
+        {/* CPU + Memória */}
         {metrics && (
           <section className="card" style={{ padding: 20, marginBottom: 24 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
               <div>
                 <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
-                  CPU — {hosts.find(h => h.id === chartHostId)?.name ?? '—'}
+                  {hosts.find(h => h.id === chartHostId)?.name ?? '—'}
                 </h2>
-                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>Últimas 2 horas</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>{periodLabel}</p>
+              </div>
+              <div style={{ display: 'flex', gap: 4, background: 'var(--bg-muted)', padding: 3, borderRadius: 'var(--r-md)' }}>
+                {PERIODS.map(p => (
+                  <button key={p.hours} onClick={() => setMetricsHours(p.hours)}
+                    style={{
+                      padding: '4px 12px', fontSize: 12, fontWeight: 600, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                      background: metricsHours === p.hours ? 'var(--bg-surface)' : 'transparent',
+                      color: metricsHours === p.hours ? 'var(--accent-text)' : 'var(--text-tertiary)',
+                      boxShadow: metricsHours === p.hours ? 'var(--shadow-sm)' : 'none',
+                    }}>
+                    {p.label}
+                  </button>
+                ))}
               </div>
               <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
                 {metrics.cpuPercent != null && (
@@ -168,6 +192,7 @@ export default function MonitoringPage() {
                 )}
               </div>
             </div>
+            <p className="label-caps" style={{ marginBottom: 8 }}>CPU</p>
             {cpuData.length > 0 ? (
               <ResponsiveContainer width="100%" height={200}>
                 <LineChart data={cpuData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
@@ -179,6 +204,24 @@ export default function MonitoringPage() {
                     formatter={v => [`${v}%`, 'CPU']}
                   />
                   <Line type="monotone" dataKey="cpu" stroke="var(--accent)" dot={false} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
+            )}
+
+            <p className="label-caps" style={{ margin: '20px 0 8px' }}>Memória</p>
+            {memData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={memData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} unit="%" />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
+                    formatter={v => [`${v}%`, 'Memória']}
+                  />
+                  <Line type="monotone" dataKey="mem" stroke="var(--purple)" dot={false} strokeWidth={2} />
                 </LineChart>
               </ResponsiveContainer>
             ) : (

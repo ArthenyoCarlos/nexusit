@@ -7,7 +7,8 @@ public record ZabbixMetrics(
         Double cpuPercent,
         Double memoryUsedPercent,
         Long uptimeSeconds,
-        List<CpuDataPoint> cpuHistory
+        List<CpuDataPoint> cpuHistory,
+        List<CpuDataPoint> memoryHistory
 ) {
     public record CpuDataPoint(long timestamp, double value) {}
 }
