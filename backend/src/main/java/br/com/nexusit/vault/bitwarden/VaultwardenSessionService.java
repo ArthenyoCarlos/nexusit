@@ -46,7 +46,6 @@ class VaultwardenSessionService {
         cached = null;
     }
 
-    @SuppressWarnings("unchecked")
     private Session login() {
         try {
             String email = props.getEmail();
@@ -80,9 +79,13 @@ class VaultwardenSessionService {
             byte[] userMacKey = slice(userKey, 32, 64);
 
             Map<String, Object> sync = client.sync(accessToken);
-            Map<String, Object> profile = (Map<String, Object>) sync.get("Profile");
+            log.info("Vaultwarden /sync chaves de topo: {}", sync.keySet());
+            Map<String, Object> profile = firstMap(sync, "Profile", "profile");
+            if (profile != null) {
+                log.info("Vaultwarden /sync Profile chaves: {}", profile.keySet());
+            }
             if (encryptedPrivateKey == null && profile != null) {
-                encryptedPrivateKey = (String) profile.get("PrivateKey");
+                encryptedPrivateKey = firstString(profile, "PrivateKey", "privateKey");
             }
             if (encryptedPrivateKey == null) {
                 throw new IllegalStateException("Não foi possível obter a chave privada RSA da conta de serviço do Vaultwarden.");
@@ -90,10 +93,11 @@ class VaultwardenSessionService {
             byte[] privateKeyBytes = BitwardenCrypto.decryptCipherString(encryptedPrivateKey, userEncKey, userMacKey);
             PrivateKey privateKey = BitwardenCrypto.toRsaPrivateKey(privateKeyBytes);
 
-            List<Map<String, Object>> orgs = profile != null ? (List<Map<String, Object>>) profile.get("Organizations") : null;
+            List<Map<String, Object>> orgs = firstList(profile, sync, "Organizations", "organizations");
             if (orgs == null) {
                 throw new IllegalStateException("A conta de serviço do Vaultwarden não pertence a nenhuma organização.");
             }
+            log.info("Vaultwarden organizações encontradas: {}", orgs.stream().map(o -> field(o, "Name", "name")).toList());
             Map<String, Object> targetOrg = orgs.stream()
                     .filter(o -> props.getOrganizationName().equalsIgnoreCase(String.valueOf(o.get("Name"))))
                     .findFirst()
@@ -129,5 +133,28 @@ class VaultwardenSessionService {
         if (value == null) return fallback;
         if (value instanceof Number n) return n.intValue();
         try { return Integer.parseInt(String.valueOf(value)); } catch (NumberFormatException e) { return fallback; }
+    }
+
+    private static Object field(Map<String, Object> m, String pascalKey, String camelKey) {
+        if (m == null) return null;
+        return m.containsKey(pascalKey) ? m.get(pascalKey) : m.get(camelKey);
+    }
+
+    private static String firstString(Map<String, Object> m, String pascalKey, String camelKey) {
+        Object v = field(m, pascalKey, camelKey);
+        return v != null ? String.valueOf(v) : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static Map<String, Object> firstMap(Map<String, Object> m, String pascalKey, String camelKey) {
+        Object v = field(m, pascalKey, camelKey);
+        return v instanceof Map ? (Map<String, Object>) v : null;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Map<String, Object>> firstList(Map<String, Object> profile, Map<String, Object> sync, String pascalKey, String camelKey) {
+        Object v = field(profile, pascalKey, camelKey);
+        if (v == null) v = field(sync, pascalKey, camelKey);
+        return v instanceof List ? (List<Map<String, Object>>) v : null;
     }
 }
