@@ -99,13 +99,13 @@ class VaultwardenSessionService {
             }
             log.info("Vaultwarden organizações encontradas: {}", orgs.stream().map(o -> field(o, "Name", "name")).toList());
             Map<String, Object> targetOrg = orgs.stream()
-                    .filter(o -> props.getOrganizationName().equalsIgnoreCase(String.valueOf(o.get("Name"))))
+                    .filter(o -> props.getOrganizationName().equalsIgnoreCase(String.valueOf(field(o, "Name", "name"))))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException(
                             "Organização \"" + props.getOrganizationName() + "\" não encontrada nas organizações da conta de serviço."));
 
-            String orgId = String.valueOf(targetOrg.get("Id"));
-            String encryptedOrgKey = String.valueOf(targetOrg.get("Key"));
+            String orgId = String.valueOf(field(targetOrg, "Id", "id"));
+            String encryptedOrgKey = String.valueOf(field(targetOrg, "Key", "key"));
             byte[] rsaCiphertext = Base64.getDecoder().decode(stripCipherStringType(encryptedOrgKey));
             byte[] orgKey = BitwardenCrypto.rsaDecrypt(rsaCiphertext, privateKey);
             byte[] orgEncKey = slice(orgKey, 0, 32);
