@@ -11,8 +11,8 @@ public interface CredentialRepository extends JpaRepository<Credential, UUID> {
 
     @Query("""
             SELECT c FROM Credential c LEFT JOIN FETCH c.createdBy
-            WHERE (:search IS NULL OR LOWER(c.title) LIKE LOWER(CONCAT('%',:search,'%'))
-                   OR LOWER(COALESCE(c.tags,'')) LIKE LOWER(CONCAT('%',:search,'%')))
+            WHERE (:search IS NULL OR LOWER(c.title) LIKE LOWER(CONCAT('%',CAST(:search AS string),'%'))
+                   OR LOWER(COALESCE(c.tags,'')) LIKE LOWER(CONCAT('%',CAST(:search AS string),'%')))
               AND (:type IS NULL OR c.type = :type)
             ORDER BY c.title
             """)
