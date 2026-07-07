@@ -2,6 +2,7 @@ package br.com.nexusit.vault;
 
 import br.com.nexusit.user.User;
 import br.com.nexusit.user.UserRepository;
+import br.com.nexusit.vault.bitwarden.VaultwardenSyncService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +18,7 @@ public class CredentialService {
     private final CredentialRepository repository;
     private final UserRepository userRepository;
     private final CryptoService crypto;
+    private final VaultwardenSyncService vaultwardenSync;
 
     public List<CredentialResponse> findAll(String search, String type) {
         return repository.findByFilters(
@@ -33,6 +35,10 @@ public class CredentialService {
 
     @Transactional
     public CredentialResponse create(CredentialRequest req, User currentUser) {
+        String vaultwardenItemId = vaultwardenSync
+                .pushCredential(req.title(), req.username(), req.secret(), req.url())
+                .orElse(null);
+
         Credential c = Credential.builder()
                 .title(req.title())
                 .type(req.type() != null ? req.type() : "PASSWORD")
@@ -41,6 +47,7 @@ public class CredentialService {
                 .url(req.url())
                 .description(req.description())
                 .tags(req.tags())
+                .vaultwardenItemId(vaultwardenItemId)
                 .createdBy(currentUser)
                 .build();
         return CredentialResponse.from(repository.save(c));

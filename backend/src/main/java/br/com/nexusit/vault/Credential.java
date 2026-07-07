@@ -37,6 +37,9 @@ public class Credential {
 
     private String tags;
 
+    @Column(name = "vaultwarden_item_id", length = 64)
+    private String vaultwardenItemId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")
     private User createdBy;

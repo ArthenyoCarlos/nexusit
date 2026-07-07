@@ -41,6 +41,11 @@ application:
     api-url: ${GLPI_API_URL:http://localhost/apirest.php}
     app-token: ${GLPI_APP_TOKEN:}
     user-token: ${GLPI_USER_TOKEN:}
+  vaultwarden:
+    base-url: ${VAULTWARDEN_BASE_URL:}
+    email: ${VAULTWARDEN_EMAIL:}
+    master-password: ${VAULTWARDEN_MASTER_PASSWORD:}
+    organization-name: ${VAULTWARDEN_ORG_NAME:Armazem Galdino}
 
 app:
   base-url: ${APP_BASE_URL:http://nexus.local}
