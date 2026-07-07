@@ -402,7 +402,7 @@ export default function TicketsPage() {
           </div>
         )}
         {detail && (
-          <div className="space-y-5">
+          <div className="space-y-6">
             <div>
               <h3 className="font-semibold text-[var(--text-primary)] mb-2">{detail.ticket.title}</h3>
               <div className="flex flex-wrap gap-2 mb-3">
@@ -420,13 +420,13 @@ export default function TicketsPage() {
             </div>
 
             {detail.content && (
-              <div className="bg-[var(--bg-subtle)] rounded-xl p-4 text-sm text-[var(--text-secondary)] whitespace-pre-wrap border border-[var(--border)]">
+              <div className="bg-[var(--bg-subtle)] rounded-xl p-4 text-sm text-[var(--text-secondary)] whitespace-pre-wrap border border-[var(--border)]" style={{ boxShadow: 'var(--shadow-xs)' }}>
                 {detail.content}
               </div>
             )}
 
             {selectedDuplicates.length > 0 && (
-              <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-4">
+              <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
                 <div className="flex items-center justify-between gap-2 mb-3">
                   <div>
                     <p className="text-xs font-semibold text-[var(--amber)] uppercase tracking-wider">Possíveis chamados duplicados</p>
@@ -452,7 +452,7 @@ export default function TicketsPage() {
             )}
 
             {/* Hermes Actions */}
-            <div className="rounded-2xl border border-[var(--accent-ring)] bg-[var(--accent-light)] p-4">
+            <div className="rounded-2xl border border-[var(--accent-ring)] bg-[var(--accent-light)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
               <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
                 <div>
                   <p className="text-xs font-semibold text-[var(--accent-text)] uppercase tracking-wider">Hermes no chamado</p>
@@ -495,7 +495,7 @@ export default function TicketsPage() {
             </div>
 
             {/* Wiki Suggestions */}
-            <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-4">
+            <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div>
                   <p className="text-xs font-semibold text-[var(--amber)] uppercase tracking-wider">Sugestões da Wiki</p>
@@ -544,7 +544,7 @@ export default function TicketsPage() {
             </div>
 
             {/* Linked Wiki Articles */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-4">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
               <div className="flex items-center justify-between gap-2 mb-3">
                 <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Artigos relacionados na Wiki</p>
                 <span className="badge bg-[var(--bg-muted)] text-[var(--text-secondary)]">{wikiLinks.length}</span>
