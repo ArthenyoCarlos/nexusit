@@ -6,6 +6,7 @@ import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
 import ExecutiveDashboardPage from './pages/ExecutiveDashboardPage'
 import SystemsPage from './pages/SystemsPage'
+import DependencyMapPage from './pages/DependencyMapPage'
 import InventoryPage from './pages/InventoryPage'
 import MonitoringPage from './pages/MonitoringPage'
 import TvDashboardPage from './pages/TvDashboardPage'
@@ -54,6 +55,7 @@ export default function App() {
               <Route path="/hermes"     element={<HermesPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
               <Route path="/systems"        element={<SystemsPage />} />
+              <Route path="/dependency-map" element={<DependencyMapPage />} />
               <Route path="/systems/:id"   element={<SystemDetailPage />} />
               <Route path="/inventory"     element={<InventoryPage />} />
               <Route path="/inventory/:id" element={<InventoryDetailPage />} />
