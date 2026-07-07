@@ -46,6 +46,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/termos/*/pdf").permitAll()
                 .requestMatchers("/dashboard/tv").permitAll()
                 .requestMatchers("/api/v3/api-docs/**", "/api/swagger-ui/**", "/api/swagger-ui.html").permitAll()
+                .requestMatchers("/ws/ssh/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
             )
             .exceptionHandling(ex -> ex.authenticationEntryPoint((request, response, authException) -> {

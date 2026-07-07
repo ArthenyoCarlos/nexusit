@@ -33,13 +33,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     ) throws ServletException, IOException {
 
         final String authHeader = request.getHeader("Authorization");
+        final String jwt;
 
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            jwt = authHeader.substring(7);
+        } else if (request.getRequestURI().startsWith("/ws/") && request.getParameter("token") != null) {
+            // Browsers can't set custom headers on a WebSocket handshake, so the SSH
+            // console upgrade request authenticates via a short-lived query param instead.
+            jwt = request.getParameter("token");
+        } else {
             filterChain.doFilter(request, response);
             return;
         }
-
-        final String jwt = authHeader.substring(7);
 
         try {
             final String userEmail = jwtService.extractUsername(jwt);

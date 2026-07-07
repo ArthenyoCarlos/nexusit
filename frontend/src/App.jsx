@@ -20,6 +20,7 @@ import NotFoundPage from './pages/NotFoundPage'
 import SystemDetailPage from './pages/SystemDetailPage'
 import InventoryDetailPage from './pages/InventoryDetailPage'
 import VaultPage from './pages/VaultPage'
+import SshConsolePage from './pages/SshConsolePage'
 import LicensesPage from './pages/LicensesPage'
 import OnboardingPage from './pages/OnboardingPage'
 import OnboardingDetailPage from './pages/OnboardingDetailPage'
@@ -67,6 +68,7 @@ export default function App() {
               <Route path="/profile"    element={<ProfilePage />} />
               <Route path="/settings"        element={<SettingsPage />} />
               <Route path="/vault"           element={<VaultPage />} />
+              <Route path="/ssh-console"     element={<SshConsolePage />} />
               <Route path="/licenses"        element={<LicensesPage />} />
               <Route path="/onboarding"           element={<OnboardingPage />} />
               <Route path="/onboarding/templates" element={<OnboardingTemplatesPage />} />
