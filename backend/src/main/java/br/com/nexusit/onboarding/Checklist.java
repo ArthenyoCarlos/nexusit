@@ -1,5 +1,6 @@
 package br.com.nexusit.onboarding;
 
+import br.com.nexusit.inventory.InventoryItem;
 import br.com.nexusit.user.User;
 import jakarta.persistence.*;
 import lombok.*;
@@ -35,6 +36,22 @@ public class Checklist {
 
     @Column(columnDefinition = "TEXT")
     private String notes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private ChecklistStatus status = ChecklistStatus.IN_PROGRESS;
+
+    @Column(name = "completed_at")
+    private LocalDateTime completedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "employee_user_id")
+    private User employeeUser;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "inventory_item_id")
+    private InventoryItem inventoryItem;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "created_by")

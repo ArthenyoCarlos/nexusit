@@ -10,9 +10,12 @@ import java.util.UUID;
 
 public interface ChecklistRepository extends JpaRepository<Checklist, UUID> {
 
-    @Query("SELECT c FROM Checklist c LEFT JOIN FETCH c.createdBy WHERE (:type IS NULL OR c.type = :type) ORDER BY c.createdAt DESC")
-    List<Checklist> findByType(@Param("type") String type);
+    @Query("SELECT c FROM Checklist c LEFT JOIN FETCH c.createdBy LEFT JOIN FETCH c.employeeUser " +
+            "WHERE (:type IS NULL OR c.type = :type) AND (:status IS NULL OR c.status = :status) " +
+            "ORDER BY c.createdAt DESC")
+    List<Checklist> findByTypeAndStatus(@Param("type") String type, @Param("status") ChecklistStatus status);
 
-    @Query("SELECT c FROM Checklist c LEFT JOIN FETCH c.items LEFT JOIN FETCH c.createdBy WHERE c.id = :id")
+    @Query("SELECT c FROM Checklist c LEFT JOIN FETCH c.items LEFT JOIN FETCH c.createdBy " +
+            "LEFT JOIN FETCH c.employeeUser LEFT JOIN FETCH c.inventoryItem WHERE c.id = :id")
     Optional<Checklist> findByIdWithItems(@Param("id") UUID id);
 }

@@ -1,46 +1,79 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
-import { getChecklists, createChecklist, toggleItem, deleteChecklist } from '../services/onboarding'
+import { useAuth } from '../contexts/AuthContext'
+import { getChecklists, createChecklist, deleteChecklist } from '../services/onboarding'
+import { getActiveTemplates } from '../services/onboardingTemplates'
+import { getUsers } from '../services/users'
+import { getInventory } from '../services/inventory'
 
-const ONBOARDING_ITEMS = [
-  'Criar conta de e-mail corporativo', 'Configurar VPN de acesso', 'Entregar notebook/computador',
-  'Instalar softwares necessários', 'Conceder acesso ao sistema ERP', 'Configurar ramal telefônico',
-  'Adicionar ao grupo de e-mail da equipe', 'Cadastrar no sistema de ponto',
-]
-const OFFBOARDING_ITEMS = [
-  'Revogar acesso ao e-mail corporativo', 'Remover acesso à VPN', 'Recolher notebook/computador',
-  'Recolher crachá e equipamentos', 'Revogar acesso ao sistema ERP', 'Fazer backup dos dados do usuário',
-  'Transferir arquivos e responsabilidades', 'Cancelar ramal telefônico',
-]
+const EMPTY_FORM = { type: 'ONBOARDING', employeeName: '', department: '', startDate: '', notes: '', templateId: '', employeeUserId: '', inventoryItemId: '' }
 
-const EMPTY_FORM = { type: 'ONBOARDING', employeeName: '', department: '', startDate: '', notes: '' }
+const STATUS_LABEL = { IN_PROGRESS: 'Em andamento', COMPLETED: 'Concluído', CANCELLED: 'Cancelado' }
+const STATUS_COLOR = {
+  IN_PROGRESS: { bg: 'var(--accent-light)', color: 'var(--accent-text)' },
+  COMPLETED:   { bg: 'var(--green-bg)',     color: 'var(--green)' },
+  CANCELLED:   { bg: 'var(--red-bg)',       color: 'var(--red)' },
+}
 
 export default function OnboardingPage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
+  const isAdmin = user?.role === 'ADMIN'
+
   const [lists, setLists]     = useState([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter]   = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
   const [modalOpen, setModalOpen] = useState(false)
   const [form, setForm]           = useState(EMPTY_FORM)
+  const [templates, setTemplates] = useState([])
+  const [users, setUsers]         = useState([])
+  const [inventory, setInventory] = useState([])
   const [saving, setSaving]       = useState(false)
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting]         = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { setLists(await getChecklists(filter ? { type: filter } : {})) } finally { setLoading(false) }
-  }, [filter])
+    try {
+      const params = {}
+      if (filter) params.type = filter
+      if (statusFilter) params.status = statusFilter
+      setLists(await getChecklists(params))
+    } finally { setLoading(false) }
+  }, [filter, statusFilter])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    getUsers().then(setUsers).catch(() => {})
+    getInventory().then(setInventory).catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    if (!modalOpen) return
+    getActiveTemplates(form.type).then(setTemplates).catch(() => setTemplates([]))
+  }, [modalOpen, form.type])
+
+  const openModal = () => { setForm(EMPTY_FORM); setModalOpen(true) }
 
   const handleCreate = async (e) => {
     e.preventDefault(); setSaving(true)
     try {
-      const defaultItems = form.type === 'ONBOARDING' ? ONBOARDING_ITEMS : OFFBOARDING_ITEMS
-      await createChecklist({ ...form, startDate: form.startDate || null, items: defaultItems.map((t, i) => ({ title: t, itemOrder: i })) })
+      await createChecklist({
+        type: form.type,
+        employeeName: form.employeeName,
+        department: form.department,
+        startDate: form.startDate || null,
+        notes: form.notes,
+        templateId: form.templateId || null,
+        employeeUserId: form.employeeUserId || null,
+        inventoryItemId: form.inventoryItemId || null,
+        items: form.templateId ? null : [],
+      })
       setModalOpen(false); load()
     } finally { setSaving(false) }
   }
@@ -62,14 +95,23 @@ export default function OnboardingPage() {
             <h1>Onboarding / Offboarding</h1>
             <p>Checklists de entrada e saída de funcionários</p>
           </div>
-          <button onClick={() => { setForm(EMPTY_FORM); setModalOpen(true) }} className="btn btn-primary">+ Novo Checklist</button>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {isAdmin && <Link to="/onboarding/templates" className="btn btn-default">Gerenciar templates</Link>}
+            <button onClick={openModal} className="btn btn-primary">+ Novo Checklist</button>
+          </div>
         </div>
 
-        <div className="filter-bar">
+        <div className="filter-bar" style={{ display: 'flex', gap: 10 }}>
           <select value={filter} onChange={e => setFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
-            <option value="">Todos</option>
+            <option value="">Todos os tipos</option>
             <option value="ONBOARDING">Onboarding</option>
             <option value="OFFBOARDING">Offboarding</option>
+          </select>
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+            <option value="">Todos os status</option>
+            <option value="IN_PROGRESS">Em andamento</option>
+            <option value="COMPLETED">Concluído</option>
+            <option value="CANCELLED">Cancelado</option>
           </select>
         </div>
 
@@ -84,13 +126,17 @@ export default function OnboardingPage() {
             {lists.map(l => {
               const p = pct(l)
               const isOn = l.type === 'ONBOARDING'
+              const sc = STATUS_COLOR[l.status] ?? STATUS_COLOR.IN_PROGRESS
               return (
                 <div key={l.id} className="card card-hover" style={{ padding: '18px 22px', cursor: 'pointer' }} onClick={() => navigate(`/onboarding/${l.id}`)}>
                   <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16 }}>
                     <div style={{ flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6, flexWrap: 'wrap' }}>
                         <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: isOn ? 'var(--accent-light)' : 'var(--purple-bg)', color: isOn ? 'var(--accent-text)' : 'var(--purple)' }}>
                           {isOn ? '👋 ONBOARDING' : '🚪 OFFBOARDING'}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 20, background: sc.bg, color: sc.color }}>
+                          {STATUS_LABEL[l.status] ?? l.status}
                         </span>
                         {l.department && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>{l.department}</span>}
                       </div>
@@ -119,7 +165,7 @@ export default function OnboardingPage() {
         <form onSubmit={handleCreate} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label className="input-label">Tipo *</label>
-            <select value={form.type} onChange={f('type')} className="input">
+            <select value={form.type} onChange={e => setForm(p => ({ ...p, type: e.target.value, templateId: '' }))} className="input">
               <option value="ONBOARDING">Onboarding (entrada)</option>
               <option value="OFFBOARDING">Offboarding (saída)</option>
             </select>
@@ -138,13 +184,33 @@ export default function OnboardingPage() {
               <input type="date" value={form.startDate} onChange={f('startDate')} className="input" />
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+            <div>
+              <label className="input-label">Usuário vinculado</label>
+              <select value={form.employeeUserId} onChange={f('employeeUserId')} className="input">
+                <option value="">Nenhum</option>
+                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="input-label">Equipamento (Inventário)</label>
+              <select value={form.inventoryItemId} onChange={f('inventoryItemId')} className="input">
+                <option value="">Nenhum</option>
+                {inventory.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              </select>
+            </div>
+          </div>
           <div>
             <label className="input-label">Observações</label>
             <textarea value={form.notes} onChange={f('notes')} rows={2} className="input" />
           </div>
-          <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-            Um checklist padrão de {form.type === 'ONBOARDING' ? ONBOARDING_ITEMS.length : OFFBOARDING_ITEMS.length} tarefas será gerado automaticamente.
-          </p>
+          <div>
+            <label className="input-label">Modelo de checklist</label>
+            <select value={form.templateId} onChange={f('templateId')} className="input">
+              <option value="">Nenhum (checklist em branco)</option>
+              {templates.map(t => <option key={t.id} value={t.id}>{t.name} ({t.items.length} tarefas)</option>)}
+            </select>
+          </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
             <button type="button" onClick={() => setModalOpen(false)} className="btn btn-default">Cancelar</button>
             <button type="submit" disabled={saving} className="btn btn-primary">{saving ? 'Criando...' : 'Criar Checklist'}</button>

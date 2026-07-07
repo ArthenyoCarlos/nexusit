@@ -23,6 +23,7 @@ import VaultPage from './pages/VaultPage'
 import LicensesPage from './pages/LicensesPage'
 import OnboardingPage from './pages/OnboardingPage'
 import OnboardingDetailPage from './pages/OnboardingDetailPage'
+import OnboardingTemplatesPage from './pages/OnboardingTemplatesPage'
 import UrlMonitorPage from './pages/UrlMonitorPage'
 import ContractsPage from './pages/ContractsPage'
 import WikiPage from './pages/WikiPage'
@@ -67,8 +68,9 @@ export default function App() {
               <Route path="/settings"        element={<SettingsPage />} />
               <Route path="/vault"           element={<VaultPage />} />
               <Route path="/licenses"        element={<LicensesPage />} />
-              <Route path="/onboarding"      element={<OnboardingPage />} />
-              <Route path="/onboarding/:id"  element={<OnboardingDetailPage />} />
+              <Route path="/onboarding"           element={<OnboardingPage />} />
+              <Route path="/onboarding/templates" element={<OnboardingTemplatesPage />} />
+              <Route path="/onboarding/:id"       element={<OnboardingDetailPage />} />
               <Route path="/url-monitor"          element={<UrlMonitorPage />} />
               <Route path="/contracts"            element={<ContractsPage />} />
               <Route path="/wiki"                 element={<WikiPage />} />

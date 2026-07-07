@@ -19,8 +19,9 @@ public class ChecklistController {
     private final ChecklistService service;
 
     @GetMapping
-    public List<ChecklistResponse> findAll(@RequestParam(required = false) String type) {
-        return service.findAll(type);
+    public List<ChecklistResponse> findAll(@RequestParam(required = false) String type,
+                                            @RequestParam(required = false) String status) {
+        return service.findAll(type, status);
     }
 
     @GetMapping("/{id}")
@@ -34,6 +35,11 @@ public class ChecklistController {
         return ResponseEntity.status(HttpStatus.CREATED).body(service.create(req, user));
     }
 
+    @PutMapping("/{id}")
+    public ChecklistResponse update(@PathVariable UUID id, @RequestBody ChecklistUpdateRequest req) {
+        return service.update(id, req);
+    }
+
     @PatchMapping("/{checklistId}/items/{itemId}/toggle")
     public ChecklistResponse toggleItem(
             @PathVariable UUID checklistId,
@@ -41,6 +47,22 @@ public class ChecklistController {
             @AuthenticationPrincipal User user
     ) {
         return service.toggleItem(checklistId, itemId, user);
+    }
+
+    @PostMapping("/{checklistId}/items")
+    public ChecklistResponse addItem(@PathVariable UUID checklistId, @RequestBody ChecklistRequest.ItemRequest req) {
+        return service.addItem(checklistId, req);
+    }
+
+    @PatchMapping("/{checklistId}/items/{itemId}")
+    public ChecklistResponse updateItem(@PathVariable UUID checklistId, @PathVariable UUID itemId,
+                                         @RequestBody ChecklistItemUpdateRequest req) {
+        return service.updateItem(checklistId, itemId, req);
+    }
+
+    @DeleteMapping("/{checklistId}/items/{itemId}")
+    public ChecklistResponse removeItem(@PathVariable UUID checklistId, @PathVariable UUID itemId) {
+        return service.removeItem(checklistId, itemId);
     }
 
     @DeleteMapping("/{id}")

@@ -4,6 +4,7 @@ import br.com.nexusit.user.User;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -31,6 +32,13 @@ public class ChecklistItem {
 
     @Column(name = "item_order")
     private Integer itemOrder;
+
+    @Column(name = "due_date")
+    private LocalDate dueDate;
+
+    @ManyToOne(fetch = FetchType.LAZY, optional = true)
+    @JoinColumn(name = "assigned_to")
+    private User assignedTo;
 
     @Column(nullable = false)
     @Builder.Default

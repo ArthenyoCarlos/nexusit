@@ -24,7 +24,6 @@ public class UserController {
     private final PasswordEncoder passwordEncoder;
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
     public List<UserSummary> listAll() {
         return userRepository.findAll().stream()
                 .map(UserSummary::from)
