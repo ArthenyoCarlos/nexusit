@@ -27,6 +27,7 @@ public class VaultwardenReadService {
 
     public List<VaultwardenCipherSummary> listOrganizationLogins() {
         if (!props.isConfigured()) {
+            log.info("Integração com Vaultwarden desligada (VAULTWARDEN_BASE_URL/EMAIL/MASTER_PASSWORD não configurados)");
             return List.of();
         }
         try {

@@ -28,6 +28,7 @@ public class VaultwardenSyncService {
 
     public Optional<String> pushCredential(String title, String username, String plainSecret, String url) {
         if (!props.isConfigured()) {
+            log.info("Integração com Vaultwarden desligada (VAULTWARDEN_BASE_URL/EMAIL/MASTER_PASSWORD não configurados) — \"{}\" não foi replicada", title);
             return Optional.empty();
         }
         try {
