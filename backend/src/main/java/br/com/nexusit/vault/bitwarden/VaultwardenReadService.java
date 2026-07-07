@@ -32,7 +32,22 @@ public class VaultwardenReadService {
         try {
             VaultwardenSessionService.Session session = sessionService.getSession();
             Map<String, Object> sync = client.sync(session.accessToken());
+            log.info("Vaultwarden /sync top-level keys: {}", sync.keySet());
+
             List<Map<String, Object>> ciphers = listOf(sync.get("Ciphers"), sync.get("ciphers"));
+            log.info("Vaultwarden /sync retornou {} ciphers no total (sessão organizationId={})", ciphers.size(), session.organizationId());
+            if (!ciphers.isEmpty()) {
+                Map<String, Object> first = ciphers.get(0);
+                log.info("Vaultwarden primeiro cipher — chaves: {}", first.keySet());
+                log.info("Vaultwarden primeiro cipher — OrganizationId/organizationId={}, Type/type={}, DeletedDate/deletedDate={}",
+                        field(first, "OrganizationId", "organizationId"),
+                        field(first, "Type", "type"),
+                        field(first, "DeletedDate", "deletedDate"));
+            }
+
+            long afterOrg = ciphers.stream().filter(c -> session.organizationId().equals(String.valueOf(field(c, "OrganizationId", "organizationId")))).count();
+            long afterType = ciphers.stream().filter(c -> intField(c, "Type", "type") == CIPHER_TYPE_LOGIN).count();
+            log.info("Vaultwarden ciphers após filtro de organização: {}, após filtro de tipo Login: {}", afterOrg, afterType);
 
             return ciphers.stream()
                     .filter(c -> session.organizationId().equals(String.valueOf(field(c, "OrganizationId", "organizationId"))))
@@ -42,7 +57,7 @@ public class VaultwardenReadService {
                     .filter(s -> s != null)
                     .toList();
         } catch (Exception e) {
-            log.warn("Não foi possível listar itens do Vaultwarden: {}", e.getMessage());
+            log.warn("Não foi possível listar itens do Vaultwarden: {}", e.getMessage(), e);
             return List.of();
         }
     }
