@@ -8,7 +8,8 @@ import { getContracts } from '../services/contracts'
 import { getMonitors } from '../services/urlmonitor'
 import { getInventory } from '../services/inventory'
 import { getFinancialSummary } from '../services/financial'
-import { computeHealthScore, healthScoreColor, healthScoreBg, healthScoreLabel } from '../utils/healthScore'
+import { computeHealthScore, computeHealthBreakdown, healthScoreColor, healthScoreBg, healthScoreLabel } from '../utils/healthScore'
+import HealthBreakdown from '../components/HealthBreakdown'
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 const BRL = v => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v ?? 0)
@@ -105,6 +106,7 @@ export default function ExecutiveDashboardPage() {
 
   const openTickets = data.tickets.filter(t => ![5, 6].includes(Number(t.status)))
   const healthScore = computeHealthScore(data)
+  const healthAreas = computeHealthBreakdown(data)
   const scoreColor = healthScoreColor(healthScore)
   const scoreBg = healthScoreBg(healthScore)
   const scoreLabel = healthScoreLabel(healthScore)
@@ -152,6 +154,10 @@ export default function ExecutiveDashboardPage() {
               </p>
             </div>
           </div>
+        </div>
+
+        <div style={{ marginBottom: 20 }}>
+          <HealthBreakdown areas={healthAreas} />
         </div>
 
         {/* KPIs */}

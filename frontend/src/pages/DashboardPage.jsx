@@ -10,7 +10,8 @@ import { getContracts } from '../services/contracts'
 import { getMonitors } from '../services/urlmonitor'
 import { getInventory } from '../services/inventory'
 import { severityOf } from '../utils/severity'
-import { computeHealthScore, healthScoreColor, healthScoreBg, healthScoreLabel } from '../utils/healthScore'
+import { computeHealthScore, computeHealthBreakdown, healthScoreColor, healthScoreBg, healthScoreLabel } from '../utils/healthScore'
+import HealthBreakdown from '../components/HealthBreakdown'
 
 function greet(name) {
   const h = new Date().getHours()
@@ -77,6 +78,10 @@ export default function DashboardPage() {
     problems: data.problems, tickets: data.tickets, licenses: data.licenses,
     contracts: data.contracts, monitors: data.monitors,
   })
+  const healthAreas    = loading ? [] : computeHealthBreakdown({
+    problems: data.problems, tickets: data.tickets, licenses: data.licenses,
+    contracts: data.contracts, monitors: data.monitors,
+  })
 
   const scoreColor = healthScoreColor(healthScore)
   const scoreBg = healthScoreBg(healthScore)
@@ -134,6 +139,11 @@ export default function DashboardPage() {
               </Link>
             </div>
           </div>
+          {!loading && (
+            <div style={{ marginTop: 10 }}>
+              <HealthBreakdown areas={healthAreas} />
+            </div>
+          )}
         </div>
 
         {/* KPIs */}
