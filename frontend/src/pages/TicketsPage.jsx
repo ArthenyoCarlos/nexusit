@@ -460,7 +460,7 @@ export default function TicketsPage() {
                 </div>
                 <span className="badge badge-blue">NexusAI</span>
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap" style={{ gap: 10 }}>
                 <button onClick={handleSmartSummary} disabled={actionLoading || wikiCreating}
                   className="btn btn-default text-xs">
                   Gerar resumo

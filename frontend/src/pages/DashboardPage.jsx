@@ -420,8 +420,8 @@ function KpiCard({ icon, label, value, sub, color, bg, to }) {
     </div>
   )
   return to
-    ? <Link to={to} style={{ display: 'block', textDecoration: 'none' }}>{inner}</Link>
-    : <div>{inner}</div>
+    ? <Link to={to} style={{ display: 'block', height: '100%', textDecoration: 'none' }}>{inner}</Link>
+    : <div style={{ height: '100%' }}>{inner}</div>
 }
 
 function TicketStatusDot({ status }) {
