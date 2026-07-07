@@ -5,3 +5,6 @@ export const revealSecret    = (id)     => api.get(`/vault/${id}/reveal`).then(r
 export const createCredential= (data)   => api.post('/vault', data).then(r => r.data)
 export const updateCredential= (id, data) => api.put(`/vault/${id}`, data).then(r => r.data)
 export const deleteCredential= (id)     => api.delete(`/vault/${id}`)
+
+export const getVaultwardenCredentials = () => api.get('/vault/vaultwarden').then(r => r.data)
+export const revealVaultwardenSecret   = (id) => api.get(`/vault/vaultwarden/${id}/reveal`).then(r => r.data.secret)

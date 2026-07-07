@@ -3,7 +3,7 @@ import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../contexts/AuthContext'
-import { getCredentials, revealSecret, createCredential, updateCredential, deleteCredential } from '../services/vault'
+import { getCredentials, revealSecret, createCredential, updateCredential, deleteCredential, getVaultwardenCredentials, revealVaultwardenSecret } from '../services/vault'
 
 const TYPES = ['PASSWORD', 'SSH', 'API_KEY', 'CERTIFICATE', 'TOKEN', 'OTHER']
 const TYPE_ICON = { PASSWORD: '🔑', SSH: '🖥️', API_KEY: '🔗', CERTIFICATE: '📜', TOKEN: '🎫', OTHER: '🔒' }
@@ -29,6 +29,11 @@ export default function VaultPage() {
   const [deleteTarget, setDeleteTarget] = useState(null)
   const [deleting, setDeleting]         = useState(false)
 
+  const [vwCreds, setVwCreds]         = useState([])
+  const [vwLoading, setVwLoading]     = useState(true)
+  const [vwRevealed, setVwRevealed]   = useState({})
+  const [vwRevealing, setVwRevealing] = useState({})
+
   const load = useCallback(async () => {
     setLoading(true)
     try {
@@ -36,7 +41,25 @@ export default function VaultPage() {
     } finally { setLoading(false) }
   }, [search, filterType])
 
+  const loadVaultwarden = useCallback(async () => {
+    setVwLoading(true)
+    try { setVwCreds(await getVaultwardenCredentials()) }
+    catch { setVwCreds([]) }
+    finally { setVwLoading(false) }
+  }, [])
+
   useEffect(() => { if (isAdmin) load() }, [isAdmin, load])
+  useEffect(() => { if (isAdmin) loadVaultwarden() }, [isAdmin, loadVaultwarden])
+
+  const handleRevealVw = async (id) => {
+    if (vwRevealed[id]) { setVwRevealed(r => { const n = {...r}; delete n[id]; return n }); return }
+    setVwRevealing(r => ({ ...r, [id]: true }))
+    try {
+      const secret = await revealVaultwardenSecret(id)
+      setVwRevealed(r => ({ ...r, [id]: secret }))
+    } catch { /* falha ao decifrar, item fica sem revelar */ }
+    finally { setVwRevealing(r => { const n = {...r}; delete n[id]; return n }) }
+  }
 
   const openCreate = () => { setEditing(null); setForm(EMPTY); setFormError(''); setShowSecret(false); setModalOpen(true) }
   const openEdit   = (c) => { setEditing(c); setForm({ title: c.title, type: c.type, username: c.username ?? '', secret: '••••••••', url: c.url ?? '', description: c.description ?? '', tags: c.tags ?? '' }); setFormError(''); setShowSecret(false); setModalOpen(true) }
@@ -141,6 +164,49 @@ export default function VaultPage() {
                   </button>
                   <button onClick={() => openEdit(c)} className="btn btn-default btn-sm">Editar</button>
                   <button onClick={() => setDeleteTarget(c)} className="btn btn-danger btn-sm">✕</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '28px 0 12px' }}>
+          <p className="label-caps">Do Vaultwarden</p>
+          <span className="badge badge-blue">{vwCreds.length}</span>
+        </div>
+        <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginBottom: 12 }}>
+          Itens criados diretamente no Vaultwarden (organização "Armazem Galdino") — somente leitura aqui.
+        </p>
+
+        {vwLoading ? (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {[...Array(2)].map((_, i) => <div key={i} className="skeleton" style={{ height: 70, borderRadius: 8 }} />)}
+          </div>
+        ) : vwCreds.length === 0 ? (
+          <div className="card empty-state">
+            <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Nenhum item encontrado no Vaultwarden (ou a integração não está configurada).</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+            {vwCreds.map(c => (
+              <div key={c.id} className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', gap: 16 }}>
+                <span style={{ fontSize: 22, flexShrink: 0 }}>🔑</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <p style={{ fontWeight: 600, fontSize: 14, color: 'var(--text-primary)' }}>{c.name}</p>
+                  <div style={{ display: 'flex', gap: 16, marginTop: 4, flexWrap: 'wrap' }}>
+                    {c.username && <span style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>👤 {c.username}</span>}
+                    {c.uri && <a href={c.uri} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: 'var(--accent)' }}>🔗 {c.uri}</a>}
+                  </div>
+                  {vwRevealed[c.id] && (
+                    <div style={{ marginTop: 8, background: 'var(--bg-muted)', padding: '6px 10px', borderRadius: 6, fontFamily: 'monospace', fontSize: 13, wordBreak: 'break-all' }}>
+                      {vwRevealed[c.id]}
+                    </div>
+                  )}
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                  <button onClick={() => handleRevealVw(c.id)} disabled={vwRevealing[c.id]} className="btn btn-default btn-sm">
+                    {vwRevealing[c.id] ? '...' : vwRevealed[c.id] ? 'Ocultar' : 'Revelar'}
+                  </button>
                 </div>
               </div>
             ))}

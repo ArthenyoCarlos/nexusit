@@ -1,6 +1,8 @@
 package br.com.nexusit.vault;
 
 import br.com.nexusit.user.User;
+import br.com.nexusit.vault.bitwarden.VaultwardenCipherSummary;
+import br.com.nexusit.vault.bitwarden.VaultwardenReadService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -20,6 +22,17 @@ import java.util.UUID;
 public class CredentialController {
 
     private final CredentialService service;
+    private final VaultwardenReadService vaultwardenReadService;
+
+    @GetMapping("/vaultwarden")
+    public List<VaultwardenCipherSummary> findVaultwardenItems() {
+        return vaultwardenReadService.listOrganizationLogins();
+    }
+
+    @GetMapping("/vaultwarden/{id}/reveal")
+    public Map<String, String> revealVaultwardenItem(@PathVariable String id) {
+        return Map.of("secret", vaultwardenReadService.revealPassword(id));
+    }
 
     @GetMapping
     public List<CredentialResponse> findAll(
