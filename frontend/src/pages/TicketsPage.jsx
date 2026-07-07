@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback } from 'react'
 import { getTickets, getTicket, addFollowup, closeTicket, assignTicket, getTechnicians } from '../services/glpi'
 import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
+import { getTicketAssetLinks, createTicketAssetLink, deleteTicketAssetLink } from '../services/ticketAssetLinks'
+import { getSystems } from '../services/systems'
+import { getInventory } from '../services/inventory'
 import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
@@ -88,11 +91,22 @@ export default function TicketsPage() {
   const [wikiSuggestionQueries, setWikiSuggestionQueries] = useState([])
   const [wikiSuggestionsLoading, setWikiSuggestionsLoading] = useState(false)
   const [technicians, setTechnicians] = useState([])
+  const [assetLinks, setAssetLinks] = useState([])
+  const [systemsList, setSystemsList] = useState([])
+  const [inventoryList, setInventoryList] = useState([])
+  const [assetPickerType, setAssetPickerType] = useState('SYSTEM')
+  const [assetPickerId, setAssetPickerId] = useState('')
+  const [assetLinking, setAssetLinking] = useState(false)
 
   useEffect(() => {
     if (!isAdmin) return
     getTechnicians().then(res => setTechnicians(res.data)).catch(() => setTechnicians([]))
   }, [isAdmin])
+
+  useEffect(() => {
+    getSystems().then(setSystemsList).catch(() => setSystemsList([]))
+    getInventory().then(setInventoryList).catch(() => setInventoryList([]))
+  }, [])
 
   const fetchTickets = useCallback(async () => {
     setLoading(true)
@@ -125,19 +139,45 @@ export default function TicketsPage() {
   }
 
   const openDetail = async (ticket) => {
-    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null); setAssistantDraft(null); setWikiLinks([]); setWikiSuggestions([]); setWikiSuggestionQueries([])
+    setSelected(ticket); setDetail(null); setFollowupText(''); setAssignUserId(''); setActionMsg(null); setAssistantDraft(null); setWikiLinks([]); setWikiSuggestions([]); setWikiSuggestionQueries([]); setAssetLinks([]); setAssetPickerId('')
     setDetailLoading(true)
     try {
-      const [ticketRes, links] = await Promise.all([
+      const [ticketRes, links, assets] = await Promise.all([
         getTicket(ticket.id),
         getTicketWikiLinks(ticket.id).catch(() => []),
+        getTicketAssetLinks(ticket.id).catch(() => []),
       ])
       setDetail(ticketRes.data)
       setWikiLinks(links)
+      setAssetLinks(assets)
       loadWikiSuggestions(ticketRes.data, links)
     }
-    catch { setDetail(null); setWikiLinks([]); setWikiSuggestions([]) }
+    catch { setDetail(null); setWikiLinks([]); setWikiSuggestions([]); setAssetLinks([]) }
     finally { setDetailLoading(false) }
+  }
+
+  const handleLinkAsset = async () => {
+    if (!assetPickerId || !selected) return
+    setAssetLinking(true)
+    try {
+      const link = await createTicketAssetLink({ glpiTicketId: selected.id, assetType: assetPickerType, assetId: assetPickerId })
+      setAssetLinks(prev => [link, ...prev.filter(l => l.id !== link.id)])
+      setAssetPickerId('')
+      setActionMsg({ type: 'success', text: 'Sistema/ativo vinculado ao chamado.' })
+    } catch {
+      setActionMsg({ type: 'error', text: 'Erro ao vincular sistema/ativo ao chamado.' })
+    } finally {
+      setAssetLinking(false)
+    }
+  }
+
+  const handleUnlinkAsset = async (id) => {
+    try {
+      await deleteTicketAssetLink(id)
+      setAssetLinks(prev => prev.filter(l => l.id !== id))
+    } catch {
+      setActionMsg({ type: 'error', text: 'Erro ao remover vínculo.' })
+    }
   }
 
   const handleAddFollowup = async () => {
@@ -567,6 +607,46 @@ export default function TicketsPage() {
                   ))}
                 </div>
               )}
+            </div>
+
+            {/* Linked Systems/Assets */}
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
+              <div className="flex items-center justify-between gap-2 mb-3">
+                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Sistemas e ativos relacionados</p>
+                <span className="badge bg-[var(--bg-muted)] text-[var(--text-secondary)]">{assetLinks.length}</span>
+              </div>
+              {assetLinks.length === 0 ? (
+                <p className="text-sm text-[var(--text-tertiary)] italic mb-3">Nenhum sistema ou ativo vinculado a este chamado ainda.</p>
+              ) : (
+                <div className="space-y-2 mb-3">
+                  {assetLinks.map(link => (
+                    <div key={link.id} className="flex items-center justify-between gap-3 rounded-xl border border-[var(--border-muted)] p-3">
+                      <div>
+                        <p className="text-sm font-semibold text-[var(--text-primary)]">
+                          {link.assetType === 'SYSTEM' ? '🖥️' : '📦'} {link.assetName}
+                        </p>
+                        <p className="text-xs text-[var(--text-tertiary)]">{link.assetSubtitle || (link.assetType === 'SYSTEM' ? 'Sistema' : 'Inventário')} · criado por {link.createdByName || 'Sistema'}</p>
+                      </div>
+                      <button onClick={() => handleUnlinkAsset(link.id)} className="btn btn-default btn-sm">Remover</button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <select value={assetPickerType} onChange={e => { setAssetPickerType(e.target.value); setAssetPickerId('') }} className="input text-xs" style={{ width: 140 }}>
+                  <option value="SYSTEM">Sistema</option>
+                  <option value="INVENTORY">Inventário</option>
+                </select>
+                <select value={assetPickerId} onChange={e => setAssetPickerId(e.target.value)} className="input text-xs" style={{ flex: '1 1 220px' }}>
+                  <option value="">Selecione...</option>
+                  {(assetPickerType === 'SYSTEM' ? systemsList : inventoryList).map(item => (
+                    <option key={item.id} value={item.id}>{item.name}</option>
+                  ))}
+                </select>
+                <button onClick={handleLinkAsset} disabled={!assetPickerId || assetLinking} className="btn btn-primary text-xs" style={{ flexShrink: 0 }}>
+                  {assetLinking ? 'Vinculando...' : 'Vincular'}
+                </button>
+              </div>
             </div>
 
             {/* Followups */}
