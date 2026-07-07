@@ -6,6 +6,7 @@ const NAV = [
     section: 'Principal',
     items: [
       { label: 'Dashboard',     path: '/dashboard',  Icon: IconDashboard  },
+      { label: 'Dash. Executivo', path: '/dashboard/executive', Icon: IconExecutive, adminOnly: true },
       { label: 'NexusAI',       path: '/hermes',     Icon: IconHermes     },
       { label: 'Monitoramento', path: '/monitoring', Icon: IconMonitor    },
     ],
@@ -155,3 +156,4 @@ function IconSchedule()   { return <svg {...i}><rect x="3" y="4" width="18" heig
 function IconWiki()       { return <svg {...i}><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 9h6M9 13h4"/></svg> }
 function IconFinancial()  { return <svg {...i}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> }
 function IconHermes()     { return <svg {...i}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> }
+function IconExecutive()  { return <svg {...i}><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg> }

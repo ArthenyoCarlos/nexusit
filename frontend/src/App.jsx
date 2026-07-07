@@ -4,6 +4,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ToastProvider } from './contexts/ToastContext'
 import LoginPage from './pages/LoginPage'
 import DashboardPage from './pages/DashboardPage'
+import ExecutiveDashboardPage from './pages/ExecutiveDashboardPage'
 import SystemsPage from './pages/SystemsPage'
 import InventoryPage from './pages/InventoryPage'
 import MonitoringPage from './pages/MonitoringPage'
@@ -49,6 +50,7 @@ export default function App() {
             {/* Protected routes */}
             <Route element={<ProtectedRoute />}>
               <Route path="/dashboard"  element={<DashboardPage />} />
+              <Route path="/dashboard/executive" element={<ExecutiveDashboardPage />} />
               <Route path="/hermes"     element={<HermesPage />} />
               <Route path="/monitoring" element={<MonitoringPage />} />
               <Route path="/systems"        element={<SystemsPage />} />

@@ -10,6 +10,7 @@ import { getContracts } from '../services/contracts'
 import { getMonitors } from '../services/urlmonitor'
 import { getInventory } from '../services/inventory'
 import { severityOf } from '../utils/severity'
+import { computeHealthScore, healthScoreColor, healthScoreBg, healthScoreLabel } from '../utils/healthScore'
 
 function greet(name) {
   const h = new Date().getHours()
@@ -22,26 +23,6 @@ const LIC_STATUS = {
   EXPIRING_SOON: { label: 'Vence em breve', color: 'var(--orange)' },
   EXPIRING:      { label: 'A vencer',       color: 'var(--amber)'  },
   OK:            { label: 'OK',             color: 'var(--green)'  },
-}
-
-function computeHealthScore({ problems, tickets, licenses, contracts, monitors }) {
-  let score = 100
-  const crit   = (problems  || []).filter(p => Number(p.severity) >= 4)
-  const warn   = (problems  || []).filter(p => Number(p.severity) < 4)
-  const open   = (tickets   || []).filter(t => ![5, 6].includes(Number(t.status)))
-  const critTx = open.filter(t => Number(t.priority) >= 4)
-  const expLic = (licenses  || []).filter(l => l.status === 'EXPIRED' || l.status === 'EXPIRING_SOON')
-  const expCtr = (contracts || []).filter(c => c.status === 'EXPIRED' || c.status === 'EXPIRING_SOON')
-  const down   = (monitors  || []).filter(m => m.enabled && m.lastStatus != null && m.lastStatus >= 400)
-
-  score -= Math.min(crit.length   * 10, 30)
-  score -= Math.min(warn.length   *  3, 12)
-  score -= Math.min(critTx.length *  5, 15)
-  score -= Math.min(open.length   *  1,  8)
-  score -= Math.min(expLic.length *  5, 15)
-  score -= Math.min(expCtr.length *  5, 15)
-  score -= Math.min(down.length   * 10, 20)
-  return Math.max(0, Math.min(score, 100))
 }
 
 export default function DashboardPage() {
@@ -97,21 +78,9 @@ export default function DashboardPage() {
     contracts: data.contracts, monitors: data.monitors,
   })
 
-  const scoreColor = healthScore == null ? 'var(--text-tertiary)'
-    : healthScore >= 80 ? 'var(--green)'
-    : healthScore >= 60 ? 'var(--amber)'
-    : healthScore >= 40 ? 'var(--orange)'
-    : 'var(--red)'
-  const scoreBg = healthScore == null ? 'var(--bg-muted)'
-    : healthScore >= 80 ? 'var(--green-bg)'
-    : healthScore >= 60 ? 'var(--amber-bg)'
-    : healthScore >= 40 ? 'var(--orange-bg)'
-    : 'var(--red-bg)'
-  const scoreLabel = healthScore == null ? '—'
-    : healthScore >= 80 ? 'Operação saudável'
-    : healthScore >= 60 ? 'Atenção necessária'
-    : healthScore >= 40 ? 'Situação crítica'
-    : 'Operação comprometida'
+  const scoreColor = healthScoreColor(healthScore)
+  const scoreBg = healthScoreBg(healthScore)
+  const scoreLabel = healthScoreLabel(healthScore)
 
   return (
     <Layout>
