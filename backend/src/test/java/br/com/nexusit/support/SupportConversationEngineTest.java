@@ -1,6 +1,7 @@
 package br.com.nexusit.support;
 
 import br.com.nexusit.glpi.GlpiService;
+import br.com.nexusit.glpi.GlpiTicket;
 import br.com.nexusit.glpi.GlpiUserRef;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -10,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -28,12 +30,13 @@ class SupportConversationEngineTest {
     @Mock SupportMessageRepository messageRepo;
     @Mock GlpiService glpiService;
     @Mock EvolutionApiClient evolutionApiClient;
+    @Mock BotAtendimentoTiStateStore stateStore;
 
     SupportConversationEngine engine;
 
     @BeforeEach
     void setUp() {
-        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, glpiService, evolutionApiClient);
+        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, glpiService, evolutionApiClient, stateStore);
         lenient().when(contactRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(conversationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(messageRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -71,7 +74,7 @@ class SupportConversationEngineTest {
         assertEquals(ConversationState.MENU, conversation.getState());
         assertEquals(42, contact.getGlpiUserId());
         verify(glpiService, never()).createUser(anyString());
-        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("O que você deseja"));
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("Como posso te ajudar"));
     }
 
     @Test
@@ -107,6 +110,42 @@ class SupportConversationEngineTest {
     }
 
     @Test
+    void menu_consultTickets_listsOpenTickets() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
+                .glpiUserId(42).glpiUserName("Maria Silva").build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.MENU).build();
+
+        when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
+        when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(glpiService.getOpenTicketsForRequester(42)).thenReturn(List.of(
+                new GlpiTicket(777, "Impressora parada", 1, "Novo", 3, "Média", "Maria Silva", "", "", "", 1, "", "", "", "", 0)
+        ));
+
+        engine.onInboundMessage(textMessage("5511999999999", "2"));
+
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("#777 - Impressora parada"));
+    }
+
+    @Test
+    void menu_talkToTechnician_createsUrgentTicketAndQueuesConversation() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
+                .glpiUserId(42).glpiUserName("Maria Silva").build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.MENU).build();
+
+        when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
+        when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(glpiService.createTicket(anyString(), anyString(), eq(42), eq(4), anyString())).thenReturn(888);
+
+        engine.onInboundMessage(textMessage("5511999999999", "3"));
+
+        assertEquals(ConversationState.PENDING_TECH, conversation.getState());
+        assertEquals(888, conversation.getGlpiTicketId());
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("Aguarde um momento"));
+    }
+
+    @Test
     void awaitingDescription_createsTicket_andMovesToPendingTech() {
         WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
                 .glpiUserId(42).glpiUserName("Maria Silva").build();
@@ -115,7 +154,7 @@ class SupportConversationEngineTest {
 
         when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
         when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
-        when(glpiService.createTicket(anyString(), anyString(), eq(42))).thenReturn(777);
+        when(glpiService.createTicket(anyString(), anyString(), eq(42), eq(3), anyString())).thenReturn(777);
 
         engine.onInboundMessage(textMessage("5511999999999", "Minha impressora não funciona"));
 

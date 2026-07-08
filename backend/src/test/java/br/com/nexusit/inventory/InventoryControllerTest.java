@@ -26,12 +26,13 @@ class InventoryControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper objectMapper;
     @MockBean InventoryService service;
+    @MockBean LabelService labelService;
 
     private InventoryResponse sampleResponse() {
         return new InventoryResponse(
-                UUID.randomUUID(), "Computador Dell", ItemType.COMPUTADOR,
+                UUID.randomUUID(), "GAL-2026-001", "Computador Dell", ItemType.COMPUTADOR,
                 "Dell", "Optiplex 7090", "SN-001", "TI",
-                null, null, ItemStatus.ACTIVE, null, LocalDateTime.now()
+                null, null, null, null, ItemStatus.ACTIVE, null, LocalDateTime.now()
         );
     }
 
@@ -58,7 +59,7 @@ class InventoryControllerTest {
     @Test
     void create_validRequest_returnsCreated() throws Exception {
         InventoryRequest req = new InventoryRequest(
-                "Impressora HP", ItemType.IMPRESSORA, null, null, "SN-002", "TI", null, null, ItemStatus.ACTIVE, null);
+                "Impressora HP", ItemType.IMPRESSORA, null, null, "SN-002", "TI", null, null, ItemStatus.ACTIVE, null, null, null);
         given(service.create(any())).willReturn(sampleResponse());
 
         mockMvc.perform(post("/api/inventory")

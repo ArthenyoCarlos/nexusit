@@ -196,11 +196,52 @@ public class GlpiService {
         return new GlpiUserRef(intVal(resp, "id"), fullName.trim());
     }
 
+    public void linkWhatsappToUser(int glpiUserId, String phoneNumber) {
+        safeCall(() -> {
+            client.put("/User/" + glpiUserId, Map.of("input", Map.of(
+                    "id", glpiUserId,
+                    "phone2", phoneNumber,
+                    "mobile", phoneNumber,
+                    "comment", "WhatsApp vinculado pelo NexusIT: " + phoneNumber
+            )));
+            return null;
+        }, null);
+    }
+
+    public List<GlpiTicket> getOpenTicketsForRequester(int requesterGlpiUserId) {
+        return safeCall(() -> {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("range", "0-199");
+            params.put("expand_dropdowns", "false");
+            params.put("get_hateoas", "false");
+            params.put("is_deleted", "0");
+            params.put("order", "DESC");
+            params.put("sort", "date_mod");
+            List<Map<String, Object>> raw = client.getList("/Ticket", params);
+            if (raw == null) return List.<GlpiTicket>of();
+            return raw.stream()
+                    .filter(t -> intVal(t, "status") <= 4)
+                    .filter(t -> intVal(t, "users_id_recipient") == requesterGlpiUserId
+                            || intVal(t, "users_id_requester") == requesterGlpiUserId
+                            || intVal(t, "_users_id_requester") == requesterGlpiUserId)
+                    .map(this::toTicket)
+                    .toList();
+        }, List.of());
+    }
+
     public int createTicket(String title, String content, int requesterGlpiUserId) {
-        Map<String, Object> resp = client.post("/Ticket", Map.of("input", Map.of(
-                "name", title,
-                "content", content,
-                "_users_id_requester", requesterGlpiUserId)));
+        return createTicket(title, content, requesterGlpiUserId, 3, "Suporte TI");
+    }
+
+    public int createTicket(String title, String content, int requesterGlpiUserId, int priority, String category) {
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("name", title);
+        input.put("content", "[Categoria sugerida: " + (category == null || category.isBlank() ? "Suporte TI" : category) + "]\n\n" + content);
+        input.put("_users_id_requester", requesterGlpiUserId);
+        input.put("priority", priority);
+        input.put("urgency", priority);
+        input.put("impact", 3);
+        Map<String, Object> resp = client.post("/Ticket", Map.of("input", input));
         return intVal(resp, "id");
     }
 

@@ -23,6 +23,7 @@ public class SupportService {
     private final SupportMessageRepository messageRepo;
     private final GlpiService glpiService;
     private final EvolutionApiClient evolutionApiClient;
+    private final BotAtendimentoTiStateStore stateStore;
 
     public List<SupportConversationSummary> getQueue() {
         return conversationRepo.findQueue().stream().map(SupportConversationSummary::from).toList();
@@ -46,9 +47,10 @@ public class SupportService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Este atendimento já foi assumido por outro técnico");
         }
         SupportConversation conversation = getOrThrow(id);
-        String text = "Você será atendido pelo(a) técnico(a) " + user.getName() + ".";
+        String text = "👨‍💻 O técnico " + user.getName() + " irá atendê-lo agora. A partir deste momento, você está em atendimento direto.";
         recordMessage(conversation, MessageDirection.OUT, MessageAuthor.HERMES, "Hermes", text);
         evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), text);
+        stateStore.save(conversation);
         if (conversation.getGlpiTicketId() != null) {
             glpiService.addFollowup(conversation.getGlpiTicketId(), "[NexusIT] Atendimento assumido por " + user.getName());
         }
@@ -75,12 +77,13 @@ public class SupportService {
         if (conversation.getGlpiTicketId() != null) {
             glpiService.closeTicket(conversation.getGlpiTicketId());
         }
-        String text = "Seu chamado foi encerrado. Obrigado por entrar em contato!";
+        String text = "✅ Seu chamado foi resolvido! Caso precise de mais ajuda, é só me chamar novamente. Obrigado! 😊";
         recordMessage(conversation, MessageDirection.OUT, MessageAuthor.HERMES, "Hermes", text);
         evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), text);
         conversation.setState(ConversationState.CLOSED);
         conversation.setClosedAt(LocalDateTime.now());
         conversationRepo.save(conversation);
+        stateStore.save(conversation);
         return getDetail(id);
     }
 

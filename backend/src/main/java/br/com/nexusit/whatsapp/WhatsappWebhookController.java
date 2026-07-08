@@ -83,7 +83,7 @@ public class WhatsappWebhookController {
     }
 
     private MediaInfo extractMedia(JsonNode messageNode) {
-        for (String mediaType : new String[]{"imageMessage", "videoMessage", "documentMessage"}) {
+        for (String mediaType : new String[]{"imageMessage", "videoMessage", "documentMessage", "audioMessage"}) {
             if (!messageNode.has(mediaType)) continue;
             JsonNode m = messageNode.path(mediaType);
             String base64 = firstNonBlank(m.path("base64").asText(""), messageNode.path("base64").asText(""));

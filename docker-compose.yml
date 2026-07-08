@@ -52,6 +52,8 @@ services:
       EVOLUTION_WEBHOOK_TOKEN: ${EVOLUTION_WEBHOOK_TOKEN:-}
     expose:
       - "8080"
+    volumes:
+      - /home/galdino/.hermes:/home/galdino/.hermes
     networks:
       - nexusit-internal
       - vps_proxy
