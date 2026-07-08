@@ -118,9 +118,13 @@ public class SupportService {
         String signedText = signedMessage(user, cleanMessage);
         if (bytes != null && bytes.length > 0) {
             // Áudio geralmente não mostra caption no WhatsApp; quando houver texto junto, envie o texto antes.
-            if ("audio".equals(kind) && !cleanMessage.isBlank()) {
-                evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), signedText);
-                evolutionApiClient.sendMedia(conversation.getContact().getPhoneNumber(), bytes, filename, mime, "");
+            if ("audio".equals(kind)) {
+                // A Evolution v2 tem endpoint específico para áudio/voice note. O sendMedia pode retornar ACK,
+                // mas alguns clientes WhatsApp não exibem o áudio gravado pelo navegador.
+                if (!cleanMessage.isBlank()) {
+                    evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), signedText);
+                }
+                evolutionApiClient.sendWhatsAppAudio(conversation.getContact().getPhoneNumber(), bytes);
             } else {
                 evolutionApiClient.sendMedia(conversation.getContact().getPhoneNumber(), bytes, filename, mime, cleanMessage.isBlank() ? signedHeader(user) : signedText);
             }

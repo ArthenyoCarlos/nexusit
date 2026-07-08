@@ -90,6 +90,28 @@ public class EvolutionApiClient {
         }
     }
 
+    /** Best-effort push-to-talk/voice note audio send through Evolution API v2. */
+    public void sendWhatsAppAudio(String phoneNumber, byte[] bytes) {
+        if (!props.isConfigured()) {
+            log.warn("Evolution API não configurada — áudio para {} não enviado", phoneNumber);
+            return;
+        }
+        if (bytes == null || bytes.length == 0) return;
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("apikey", props.getApiKey());
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("number", phoneNumber);
+            body.put("audio", Base64.getEncoder().encodeToString(bytes));
+            restTemplate.exchange(
+                    props.getBaseUrl() + "/message/sendWhatsAppAudio/" + props.getInstanceName(),
+                    HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+        } catch (Exception e) {
+            log.warn("Falha ao enviar áudio WhatsApp para {}: {}", phoneNumber, e.toString());
+        }
+    }
+
     private String normalizeMime(String mime) {
         if (mime == null || mime.isBlank()) return "application/octet-stream";
         return mime.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);

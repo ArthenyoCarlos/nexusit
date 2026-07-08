@@ -76,4 +76,44 @@ class SupportServiceTest {
         assertEquals("image", saved.getValue().getMediaKind());
         assertEquals("print.png", saved.getValue().getMediaFilename());
     }
+
+    @Test
+    void replyWithAudio_usesEvolutionAudioEndpoint_andStoresAttachment() {
+        UUID conversationId = UUID.randomUUID();
+        WhatsappContact contact = WhatsappContact.builder()
+                .id(UUID.randomUUID())
+                .phoneNumber("559999999999")
+                .displayName("Cliente")
+                .build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(conversationId)
+                .contact(contact)
+                .state(ConversationState.HUMAN_ACTIVE)
+                .glpiTicketId(123)
+                .build();
+        User tech = User.builder()
+                .id(UUID.randomUUID())
+                .name("Arthenyo Carlos")
+                .email("arthenyo@example.com")
+                .role(Role.ADMIN)
+                .jobTitle("Consultor(a)")
+                .active(true)
+                .build();
+        byte[] audioBytes = new byte[]{9, 8, 7};
+        MockMultipartFile audio = new MockMultipartFile("file", "audio.ogg", "audio/ogg", audioBytes);
+
+        when(conversationRepo.findByIdWithContact(conversationId)).thenReturn(Optional.of(conversation));
+        when(messageRepo.findByConversation(conversationId)).thenReturn(List.of());
+
+        service.reply(conversationId, tech, "", audio);
+
+        verify(evolutionApiClient).sendWhatsAppAudio(eq("559999999999"), aryEq(audioBytes));
+        verify(evolutionApiClient, never()).sendMedia(anyString(), any(), anyString(), anyString(), anyString());
+        verify(glpiService).uploadDocumentToTicket(eq(123), aryEq(audioBytes), eq("audio.ogg"), eq("audio/ogg"));
+
+        ArgumentCaptor<SupportMessage> saved = ArgumentCaptor.forClass(SupportMessage.class);
+        verify(messageRepo).save(saved.capture());
+        assertEquals("audio", saved.getValue().getMediaKind());
+        assertEquals("audio.ogg", saved.getValue().getMediaFilename());
+    }
 }
