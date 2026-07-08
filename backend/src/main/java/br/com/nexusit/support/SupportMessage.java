@@ -36,6 +36,21 @@ public class SupportMessage {
     @Column(columnDefinition = "TEXT")
     private String content;
 
+    @Column(name = "media_bytes", columnDefinition = "BYTEA")
+    private byte[] mediaBytes;
+
+    @Column(name = "media_filename")
+    private String mediaFilename;
+
+    @Column(name = "media_mime", length = 128)
+    private String mediaMime;
+
+    @Column(name = "media_kind", length = 32)
+    private String mediaKind;
+
+    @Column(columnDefinition = "TEXT")
+    private String transcription;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

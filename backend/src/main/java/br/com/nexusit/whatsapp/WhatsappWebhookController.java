@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Base64;
+import java.util.Locale;
 
 /**
  * Receives Evolution API's "messages.upsert" webhook events. This endpoint has no
@@ -71,21 +72,22 @@ public class WhatsappWebhookController {
                 phoneNumber, pushName, text,
                 media != null ? media.bytes() : null,
                 media != null ? media.filename() : null,
-                media != null ? media.mime() : null
+                media != null ? media.mime() : null,
+                media != null ? media.kind() : null
         ));
     }
 
     private String extractText(JsonNode messageNode) {
         if (messageNode.has("conversation")) return messageNode.path("conversation").asText("");
         if (messageNode.has("extendedTextMessage")) return messageNode.path("extendedTextMessage").path("text").asText("");
-        for (String mediaType : new String[]{"imageMessage", "videoMessage", "documentMessage", "audioMessage"}) {
+        for (String mediaType : mediaTypes()) {
             if (messageNode.has(mediaType)) return messageNode.path(mediaType).path("caption").asText("");
         }
         return "";
     }
 
     private MediaInfo extractMedia(JsonNode messageNode) {
-        for (String mediaType : new String[]{"imageMessage", "videoMessage", "documentMessage", "audioMessage"}) {
+        for (String mediaType : mediaTypes()) {
             if (!messageNode.has(mediaType)) continue;
             JsonNode m = messageNode.path(mediaType);
             String base64 = firstNonBlank(m.path("base64").asText(""), messageNode.path("base64").asText(""));
@@ -95,14 +97,62 @@ public class WhatsappWebhookController {
                 return null;
             }
             byte[] bytes = Base64.getDecoder().decode(base64);
-            String mime = m.path("mimetype").asText("application/octet-stream");
-            String ext = mime.contains("/") ? mime.substring(mime.indexOf('/') + 1) : "bin";
-            return new MediaInfo(bytes, "anexo." + ext, mime);
+            String mime = firstNonBlank(m.path("mimetype").asText(""), defaultMime(mediaType));
+            String filename = firstNonBlank(m.path("fileName").asText(""), "whatsapp-" + kind(mediaType) + "." + extensionFor(mime, mediaType));
+            return new MediaInfo(bytes, filename, mime, kind(mediaType));
         }
         return null;
     }
 
+    private String[] mediaTypes() {
+        return new String[]{"imageMessage", "videoMessage", "documentMessage", "audioMessage", "stickerMessage"};
+    }
+
+    private String kind(String mediaType) {
+        return switch (mediaType) {
+            case "imageMessage" -> "image";
+            case "videoMessage" -> "video";
+            case "audioMessage" -> "audio";
+            case "stickerMessage" -> "sticker";
+            default -> "document";
+        };
+    }
+
+    private String defaultMime(String mediaType) {
+        return switch (mediaType) {
+            case "imageMessage" -> "image/jpeg";
+            case "videoMessage" -> "video/mp4";
+            case "audioMessage" -> "audio/ogg";
+            case "stickerMessage" -> "image/webp";
+            default -> "application/octet-stream";
+        };
+    }
+
+    private String extensionFor(String mime, String mediaType) {
+        String normalized = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
+        if (normalized.contains("webp")) return "webp";
+        if (normalized.contains("jpeg")) return "jpg";
+        if (normalized.contains("png")) return "png";
+        if (normalized.contains("mp4")) return "mp4";
+        if (normalized.contains("quicktime")) return "mov";
+        if (normalized.contains("ogg") || normalized.contains("opus")) return "ogg";
+        if (normalized.contains("mpeg")) return "mp3";
+        if (normalized.contains("wav")) return "wav";
+        if (normalized.contains("pdf")) return "pdf";
+        if (mime != null && mime.contains("/")) {
+            String ext = mime.substring(mime.indexOf('/') + 1).split("[;+]")[0].replaceAll("[^a-z0-9]", "");
+            if (!ext.isBlank()) return ext;
+        }
+        return switch (mediaType) {
+            case "stickerMessage" -> "webp";
+            case "audioMessage" -> "ogg";
+            case "videoMessage" -> "mp4";
+            case "imageMessage" -> "jpg";
+            default -> "bin";
+        };
+    }
+
     private String firstNonBlank(String a, String b) { return a != null && !a.isBlank() ? a : b; }
 
-    private record MediaInfo(byte[] bytes, String filename, String mime) {}
+    private record MediaInfo(byte[] bytes, String filename, String mime, String kind) {}
 }

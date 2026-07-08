@@ -31,19 +31,28 @@ class SupportConversationEngineTest {
     @Mock GlpiService glpiService;
     @Mock EvolutionApiClient evolutionApiClient;
     @Mock BotAtendimentoTiStateStore stateStore;
+    @Mock AudioTranscriptionService audioTranscriptionService;
 
     SupportConversationEngine engine;
 
     @BeforeEach
     void setUp() {
-        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, glpiService, evolutionApiClient, stateStore);
+        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, glpiService, evolutionApiClient, stateStore, audioTranscriptionService);
         lenient().when(contactRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(conversationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(messageRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 
     private InboundWhatsappMessage textMessage(String phone, String text) {
-        return new InboundWhatsappMessage(phone, "Funcionário Teste", text, null, null, null);
+        return new InboundWhatsappMessage(phone, "Funcionário Teste", text, null, null, null, null);
+    }
+
+    private InboundWhatsappMessage audioMessage(String phone, byte[] bytes) {
+        return new InboundWhatsappMessage(phone, "Funcionário Teste", "", bytes, "audio.ogg", "audio/ogg", "audio");
+    }
+
+    private InboundWhatsappMessage imageMessage(String phone, byte[] bytes) {
+        return new InboundWhatsappMessage(phone, "Funcionário Teste", "", bytes, "foto.png", "image/png", "image");
     }
 
     @Test
@@ -161,6 +170,59 @@ class SupportConversationEngineTest {
         assertEquals(ConversationState.PENDING_TECH, conversation.getState());
         assertEquals(777, conversation.getGlpiTicketId());
         verify(evolutionApiClient).sendText(eq("5511999999999"), contains("777"));
+    }
+
+    @Test
+    void awaitingDescription_recordsImageMedia_andUploadsToGlpi() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
+                .glpiUserId(42).glpiUserName("Maria Silva").build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.AWAITING_DESCRIPTION).build();
+        byte[] bytes = new byte[]{1, 2, 3};
+
+        when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
+        when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(glpiService.createTicket(anyString(), anyString(), eq(42), eq(3), anyString())).thenReturn(777);
+
+        engine.onInboundMessage(imageMessage("5511999999999", bytes));
+
+        ArgumentCaptor<SupportMessage> saved = ArgumentCaptor.forClass(SupportMessage.class);
+        verify(messageRepo, atLeastOnce()).save(saved.capture());
+        SupportMessage inbound = saved.getAllValues().stream()
+                .filter(m -> m.getDirection() == MessageDirection.IN)
+                .findFirst().orElseThrow();
+        assertArrayEquals(bytes, inbound.getMediaBytes());
+        assertEquals("foto.png", inbound.getMediaFilename());
+        assertEquals("image/png", inbound.getMediaMime());
+        assertEquals("image", inbound.getMediaKind());
+        verify(glpiService).uploadDocumentToTicket(eq(777), eq(bytes), eq("foto.png"), eq("image/png"));
+    }
+
+    @Test
+    void awaitingDescription_transcribesAudio_andUsesTranscriptInTicket() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
+                .glpiUserId(42).glpiUserName("Maria Silva").build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.AWAITING_DESCRIPTION).build();
+        byte[] bytes = new byte[]{9, 8, 7};
+
+        when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
+        when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(audioTranscriptionService.transcribe(bytes, "audio.ogg", "audio/ogg"))
+                .thenReturn("A impressora do caixa três parou de imprimir.");
+        when(glpiService.createTicket(anyString(), contains("A impressora do caixa três"), eq(42), eq(3), anyString())).thenReturn(778);
+
+        engine.onInboundMessage(audioMessage("5511999999999", bytes));
+
+        assertEquals(778, conversation.getGlpiTicketId());
+        ArgumentCaptor<SupportMessage> saved = ArgumentCaptor.forClass(SupportMessage.class);
+        verify(messageRepo, atLeastOnce()).save(saved.capture());
+        SupportMessage inbound = saved.getAllValues().stream()
+                .filter(m -> m.getDirection() == MessageDirection.IN)
+                .findFirst().orElseThrow();
+        assertEquals("audio", inbound.getMediaKind());
+        assertEquals("A impressora do caixa três parou de imprimir.", inbound.getTranscription());
+        assertTrue(inbound.getContent().contains("Áudio transcrito"));
     }
 
     @Test

@@ -3,9 +3,14 @@ package br.com.nexusit.support;
 import br.com.nexusit.user.User;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.UUID;
 
@@ -24,6 +29,19 @@ public class SupportController {
 
     @GetMapping("/{id}")
     public SupportConversationDetail getDetail(@PathVariable UUID id) { return service.getDetail(id); }
+
+    @GetMapping("/messages/{messageId}/media")
+    public ResponseEntity<byte[]> getMessageMedia(@PathVariable UUID messageId) {
+        SupportMessageMedia media = service.getMessageMedia(messageId);
+        String mime = media.mime() == null || media.mime().isBlank() ? "application/octet-stream" : media.mime();
+        String filename = media.filename() == null || media.filename().isBlank() ? "anexo" : media.filename();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType(mime))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.inline()
+                        .filename(filename, StandardCharsets.UTF_8)
+                        .build().toString())
+                .body(media.bytes());
+    }
 
     @PostMapping("/{id}/claim")
     public SupportConversationDetail claim(@PathVariable UUID id, @AuthenticationPrincipal User user) {

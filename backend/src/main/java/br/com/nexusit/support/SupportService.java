@@ -40,6 +40,15 @@ public class SupportService {
         return new SupportConversationDetail(SupportConversationSummary.from(conversation), messages);
     }
 
+    public SupportMessageMedia getMessageMedia(UUID messageId) {
+        SupportMessage message = messageRepo.findById(messageId)
+                .orElseThrow(() -> new EntityNotFoundException("Mensagem não encontrada"));
+        if (message.getMediaBytes() == null || message.getMediaBytes().length == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Mensagem sem mídia");
+        }
+        return new SupportMessageMedia(message.getMediaBytes(), message.getMediaFilename(), message.getMediaMime());
+    }
+
     @Transactional
     public SupportConversationDetail claim(UUID id, User user) {
         int updated = conversationRepo.claim(id, user, LocalDateTime.now());

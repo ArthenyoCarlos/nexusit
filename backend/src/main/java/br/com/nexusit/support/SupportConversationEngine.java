@@ -29,7 +29,7 @@ public class SupportConversationEngine {
             "2️⃣ Consultar meus chamados\n" +
             "3️⃣ Falar com um técnico\n" +
             "0️⃣ Encerrar atendimento";
-    private static final String ASK_DESCRIPTION = "Por favor, descreva seu problema. Você pode enviar fotos, vídeos ou Audio 📷";
+    private static final String ASK_DESCRIPTION = "Por favor, descreva seu problema. Você pode enviar fotos, vídeos ou áudio 📷🎧";
     private static final String WAIT_TECH = "Aguarde um momento, estou verificando a disponibilidade dos técnicos...";
     private static final String CLOSED_TEXT = "Atendimento encerrado. Caso precise de mais ajuda, é só me chamar novamente. Obrigado! 😊";
 
@@ -39,6 +39,7 @@ public class SupportConversationEngine {
     private final GlpiService glpiService;
     private final EvolutionApiClient evolutionApiClient;
     private final BotAtendimentoTiStateStore stateStore;
+    private final AudioTranscriptionService audioTranscriptionService;
 
     @Transactional
     public void onInboundMessage(InboundWhatsappMessage msg) {
@@ -58,8 +59,8 @@ public class SupportConversationEngine {
                             .build());
                 });
 
-        recordMessage(conversation, MessageDirection.IN, MessageAuthor.EMPLOYEE,
-                employeeDisplayName(contact, msg), inboundContent(msg));
+        String transcription = transcribeIfAudio(msg);
+        recordInboundMessage(conversation, contact, msg, transcription);
 
         if (isNewConversation.get()) {
             if (conversation.getState() == ConversationState.AWAITING_NAME) {
@@ -72,17 +73,17 @@ public class SupportConversationEngine {
         }
 
         switch (conversation.getState()) {
-            case AWAITING_NAME -> handleAwaitingName(conversation, contact, msg);
+            case AWAITING_NAME -> handleAwaitingName(conversation, contact, msg, transcription);
             case MENU -> handleMenu(conversation, contact, msg);
-            case AWAITING_DESCRIPTION -> handleAwaitingDescription(conversation, contact, msg);
-            case PENDING_TECH, HUMAN_ACTIVE -> appendFollowupOnly(conversation, msg);
+            case AWAITING_DESCRIPTION -> handleAwaitingDescription(conversation, contact, msg, transcription);
+            case PENDING_TECH, HUMAN_ACTIVE -> appendFollowupOnly(conversation, msg, transcription);
             case CLOSED -> log.debug("Mensagem recebida para conversa já fechada {}", conversation.getId());
         }
         persistState(conversation);
     }
 
-    private void handleAwaitingName(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg) {
-        String name = msg.text() == null ? "" : msg.text().trim();
+    private void handleAwaitingName(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String transcription) {
+        String name = firstNonBlank(msg.text(), transcription).trim();
         if (name.isBlank()) {
             sendAndRecord(conversation, "Não entendi. Pode me dizer seu nome completo?");
             return;
@@ -135,9 +136,9 @@ public class SupportConversationEngine {
         sendAndRecord(conversation, "Não entendi sua opção.\n\n" + menuText(contact.getGlpiUserName()));
     }
 
-    private void handleAwaitingDescription(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg) {
+    private void handleAwaitingDescription(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String transcription) {
         if (conversation.getGlpiTicketId() == null) {
-            String description = msg.hasText() ? msg.text() : "(sem descrição em texto — mídia recebida pelo WhatsApp)";
+            String description = descriptionFrom(msg, transcription);
             int ticketId = glpiService.createTicket(
                     autoTitle(description),
                     description,
@@ -151,14 +152,15 @@ public class SupportConversationEngine {
             attachMediaIfAny(ticketId, msg);
             sendAndRecord(conversation, "✅ Chamado #" + ticketId + " aberto com sucesso! Um técnico irá atendê-lo em breve. Você será notificado aqui quando seu chamado for atendido.");
         } else {
-            appendFollowupOnly(conversation, msg);
+            appendFollowupOnly(conversation, msg, transcription);
         }
     }
 
-    private void appendFollowupOnly(SupportConversation conversation, InboundWhatsappMessage msg) {
+    private void appendFollowupOnly(SupportConversation conversation, InboundWhatsappMessage msg, String transcription) {
         if (conversation.getGlpiTicketId() == null) return;
         attachMediaIfAny(conversation.getGlpiTicketId(), msg);
-        if (msg.hasText()) glpiService.addFollowup(conversation.getGlpiTicketId(), "[WhatsApp] " + msg.text());
+        String followup = followupFrom(msg, transcription);
+        if (!followup.isBlank()) glpiService.addFollowup(conversation.getGlpiTicketId(), followup);
     }
 
     private String formatOpenTickets(WhatsappContact contact) {
@@ -178,18 +180,32 @@ public class SupportConversationEngine {
     }
 
     private void sendAndRecord(SupportConversation conversation, String text) {
-        recordMessage(conversation, MessageDirection.OUT, MessageAuthor.HERMES, "Hermes", text);
+        recordMessage(conversation, MessageDirection.OUT, MessageAuthor.HERMES, "Hermes", text,
+                null, null, null, null, null);
         evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), text);
     }
 
+    private void recordInboundMessage(SupportConversation conversation, WhatsappContact contact,
+                                      InboundWhatsappMessage msg, String transcription) {
+        recordMessage(conversation, MessageDirection.IN, MessageAuthor.EMPLOYEE,
+                employeeDisplayName(contact, msg), inboundContent(msg, transcription),
+                msg.mediaBytes(), msg.mediaFilename(), msg.mediaMime(), msg.mediaKind(), transcription);
+    }
+
     private void recordMessage(SupportConversation conversation, MessageDirection direction, MessageAuthor author,
-                                String authorName, String content) {
+                               String authorName, String content, byte[] mediaBytes, String mediaFilename,
+                               String mediaMime, String mediaKind, String transcription) {
         messageRepo.save(SupportMessage.builder()
                 .conversation(conversation)
                 .direction(direction)
                 .author(author)
                 .authorName(authorName)
                 .content(content)
+                .mediaBytes(mediaBytes)
+                .mediaFilename(mediaFilename)
+                .mediaMime(mediaMime)
+                .mediaKind(mediaKind)
+                .transcription(transcription == null || transcription.isBlank() ? null : transcription)
                 .build());
     }
 
@@ -203,10 +219,34 @@ public class SupportConversationEngine {
         return contact.getPhoneNumber();
     }
 
-    private String inboundContent(InboundWhatsappMessage msg) {
+    private String inboundContent(InboundWhatsappMessage msg, String transcription) {
         if (msg.hasText()) return msg.text();
+        if (msg.isAudio() && transcription != null && !transcription.isBlank()) return "🎧 Áudio transcrito:\n" + transcription;
         if (msg.hasMedia()) return "[Mídia recebida: " + msg.mediaFilename() + "]";
         return "";
+    }
+
+    private String descriptionFrom(InboundWhatsappMessage msg, String transcription) {
+        if (msg.hasText()) return msg.text();
+        if (msg.isAudio() && transcription != null && !transcription.isBlank()) {
+            return "Funcionário enviou áudio via WhatsApp.\n\nTranscrição:\n" + transcription;
+        }
+        if (msg.hasMedia()) return "(sem descrição em texto — mídia recebida pelo WhatsApp: " + msg.mediaFilename() + ")";
+        return "(sem descrição em texto)";
+    }
+
+    private String followupFrom(InboundWhatsappMessage msg, String transcription) {
+        if (msg.hasText()) return "[WhatsApp] " + msg.text();
+        if (msg.isAudio() && transcription != null && !transcription.isBlank()) {
+            return "[WhatsApp áudio transcrito] " + transcription;
+        }
+        if (msg.hasMedia()) return "[WhatsApp] Mídia recebida: " + msg.mediaFilename();
+        return "";
+    }
+
+    private String transcribeIfAudio(InboundWhatsappMessage msg) {
+        if (!msg.isAudio() || !msg.hasMedia()) return "";
+        return audioTranscriptionService.transcribe(msg.mediaBytes(), msg.mediaFilename(), msg.mediaMime());
     }
 
     private String firstName(String fullName) {
@@ -239,5 +279,9 @@ public class SupportConversationEngine {
 
     private String normalize(String s) {
         return s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
+    }
+
+    private String firstNonBlank(String a, String b) {
+        return a != null && !a.isBlank() ? a : b != null ? b : "";
     }
 }

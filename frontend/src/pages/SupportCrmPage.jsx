@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { getQueue, getMine, getConversation, claimConversation, replyToConversation, closeConversation } from '../services/support'
+import { getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation } from '../services/support'
 
 const STATE_LABEL = {
   AWAITING_NAME: 'Identificando', MENU: 'No menu', AWAITING_DESCRIPTION: 'Descrevendo problema',
@@ -15,6 +15,76 @@ function timeAgo(iso) {
   if (diff < 60) return `${diff}s atrás`
   if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`
   return `${Math.floor(diff / 3600)}h atrás`
+}
+
+function MediaAttachment({ message }) {
+  const [url, setUrl] = useState(null)
+  const [error, setError] = useState(false)
+  const mime = message.mediaMime || ''
+  const kind = message.mediaKind || ''
+
+  useEffect(() => {
+    let revoked = false
+    let objectUrl = null
+    if (!message.mediaUrl) return undefined
+    getMessageMediaBlob(message.id)
+      .then(blob => {
+        if (revoked) return
+        objectUrl = URL.createObjectURL(blob)
+        setUrl(objectUrl)
+      })
+      .catch(() => setError(true))
+    return () => {
+      revoked = true
+      if (objectUrl) URL.revokeObjectURL(objectUrl)
+    }
+  }, [message.id, message.mediaUrl])
+
+  if (!message.mediaUrl) return null
+  if (error) return <p style={{ fontSize: 12, color: 'var(--danger)' }}>Não foi possível carregar a mídia.</p>
+  if (!url) return <div className="skeleton" style={{ height: 90, borderRadius: 10, marginTop: 6 }} />
+
+  const label = message.mediaFilename || 'anexo'
+  const boxStyle = { marginTop: 8, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-muted)', background: 'rgba(0,0,0,.08)' }
+
+  if (kind === 'image' || kind === 'sticker' || mime.startsWith('image/')) {
+    return (
+      <div style={boxStyle}>
+        <img src={url} alt={label} style={{ display: 'block', maxWidth: 280, maxHeight: 260, width: '100%', objectFit: 'contain', background: 'rgba(255,255,255,.04)' }} />
+        <a href={url} download={label} style={{ display: 'block', padding: '6px 8px', fontSize: 11.5, color: 'inherit', opacity: 0.8 }}>{kind === 'sticker' ? 'Figurinha' : 'Imagem'} · {label}</a>
+      </div>
+    )
+  }
+
+  if (kind === 'video' || mime.startsWith('video/')) {
+    return (
+      <div style={{ ...boxStyle, padding: 8 }}>
+        <video src={url} controls style={{ display: 'block', maxWidth: 360, width: '100%', borderRadius: 8 }} />
+        <a href={url} download={label} style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'inherit', opacity: 0.8 }}>Vídeo · {label}</a>
+      </div>
+    )
+  }
+
+  if (kind === 'audio' || mime.startsWith('audio/')) {
+    return (
+      <div style={{ ...boxStyle, padding: 8 }}>
+        <audio src={url} controls style={{ display: 'block', width: '100%' }} />
+        <a href={url} download={label} style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'inherit', opacity: 0.8 }}>Áudio · {label}</a>
+        {message.transcription && (
+          <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,.06)' }}>
+            <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, opacity: 0.7 }}>Transcrição</p>
+            <p style={{ margin: '3px 0 0', fontSize: 12.5, whiteSpace: 'pre-wrap' }}>{message.transcription}</p>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ ...boxStyle, padding: 8 }}>
+      <a href={url} download={label} style={{ fontSize: 12.5, color: 'inherit' }}>📎 Baixar anexo · {label}</a>
+    </div>
+  )
 }
 
 export default function SupportCrmPage() {
@@ -187,7 +257,8 @@ export default function SupportCrmPage() {
                           color: mine ? 'var(--text-inverse)' : 'var(--text-primary)',
                         }}>
                           {!mine && <p style={{ fontSize: 10.5, fontWeight: 700, opacity: 0.7, marginBottom: 2 }}>{m.authorName}</p>}
-                          <p style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{m.content}</p>
+                          {m.content && <p style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{m.content}</p>}
+                          <MediaAttachment message={m} />
                         </div>
                       </div>
                     )
