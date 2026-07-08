@@ -20,6 +20,7 @@ function timeAgo(iso) {
 function MediaAttachment({ message }) {
   const [url, setUrl] = useState(null)
   const [error, setError] = useState(false)
+  const [previewOpen, setPreviewOpen] = useState(false)
   const mime = message.mediaMime || ''
   const kind = message.mediaKind || ''
 
@@ -27,6 +28,7 @@ function MediaAttachment({ message }) {
     let revoked = false
     let objectUrl = null
     if (!message.mediaUrl) return undefined
+    setError(false)
     getMessageMediaBlob(message.id)
       .then(blob => {
         if (revoked) return
@@ -45,31 +47,92 @@ function MediaAttachment({ message }) {
   if (!url) return <div className="skeleton" style={{ height: 90, borderRadius: 10, marginTop: 6 }} />
 
   const label = message.mediaFilename || 'anexo'
+  const isImage = kind === 'image' || kind === 'sticker' || mime.startsWith('image/')
+  const isVideo = kind === 'video' || mime.startsWith('video/')
+  const isAudio = kind === 'audio' || mime.startsWith('audio/')
   const boxStyle = { marginTop: 8, borderRadius: 12, overflow: 'hidden', border: '1px solid var(--border-muted)', background: 'rgba(0,0,0,.08)' }
+  const actionStyle = { display: 'flex', gap: 10, alignItems: 'center', padding: '6px 8px', fontSize: 11.5, color: 'inherit', opacity: 0.85, flexWrap: 'wrap' }
+  const linkStyle = { color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2, cursor: 'pointer', background: 'none', border: 0, padding: 0, font: 'inherit' }
 
-  if (kind === 'image' || kind === 'sticker' || mime.startsWith('image/')) {
+  const preview = previewOpen && (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={() => setPreviewOpen(false)}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999, background: 'rgba(0,0,0,.88)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setPreviewOpen(false)}
+        className="btn btn-secondary btn-sm"
+        style={{ position: 'absolute', top: 16, right: 16 }}
+      >
+        Fechar
+      </button>
+      {isImage ? (
+        <img
+          src={url}
+          alt={label}
+          onClick={e => e.stopPropagation()}
+          style={{ maxWidth: '96vw', maxHeight: '92vh', objectFit: 'contain', borderRadius: 12 }}
+        />
+      ) : isVideo ? (
+        <video
+          src={url}
+          controls
+          autoPlay
+          onClick={e => e.stopPropagation()}
+          style={{ maxWidth: '96vw', maxHeight: '92vh', borderRadius: 12 }}
+        />
+      ) : null}
+    </div>
+  )
+
+  if (isImage) {
     return (
-      <div style={boxStyle}>
-        <img src={url} alt={label} style={{ display: 'block', maxWidth: 280, maxHeight: 260, width: '100%', objectFit: 'contain', background: 'rgba(255,255,255,.04)' }} />
-        <a href={url} download={label} style={{ display: 'block', padding: '6px 8px', fontSize: 11.5, color: 'inherit', opacity: 0.8 }}>{kind === 'sticker' ? 'Figurinha' : 'Imagem'} · {label}</a>
-      </div>
+      <>
+        <div style={boxStyle}>
+          <button type="button" onClick={() => setPreviewOpen(true)} title="Abrir imagem" style={{ display: 'block', width: '100%', border: 0, padding: 0, cursor: 'zoom-in', background: 'transparent' }}>
+            <img src={url} alt={label} style={{ display: 'block', maxWidth: 320, maxHeight: 300, width: '100%', objectFit: 'contain', background: 'rgba(255,255,255,.04)' }} />
+          </button>
+          <div style={actionStyle}>
+            <span>{kind === 'sticker' ? 'Figurinha' : 'Imagem'} · {label}</span>
+            <button type="button" onClick={() => setPreviewOpen(true)} style={linkStyle}>Abrir</button>
+            <a href={url} download={label} style={linkStyle}>Baixar</a>
+          </div>
+        </div>
+        {preview}
+      </>
     )
   }
 
-  if (kind === 'video' || mime.startsWith('video/')) {
+  if (isVideo) {
     return (
-      <div style={{ ...boxStyle, padding: 8 }}>
-        <video src={url} controls style={{ display: 'block', maxWidth: 360, width: '100%', borderRadius: 8 }} />
-        <a href={url} download={label} style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'inherit', opacity: 0.8 }}>Vídeo · {label}</a>
-      </div>
+      <>
+        <div style={{ ...boxStyle, padding: 8 }}>
+          <video src={url} controls style={{ display: 'block', maxWidth: 420, width: '100%', borderRadius: 8 }} />
+          <div style={{ ...actionStyle, paddingLeft: 0, paddingRight: 0 }}>
+            <span>Vídeo · {label}</span>
+            <button type="button" onClick={() => setPreviewOpen(true)} style={linkStyle}>Abrir</button>
+            <a href={url} download={label} style={linkStyle}>Baixar</a>
+          </div>
+        </div>
+        {preview}
+      </>
     )
   }
 
-  if (kind === 'audio' || mime.startsWith('audio/')) {
+  if (isAudio) {
     return (
       <div style={{ ...boxStyle, padding: 8 }}>
         <audio src={url} controls style={{ display: 'block', width: '100%' }} />
-        <a href={url} download={label} style={{ display: 'block', marginTop: 6, fontSize: 11.5, color: 'inherit', opacity: 0.8 }}>Áudio · {label}</a>
+        <div style={{ ...actionStyle, paddingLeft: 0, paddingRight: 0 }}>
+          <span>Áudio · {label}</span>
+          <a href={url} download={label} style={linkStyle}>Baixar</a>
+        </div>
         {message.transcription && (
           <div style={{ marginTop: 8, padding: '8px 10px', borderRadius: 8, background: 'rgba(255,255,255,.06)' }}>
             <p style={{ margin: 0, fontSize: 10.5, fontWeight: 700, opacity: 0.7 }}>Transcrição</p>
