@@ -1,9 +1,17 @@
 package br.com.nexusit.glpi;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 
+import java.text.Normalizer;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -13,6 +21,7 @@ import java.util.function.Supplier;
 public class GlpiService {
 
     private final GlpiClient client;
+    private final ObjectMapper objectMapper;
 
     // Status: 1=Novo, 2=Em andamento (atribuído), 3=Em andamento (planejado),
     //         4=Aguardando, 5=Resolvido, 6=Fechado
@@ -149,6 +158,95 @@ public class GlpiService {
         String login = str(u, "name");
         String full = (first + " " + last).trim();
         return full.isBlank() ? login : full + " (" + login + ")";
+    }
+
+    // ── Support/WhatsApp integration ─────────────────────────────────────
+
+    public Optional<GlpiUserRef> findUserByName(String name) {
+        return safeCall(() -> {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("range", "0-299");
+            List<Map<String, Object>> raw = client.getList("/User", params);
+            if (raw == null) return Optional.<GlpiUserRef>empty();
+            String needle = normalize(name);
+            return raw.stream()
+                    .filter(u -> intVal(u, "is_deleted") == 0)
+                    .map(u -> new GlpiUserRef(intVal(u, "id"), fullName(u)))
+                    .filter(u -> !u.name().isBlank() && normalize(u.name()).contains(needle))
+                    .findFirst();
+        }, Optional.empty());
+    }
+
+    public GlpiUserRef createUser(String fullName) {
+        String[] parts = fullName.trim().split("\\s+", 2);
+        String firstname = parts[0];
+        String lastname = parts.length > 1 ? parts[1] : "";
+        String login = slugifyLogin(fullName);
+
+        Map<String, Object> resp;
+        try {
+            resp = client.post("/User", Map.of("input", Map.of(
+                    "name", login, "firstname", firstname, "realname", lastname)));
+        } catch (Exception e) {
+            // login collision or transient error — retry once with a random numeric suffix
+            resp = client.post("/User", Map.of("input", Map.of(
+                    "name", login + (1000 + new Random().nextInt(9000)),
+                    "firstname", firstname, "realname", lastname)));
+        }
+        return new GlpiUserRef(intVal(resp, "id"), fullName.trim());
+    }
+
+    public int createTicket(String title, String content, int requesterGlpiUserId) {
+        Map<String, Object> resp = client.post("/Ticket", Map.of("input", Map.of(
+                "name", title,
+                "content", content,
+                "_users_id_requester", requesterGlpiUserId)));
+        return intVal(resp, "id");
+    }
+
+    public void uploadDocumentToTicket(int ticketId, byte[] bytes, String filename, String mime) {
+        try {
+            Map<String, Object> manifestMap = Map.of("input", Map.of(
+                    "name", filename, "_filename", List.of(filename)));
+            String manifest = objectMapper.writeValueAsString(manifestMap);
+
+            HttpHeaders manifestHeaders = new HttpHeaders();
+            manifestHeaders.setContentType(MediaType.TEXT_PLAIN);
+            ByteArrayResource fileResource = new ByteArrayResource(bytes) {
+                @Override public String getFilename() { return filename; }
+            };
+
+            MultiValueMap<String, Object> parts = new LinkedMultiValueMap<>();
+            parts.add("uploadManifest", new HttpEntity<>(manifest, manifestHeaders));
+            parts.add("filename[0]", fileResource);
+
+            Map<String, Object> resp = client.postMultipart("/Document", parts);
+            int documentId = intVal(resp, "id");
+            if (documentId > 0) {
+                client.post("/Document_Item", Map.of("input", Map.of(
+                        "documents_id", documentId, "itemtype", "Ticket", "items_id", ticketId)));
+            }
+        } catch (Exception e) {
+            log.warn("Falha ao anexar documento '{}' ao chamado {}: {}", filename, ticketId, e.getMessage());
+        }
+    }
+
+    private String fullName(Map<String, Object> u) {
+        String first = str(u, "firstname");
+        String last = str(u, "realname");
+        String full = (first + " " + last).trim();
+        return full.isBlank() ? str(u, "name") : full;
+    }
+
+    private String normalize(String s) {
+        if (s == null) return "";
+        String n = Normalizer.normalize(s, Normalizer.Form.NFD).replaceAll("\\p{M}", "");
+        return n.toLowerCase(Locale.ROOT).trim();
+    }
+
+    private String slugifyLogin(String fullName) {
+        String n = normalize(fullName).replaceAll("[^a-z0-9]+", ".").replaceAll("^\\.+|\\.+$", "");
+        return n.isBlank() ? "user" + System.currentTimeMillis() : n;
     }
 
     // ── Parsing ───────────────────────────────────────────────────────────

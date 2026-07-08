@@ -46,6 +46,11 @@ application:
     email: ${VAULTWARDEN_EMAIL:}
     master-password: ${VAULTWARDEN_MASTER_PASSWORD:}
     organization-name: ${VAULTWARDEN_ORG_NAME:Armazem Galdino}
+  whatsapp:
+    base-url: ${EVOLUTION_API_BASE_URL:}
+    api-key: ${EVOLUTION_API_KEY:}
+    instance-name: ${EVOLUTION_API_INSTANCE:}
+    webhook-token: ${EVOLUTION_WEBHOOK_TOKEN:}
 
 app:
   base-url: ${APP_BASE_URL:http://nexus.local}

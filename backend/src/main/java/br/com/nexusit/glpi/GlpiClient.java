@@ -104,6 +104,17 @@ public class GlpiClient {
         });
     }
 
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public Map<String, Object> postMultipart(String path, org.springframework.util.MultiValueMap<String, Object> parts) {
+        return withRetry(() -> {
+            HttpHeaders headers = buildBaseHeaders(session());
+            headers.setContentType(MediaType.MULTIPART_FORM_DATA);
+            ResponseEntity<Map> resp = restTemplate.exchange(
+                    url(path), HttpMethod.POST, new HttpEntity<>(parts, headers), Map.class);
+            return (Map<String, Object>) resp.getBody();
+        });
+    }
+
     // ── Internals ─────────────────────────────────────────────────────────
 
     private SimpleClientHttpRequestFactory createRequestFactory() {

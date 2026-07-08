@@ -45,6 +45,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/glpi/**").permitAll()
                 .requestMatchers("/api/termos/*/pdf").permitAll()
                 .requestMatchers("/dashboard/tv").permitAll()
+                .requestMatchers("/api/whatsapp/webhook").permitAll()
                 .requestMatchers("/api/v3/api-docs/**", "/api/swagger-ui/**", "/api/swagger-ui.html").permitAll()
                 .requestMatchers("/ws/ssh/**").hasRole("ADMIN")
                 .anyRequest().authenticated()
