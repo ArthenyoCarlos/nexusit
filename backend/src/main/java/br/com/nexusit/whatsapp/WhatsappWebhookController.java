@@ -56,9 +56,11 @@ public class WhatsappWebhookController {
         if (key.path("fromMe").asBoolean(false)) return; // ignore echoes of messages we sent
 
         String remoteJid = key.path("remoteJid").asText("");
-        if (remoteJid.isBlank() || remoteJid.endsWith("@g.us")) return; // ignore group chats
+        String remoteJidAlt = key.path("remoteJidAlt").asText("");
+        String contactJid = remoteJid.endsWith("@lid") && !remoteJidAlt.isBlank() ? remoteJidAlt : remoteJid;
+        if (contactJid.isBlank() || contactJid.endsWith("@g.us")) return; // ignore group chats
 
-        String phoneNumber = remoteJid.split("@")[0];
+        String phoneNumber = contactJid.split("@")[0];
         String pushName = firstNonBlank(envelope.path("pushName").asText(""), data.path("pushName").asText(""));
 
         JsonNode messageNode = envelope.path("message");
