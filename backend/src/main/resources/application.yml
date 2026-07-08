@@ -51,6 +51,11 @@ application:
     api-key: ${EVOLUTION_API_KEY:}
     instance-name: ${EVOLUTION_API_INSTANCE:}
     webhook-token: ${EVOLUTION_WEBHOOK_TOKEN:}
+  transcription:
+    api-url: ${OPENAI_TRANSCRIPTION_API_URL:https://api.openai.com/v1/audio/transcriptions}
+    api-key: ${OPENAI_API_KEY:}
+    model: ${OPENAI_TRANSCRIPTION_MODEL:whisper-1}
+    language: ${OPENAI_TRANSCRIPTION_LANGUAGE:pt}
 
 app:
   base-url: ${APP_BASE_URL:http://nexus.local}
