@@ -6,6 +6,7 @@ COPY src ./src
 RUN mvn package -Dmaven.test.skip=true -q
 
 FROM eclipse-temurin:21-jre-alpine
+RUN apk add --no-cache ffmpeg
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 ENTRYPOINT ["java", "-jar", "app.jar"]

@@ -6,6 +6,7 @@ import br.com.nexusit.user.User;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +14,8 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
@@ -20,6 +23,7 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 @Transactional(readOnly = true)
 public class SupportService {
 
@@ -97,6 +101,13 @@ public class SupportService {
             filename = safeFilename(file.getOriginalFilename(), file.getContentType());
             mime = file.getContentType() == null || file.getContentType().isBlank() ? "application/octet-stream" : file.getContentType();
             kind = mediaKind(mime);
+            if ("audio".equals(kind)) {
+                OutgoingMedia converted = convertAudioForWhatsapp(bytes, filename, mime);
+                bytes = converted.bytes();
+                filename = converted.filename();
+                mime = converted.mime();
+                kind = mediaKind(mime);
+            }
         }
         if (cleanMessage.isBlank() && (bytes == null || bytes.length == 0)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma mensagem ou anexe uma mídia");
@@ -168,6 +179,70 @@ public class SupportService {
         if (m.startsWith("audio/")) return "audio";
         return "document";
     }
+
+    private OutgoingMedia convertAudioForWhatsapp(byte[] input, String filename, String mime) {
+        String normalizedMime = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
+        boolean alreadyWhatsappFriendly = normalizedMime.startsWith("audio/ogg") || normalizedMime.startsWith("audio/mpeg") || normalizedMime.startsWith("audio/mp4");
+        if (alreadyWhatsappFriendly) {
+            return new OutgoingMedia(input, filename, mime);
+        }
+
+        Path in = null;
+        Path out = null;
+        try {
+            in = Files.createTempFile("nexusit-audio-in-", extensionFor(filename, mime));
+            out = Files.createTempFile("nexusit-audio-out-", ".ogg");
+            Files.write(in, input);
+            Process process = new ProcessBuilder(
+                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
+                    "-i", in.toString(),
+                    "-vn", "-c:a", "libopus", "-b:a", "32k", "-ar", "48000", "-ac", "1",
+                    out.toString()
+            ).redirectErrorStream(true).start();
+            byte[] output = process.getInputStream().readAllBytes();
+            boolean finished = process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS);
+            if (!finished) {
+                process.destroyForcibly();
+                throw new IOException("timeout ao converter áudio");
+            }
+            if (process.exitValue() != 0) {
+                throw new IOException("ffmpeg exit=" + process.exitValue() + " output=" + new String(output));
+            }
+            byte[] converted = Files.readAllBytes(out);
+            String outName = baseName(filename == null || filename.isBlank() ? "audio-tecnico" : filename) + ".ogg";
+            return new OutgoingMedia(converted, outName, "audio/ogg; codecs=opus");
+        } catch (Exception e) {
+            log.warn("Falha ao converter áudio '{}' de {} para OGG/Opus; enviando original: {}", filename, mime, e.toString());
+            return new OutgoingMedia(input, filename, mime);
+        } finally {
+            deleteQuietly(in);
+            deleteQuietly(out);
+        }
+    }
+
+    private String extensionFor(String filename, String mime) {
+        if (filename != null && filename.contains(".")) {
+            return filename.substring(filename.lastIndexOf('.'));
+        }
+        String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
+        if (m.contains("webm")) return ".webm";
+        if (m.contains("ogg")) return ".ogg";
+        if (m.contains("mpeg") || m.contains("mp3")) return ".mp3";
+        return ".audio";
+    }
+
+    private String baseName(String filename) {
+        String clean = filename.replaceAll("[\\r\\n\\t]", "_");
+        int dot = clean.lastIndexOf('.');
+        return dot > 0 ? clean.substring(0, dot) : clean;
+    }
+
+    private void deleteQuietly(Path path) {
+        if (path == null) return;
+        try { Files.deleteIfExists(path); } catch (IOException ignored) { }
+    }
+
+    private record OutgoingMedia(byte[] bytes, String filename, String mime) {}
 
     private String safeFilename(String original, String mime) {
         if (original != null && !original.isBlank()) {

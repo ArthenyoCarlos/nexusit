@@ -19,6 +19,7 @@ import java.net.HttpURLConnection;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
 
@@ -68,16 +69,19 @@ public class EvolutionApiClient {
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);
             headers.set("apikey", props.getApiKey());
-            String safeMime = mime == null || mime.isBlank() ? "application/octet-stream" : mime;
+            String safeMime = normalizeMime(mime);
             String safeFilename = filename == null || filename.isBlank() ? defaultFilename(safeMime) : filename;
-            Map<String, Object> body = Map.of(
-                    "number", phoneNumber,
-                    "mediatype", mediaType(safeMime),
-                    "mimetype", safeMime,
-                    "caption", caption == null ? "" : caption,
-                    "media", Base64.getEncoder().encodeToString(bytes),
-                    "fileName", safeFilename
-            );
+            String mediatype = mediaType(safeMime);
+            Map<String, Object> body = new LinkedHashMap<>();
+            body.put("number", phoneNumber);
+            body.put("mediatype", mediatype);
+            body.put("mimetype", safeMime);
+            body.put("caption", caption == null ? "" : caption);
+            body.put("media", Base64.getEncoder().encodeToString(bytes));
+            body.put("fileName", safeFilename);
+            if ("audio".equals(mediatype)) {
+                body.put("ptt", true);
+            }
             restTemplate.exchange(
                     props.getBaseUrl() + "/message/sendMedia/" + props.getInstanceName(),
                     HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
@@ -86,8 +90,13 @@ public class EvolutionApiClient {
         }
     }
 
+    private String normalizeMime(String mime) {
+        if (mime == null || mime.isBlank()) return "application/octet-stream";
+        return mime.split(";", 2)[0].trim().toLowerCase(Locale.ROOT);
+    }
+
     private String mediaType(String mime) {
-        String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
+        String m = normalizeMime(mime);
         if (m.startsWith("image/")) return "image";
         if (m.startsWith("video/")) return "video";
         if (m.startsWith("audio/")) return "audio";

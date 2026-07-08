@@ -233,7 +233,9 @@ export default function SupportCrmPage() {
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+      const preferredTypes = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm']
+      const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type))
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
       audioChunksRef.current = []
       recorder.ondataavailable = e => { if (e.data?.size) audioChunksRef.current.push(e.data) }
       recorder.onstop = () => {
