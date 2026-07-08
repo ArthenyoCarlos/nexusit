@@ -78,7 +78,7 @@ export default function Layout({ children }) {
       <div className={`nav-backdrop${isNavOpen ? ' open' : ''}`} onClick={() => setIsNavOpen(false)} />
 
       {/* Sidebar fixo / drawer mobile */}
-      <div className={`app-sidebar-wrap${isNavOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 10 }}>
+      <div className={`app-sidebar-wrap${isNavOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 40 }}>
         <Sidebar onNavigate={() => setIsNavOpen(false)} />
       </div>
 
