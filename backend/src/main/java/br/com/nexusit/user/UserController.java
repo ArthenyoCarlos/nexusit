@@ -46,6 +46,9 @@ public class UserController {
         if (req.name() != null && !req.name().isBlank()) {
             user.setName(req.name().trim());
         }
+        if (req.jobTitle() != null) {
+            user.setJobTitle(normalizeJobTitle(req.jobTitle(), user.getRole()));
+        }
         if (req.newPassword() != null && !req.newPassword().isBlank()) {
             if (req.currentPassword() == null || !passwordEncoder.matches(req.currentPassword(), user.getPasswordHash())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha atual incorreta");
@@ -61,11 +64,13 @@ public class UserController {
         if (userRepository.existsByEmail(req.email())) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email já cadastrado");
         }
+        Role role = req.role() != null ? req.role() : Role.TECHNICIAN;
         User user = User.builder()
-                .name(req.name())
-                .email(req.email())
+                .name(req.name().trim())
+                .email(req.email().trim())
                 .passwordHash(passwordEncoder.encode(req.password()))
-                .role(req.role() != null ? req.role() : Role.TECHNICIAN)
+                .role(role)
+                .jobTitle(normalizeJobTitle(req.jobTitle(), role))
                 .active(true)
                 .build();
         return ResponseEntity.status(HttpStatus.CREATED).body(UserSummary.from(userRepository.save(user)));
@@ -78,6 +83,7 @@ public class UserController {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
         if (req.name() != null && !req.name().isBlank()) user.setName(req.name().trim());
         if (req.role() != null) user.setRole(req.role());
+        if (req.jobTitle() != null) user.setJobTitle(normalizeJobTitle(req.jobTitle(), user.getRole()));
         if (req.active() != null) user.setActive(req.active());
         if (req.password() != null && !req.password().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(req.password()));
@@ -93,22 +99,28 @@ public class UserController {
         return ResponseEntity.noContent().build();
     }
 
-    // ── Records ────────────────────────────────────────────────────────────────
-
-    public record UserSummary(UUID id, String name, String email, Role role, boolean active) {
-        public static UserSummary from(User u) {
-            return new UserSummary(u.getId(), u.getName(), u.getEmail(), u.getRole(), u.isActive());
+    public static String normalizeJobTitle(String jobTitle, Role role) {
+        if (jobTitle == null || jobTitle.isBlank()) {
+            return role == Role.ADMIN ? "Administrador(a)" : "Técnico(a)";
         }
+        return jobTitle.trim();
     }
 
-    public record UpdateProfileRequest(String name, String currentPassword, String newPassword) {}
+    // ── Records ────────────────────────────────────────────────────────────────
+
+    public record UpdateProfileRequest(String name, String jobTitle, String currentPassword, String newPassword) {}
 
     public record CreateUserRequest(
             @NotBlank String name,
             @NotBlank @Email String email,
             @NotBlank String password,
-            Role role
-    ) {}
+            Role role,
+            String jobTitle
+    ) {
+        public CreateUserRequest(String name, String email, String password, Role role) {
+            this(name, email, password, role, null);
+        }
+    }
 
-    public record UpdateUserRequest(String name, Role role, Boolean active, String password) {}
+    public record UpdateUserRequest(String name, Role role, String jobTitle, Boolean active, String password) {}
 }

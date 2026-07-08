@@ -1,6 +1,7 @@
 package br.com.nexusit.support;
 
 import br.com.nexusit.glpi.GlpiService;
+import br.com.nexusit.user.Role;
 import br.com.nexusit.user.User;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import jakarta.persistence.EntityNotFoundException;
@@ -8,10 +9,13 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -56,26 +60,69 @@ public class SupportService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Este atendimento já foi assumido por outro técnico");
         }
         SupportConversation conversation = getOrThrow(id);
-        String text = "👨‍💻 O técnico " + user.getName() + " irá atendê-lo agora. A partir deste momento, você está em atendimento direto.";
+        String title = supportTitle(user);
+        String text = "👨‍💻 " + title + " " + user.getName() + " irá atendê-lo agora. A partir deste momento, você está em atendimento direto.";
         recordMessage(conversation, MessageDirection.OUT, MessageAuthor.HERMES, "Hermes", text);
         evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), text);
         stateStore.save(conversation);
         if (conversation.getGlpiTicketId() != null) {
-            glpiService.addFollowup(conversation.getGlpiTicketId(), "[NexusIT] Atendimento assumido por " + user.getName());
+            glpiService.addFollowup(conversation.getGlpiTicketId(), "[NexusIT] Atendimento assumido por " + title + " " + user.getName());
         }
         return getDetail(id);
     }
 
     @Transactional
     public SupportConversationDetail reply(UUID id, User user, String message) {
+        return reply(id, user, message, null);
+    }
+
+    @Transactional
+    public SupportConversationDetail reply(UUID id, User user, String message, MultipartFile file) {
         SupportConversation conversation = getOrThrow(id);
         if (conversation.getState() != ConversationState.HUMAN_ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Este atendimento não está mais ativo");
         }
-        recordMessage(conversation, MessageDirection.OUT, MessageAuthor.TECH, user.getName(), message);
-        evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), "Consultor(a) " + user.getName() + ": " + message);
+
+        String cleanMessage = message == null ? "" : message.trim();
+        byte[] bytes = null;
+        String filename = null;
+        String mime = null;
+        String kind = null;
+        if (file != null && !file.isEmpty()) {
+            try {
+                bytes = file.getBytes();
+            } catch (IOException e) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Não foi possível ler o anexo");
+            }
+            filename = safeFilename(file.getOriginalFilename(), file.getContentType());
+            mime = file.getContentType() == null || file.getContentType().isBlank() ? "application/octet-stream" : file.getContentType();
+            kind = mediaKind(mime);
+        }
+        if (cleanMessage.isBlank() && (bytes == null || bytes.length == 0)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma mensagem ou anexe uma mídia");
+        }
+
+        recordMessage(conversation, MessageDirection.OUT, MessageAuthor.TECH, user.getName(), cleanMessage, bytes, filename, mime, kind, null);
+
+        String signedText = signedMessage(user, cleanMessage);
+        if (bytes != null && bytes.length > 0) {
+            // Áudio geralmente não mostra caption no WhatsApp; quando houver texto junto, envie o texto antes.
+            if ("audio".equals(kind) && !cleanMessage.isBlank()) {
+                evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), signedText);
+                evolutionApiClient.sendMedia(conversation.getContact().getPhoneNumber(), bytes, filename, mime, "");
+            } else {
+                evolutionApiClient.sendMedia(conversation.getContact().getPhoneNumber(), bytes, filename, mime, cleanMessage.isBlank() ? signedHeader(user) : signedText);
+            }
+        } else {
+            evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), signedText);
+        }
+
         if (conversation.getGlpiTicketId() != null) {
-            glpiService.addFollowup(conversation.getGlpiTicketId(), "[" + user.getName() + "] " + message);
+            String followup = "[" + supportTitle(user) + " " + user.getName() + "]" + (cleanMessage.isBlank() ? " Enviou anexo." : " " + cleanMessage);
+            glpiService.addFollowup(conversation.getGlpiTicketId(), followup);
+            if (bytes != null && bytes.length > 0) {
+                glpiService.uploadDocumentToTicket(conversation.getGlpiTicketId(), bytes, filename, mime);
+            }
         }
         return getDetail(id);
     }
@@ -101,14 +148,58 @@ public class SupportService {
                 .orElseThrow(() -> new EntityNotFoundException("Atendimento não encontrado"));
     }
 
+    private String signedHeader(User user) {
+        return "*" + supportTitle(user) + " " + user.getName() + ":*";
+    }
+
+    private String signedMessage(User user, String message) {
+        return signedHeader(user) + (message == null || message.isBlank() ? "" : " " + message.trim());
+    }
+
+    private String supportTitle(User user) {
+        if (user.getJobTitle() != null && !user.getJobTitle().isBlank()) return user.getJobTitle().trim();
+        return user.getRole() == Role.ADMIN ? "Administrador(a)" : "Técnico(a)";
+    }
+
+    private String mediaKind(String mime) {
+        String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
+        if (m.startsWith("image/")) return "image";
+        if (m.startsWith("video/")) return "video";
+        if (m.startsWith("audio/")) return "audio";
+        return "document";
+    }
+
+    private String safeFilename(String original, String mime) {
+        if (original != null && !original.isBlank()) {
+            return original.replaceAll("[\\r\\n\\t]", "_");
+        }
+        return switch (mediaKind(mime)) {
+            case "image" -> "imagem.png";
+            case "video" -> "video.mp4";
+            case "audio" -> "audio.webm";
+            default -> "documento";
+        };
+    }
+
     private void recordMessage(SupportConversation conversation, MessageDirection direction, MessageAuthor author,
                                 String authorName, String content) {
+        recordMessage(conversation, direction, author, authorName, content, null, null, null, null, null);
+    }
+
+    private void recordMessage(SupportConversation conversation, MessageDirection direction, MessageAuthor author,
+                                String authorName, String content, byte[] mediaBytes, String mediaFilename,
+                                String mediaMime, String mediaKind, String transcription) {
         messageRepo.save(SupportMessage.builder()
                 .conversation(conversation)
                 .direction(direction)
                 .author(author)
                 .authorName(authorName)
                 .content(content)
+                .mediaBytes(mediaBytes)
+                .mediaFilename(mediaFilename)
+                .mediaMime(mediaMime)
+                .mediaKind(mediaKind)
+                .transcription(transcription)
                 .build());
     }
 }

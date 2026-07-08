@@ -6,7 +6,7 @@ import Layout from '../components/Layout'
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth()
-  const [nameForm, setNameForm] = useState({ name: user?.name ?? '' })
+  const [nameForm, setNameForm] = useState({ name: user?.name ?? '', jobTitle: user?.jobTitle ?? (user?.role === 'ADMIN' ? 'Administrador(a)' : 'Técnico(a)') })
   const [passForm, setPassForm] = useState({ currentPassword: '', newPassword: '', confirmPassword: '' })
   const [nameSaving, setNameSaving] = useState(false)
   const [passSaving, setPassSaving] = useState(false)
@@ -18,9 +18,9 @@ export default function ProfilePage() {
     if (!nameForm.name.trim()) return
     setNameSaving(true); setNameMsg(null)
     try {
-      const { data } = await updateProfile({ name: nameForm.name.trim() })
-      updateUser({ name: data.name })
-      setNameMsg({ ok: true, text: 'Nome atualizado com sucesso.' })
+      const { data } = await updateProfile({ name: nameForm.name.trim(), jobTitle: nameForm.jobTitle.trim() })
+      updateUser({ name: data.name, jobTitle: data.jobTitle })
+      setNameMsg({ ok: true, text: 'Perfil atualizado com sucesso.' })
     } catch { setNameMsg({ ok: false, text: 'Erro ao atualizar nome.' }) }
     finally { setNameSaving(false) }
   }
@@ -63,6 +63,7 @@ export default function ProfilePage() {
           <div>
             <p style={{ fontSize: 16, fontWeight: 700, color: 'var(--text-primary)' }}>{user?.name}</p>
             <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginTop: 2 }}>{user?.email}</p>
+            <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 2 }}>{user?.jobTitle || (user?.role === 'ADMIN' ? 'Administrador(a)' : 'Técnico(a)')}</p>
             <span className={user?.role === 'ADMIN' ? 'badge badge-purple' : 'badge badge-blue'} style={{ marginTop: 6, display: 'inline-flex' }}>
               {user?.role === 'ADMIN' ? 'Administrador' : 'Técnico'}
             </span>
@@ -71,18 +72,23 @@ export default function ProfilePage() {
 
         {/* Name */}
         <div className="card" style={{ padding: '20px 22px', marginBottom: 14 }}>
-          <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Atualizar nome de exibição</p>
+          <p style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--text-primary)', marginBottom: 16 }}>Atualizar perfil de atendimento</p>
           <form onSubmit={handleNameSave} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
             <div>
               <label className="input-label">Nome completo</label>
-              <input type="text" value={nameForm.name} onChange={e => setNameForm({ name: e.target.value })} className="input" />
+              <input type="text" value={nameForm.name} onChange={e => setNameForm(f => ({ ...f, name: e.target.value }))} className="input" />
+            </div>
+            <div>
+              <label className="input-label">Cargo usado no WhatsApp</label>
+              <input type="text" value={nameForm.jobTitle} onChange={e => setNameForm(f => ({ ...f, jobTitle: e.target.value }))} placeholder="Ex.: Técnico(a), Consultor(a), Supervisor(a)" className="input" />
+              <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 4 }}>Assinatura: *{nameForm.jobTitle || 'Técnico(a)'} {nameForm.name || 'Nome'}:*</p>
             </div>
             {nameMsg && (
               <p style={{ fontSize: 13, color: nameMsg.ok ? 'var(--green)' : 'var(--red)' }}>{nameMsg.text}</p>
             )}
             <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <button type="submit" disabled={nameSaving || !nameForm.name.trim()} className="btn btn-primary">
-                {nameSaving ? 'Salvando...' : 'Salvar nome'}
+              <button type="submit" disabled={nameSaving || !nameForm.name.trim() || !nameForm.jobTitle.trim()} className="btn btn-primary">
+                {nameSaving ? 'Salvando...' : 'Salvar perfil'}
               </button>
             </div>
           </form>

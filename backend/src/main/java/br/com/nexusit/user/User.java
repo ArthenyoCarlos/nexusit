@@ -39,6 +39,9 @@ public class User implements UserDetails {
     @Column(columnDefinition = "user_role")
     private Role role;
 
+    @Column(name = "job_title", length = 120)
+    private String jobTitle;
+
     @Column(nullable = false)
     private boolean active;
 

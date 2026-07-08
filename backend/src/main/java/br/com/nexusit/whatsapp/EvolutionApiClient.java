@@ -18,6 +18,7 @@ import java.io.IOException;
 import java.net.HttpURLConnection;
 import java.security.SecureRandom;
 import java.security.cert.X509Certificate;
+import java.util.Base64;
 import java.util.Locale;
 import java.util.Map;
 
@@ -54,6 +55,52 @@ public class EvolutionApiClient {
         } catch (Exception e) {
             log.warn("Falha ao enviar mensagem WhatsApp para {}: {}", phoneNumber, e.toString());
         }
+    }
+
+    /** Best-effort media send through Evolution API v2 sendMedia endpoint. */
+    public void sendMedia(String phoneNumber, byte[] bytes, String filename, String mime, String caption) {
+        if (!props.isConfigured()) {
+            log.warn("Evolution API não configurada — mídia para {} não enviada", phoneNumber);
+            return;
+        }
+        if (bytes == null || bytes.length == 0) return;
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_JSON);
+            headers.set("apikey", props.getApiKey());
+            String safeMime = mime == null || mime.isBlank() ? "application/octet-stream" : mime;
+            String safeFilename = filename == null || filename.isBlank() ? defaultFilename(safeMime) : filename;
+            Map<String, Object> body = Map.of(
+                    "number", phoneNumber,
+                    "mediatype", mediaType(safeMime),
+                    "mimetype", safeMime,
+                    "caption", caption == null ? "" : caption,
+                    "media", Base64.getEncoder().encodeToString(bytes),
+                    "fileName", safeFilename
+            );
+            restTemplate.exchange(
+                    props.getBaseUrl() + "/message/sendMedia/" + props.getInstanceName(),
+                    HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+        } catch (Exception e) {
+            log.warn("Falha ao enviar mídia WhatsApp para {}: {}", phoneNumber, e.toString());
+        }
+    }
+
+    private String mediaType(String mime) {
+        String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
+        if (m.startsWith("image/")) return "image";
+        if (m.startsWith("video/")) return "video";
+        if (m.startsWith("audio/")) return "audio";
+        return "document";
+    }
+
+    private String defaultFilename(String mime) {
+        return switch (mediaType(mime)) {
+            case "image" -> "imagem.png";
+            case "video" -> "video.mp4";
+            case "audio" -> "audio.ogg";
+            default -> "documento";
+        };
     }
 
     private SimpleClientHttpRequestFactory createRequestFactory() {

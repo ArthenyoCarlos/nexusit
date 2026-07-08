@@ -9,6 +9,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
@@ -48,10 +49,18 @@ public class SupportController {
         return service.claim(id, user);
     }
 
-    @PostMapping("/{id}/reply")
+    @PostMapping(value = "/{id}/reply", consumes = MediaType.APPLICATION_JSON_VALUE)
     public SupportConversationDetail reply(@PathVariable UUID id, @Valid @RequestBody ReplyRequest req,
                                             @AuthenticationPrincipal User user) {
         return service.reply(id, user, req.message());
+    }
+
+    @PostMapping(value = "/{id}/reply", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public SupportConversationDetail replyWithAttachment(@PathVariable UUID id,
+                                                         @RequestPart(value = "message", required = false) String message,
+                                                         @RequestPart(value = "file", required = false) MultipartFile file,
+                                                         @AuthenticationPrincipal User user) {
+        return service.reply(id, user, message, file);
     }
 
     @PostMapping("/{id}/close")

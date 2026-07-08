@@ -17,6 +17,13 @@ function timeAgo(iso) {
   return `${Math.floor(diff / 3600)}h atrás`
 }
 
+function formatBytes(bytes) {
+  if (!bytes) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 function MediaAttachment({ message }) {
   const [url, setUrl] = useState(null)
   const [error, setError] = useState(false)
@@ -161,9 +168,14 @@ export default function SupportCrmPage() {
   const [detail, setDetail] = useState(null)
   const [claimingId, setClaimingId] = useState(null)
   const [message, setMessage] = useState('')
+  const [selectedFile, setSelectedFile] = useState(null)
+  const [recording, setRecording] = useState(false)
   const [sending, setSending] = useState(false)
   const [closing, setClosing] = useState(false)
   const threadEndRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
 
   const loadLists = useCallback(async () => {
     const [q, m] = await Promise.all([getQueue(), getMine()])
@@ -208,12 +220,42 @@ export default function SupportCrmPage() {
 
   const handleSend = async (e) => {
     e.preventDefault()
-    if (!message.trim() || !selectedId) return
+    if ((!message.trim() && !selectedFile) || !selectedId) return
     setSending(true)
     try {
-      setDetail(await replyToConversation(selectedId, message.trim()))
+      setDetail(await replyToConversation(selectedId, message.trim(), selectedFile))
       setMessage('')
+      setSelectedFile(null)
+      if (fileInputRef.current) fileInputRef.current.value = ''
     } finally { setSending(false) }
+  }
+
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data?.size) audioChunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        stream.getTracks().forEach(track => track.stop())
+        const type = recorder.mimeType || 'audio/webm'
+        const blob = new Blob(audioChunksRef.current, { type })
+        const ext = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm'
+        setSelectedFile(new File([blob], `audio-tecnico-${Date.now()}.${ext}`, { type }))
+        setRecording(false)
+      }
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setRecording(true)
+    } catch {
+      toast.add('Não foi possível acessar o microfone neste navegador.', 'error')
+    }
+  }
+
+  const stopRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (recorder && recorder.state !== 'inactive') recorder.stop()
+    else setRecording(false)
   }
 
   const handleClose = async () => {
@@ -329,15 +371,37 @@ export default function SupportCrmPage() {
                   <div ref={threadEndRef} />
                 </div>
 
-                <form onSubmit={handleSend} style={{ display: 'flex', gap: 8, padding: '12px 18px', borderTop: '1px solid var(--border-muted)' }}>
-                  <input
-                    value={message}
-                    onChange={e => setMessage(e.target.value)}
-                    disabled={!isMine}
-                    placeholder={isMine ? 'Escreva uma resposta...' : conversation.state === 'HUMAN_ACTIVE' ? 'Atendido por outro técnico' : 'Atendimento não está ativo'}
-                    className="input" style={{ flex: 1 }}
-                  />
-                  <button type="submit" disabled={!isMine || sending || !message.trim()} className="btn btn-primary">{sending ? 'Enviando...' : 'Enviar'}</button>
+                <form onSubmit={handleSend} style={{ padding: '12px 18px', borderTop: '1px solid var(--border-muted)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {selectedFile && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--bg-muted)', border: '1px solid var(--border-muted)' }}>
+                      <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>📎 {selectedFile.name} · {formatBytes(selectedFile.size)}</span>
+                      <button type="button" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="btn btn-default btn-sm">Remover</button>
+                    </div>
+                  )}
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <input
+                      value={message}
+                      onChange={e => setMessage(e.target.value)}
+                      disabled={!isMine}
+                      placeholder={isMine ? 'Escreva uma resposta ou anexe algo...' : conversation.state === 'HUMAN_ACTIVE' ? 'Atendido por outro técnico' : 'Atendimento não está ativo'}
+                      className="input" style={{ flex: 1 }}
+                    />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip,.rar"
+                      disabled={!isMine || sending || recording}
+                      onChange={e => setSelectedFile(e.target.files?.[0] ?? null)}
+                      style={{ display: 'none' }}
+                    />
+                    <button type="button" disabled={!isMine || sending || recording} onClick={() => fileInputRef.current?.click()} className="btn btn-default">Anexar</button>
+                    {recording ? (
+                      <button type="button" onClick={stopRecording} className="btn btn-danger">Parar áudio</button>
+                    ) : (
+                      <button type="button" disabled={!isMine || sending || selectedFile} onClick={startRecording} className="btn btn-default">Gravar áudio</button>
+                    )}
+                    <button type="submit" disabled={!isMine || sending || recording || (!message.trim() && !selectedFile)} className="btn btn-primary">{sending ? 'Enviando...' : 'Enviar'}</button>
+                  </div>
                 </form>
               </>
             )}

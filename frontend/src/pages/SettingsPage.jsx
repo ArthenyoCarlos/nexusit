@@ -11,7 +11,7 @@ const REFRESH_OPTIONS = [
   { label: '2 min', value: 120 },
   { label: '5 min', value: 300 },
 ]
-const EMPTY_FORM = { name: '', email: '', password: '', role: 'TECHNICIAN' }
+const EMPTY_FORM = { name: '', email: '', password: '', role: 'TECHNICIAN', jobTitle: 'Técnico(a)' }
 
 export default function SettingsPage() {
   const { user: me } = useAuth()
@@ -35,15 +35,15 @@ export default function SettingsPage() {
 
   function handleRefreshChange(v) { setRefreshInterval(v); localStorage.setItem(REFRESH_KEY, String(v)) }
   function openCreate() { setEditingUser(null); setForm(EMPTY_FORM); setError(null); setModalOpen(true) }
-  function openEdit(u) { setEditingUser(u); setForm({ name: u.name, email: u.email, password: '', role: u.role }); setError(null); setModalOpen(true) }
+  function openEdit(u) { setEditingUser(u); setForm({ name: u.name, email: u.email, password: '', role: u.role, jobTitle: u.jobTitle || (u.role === 'ADMIN' ? 'Administrador(a)' : 'Técnico(a)') }); setError(null); setModalOpen(true) }
 
   async function handleSave() {
     setSaving(true); setError(null)
     try {
       if (editingUser) {
-        await updateUser(editingUser.id, { name: form.name, role: form.role, active: editingUser.active, password: form.password || undefined })
+        await updateUser(editingUser.id, { name: form.name, role: form.role, jobTitle: form.jobTitle, active: editingUser.active, password: form.password || undefined })
       } else {
-        await createUser({ name: form.name, email: form.email, password: form.password, role: form.role })
+        await createUser({ name: form.name, email: form.email, password: form.password, role: form.role, jobTitle: form.jobTitle })
       }
       setModalOpen(false); loadUsers()
     } catch (err) { setError(err?.response?.data?.message ?? 'Erro ao salvar.') }
@@ -123,6 +123,7 @@ export default function SettingsPage() {
                     <th>Usuário</th>
                     <th>Email</th>
                     <th>Perfil</th>
+                    <th>Cargo</th>
                     <th>Status</th>
                     <th>Ações</th>
                   </tr>
@@ -144,6 +145,7 @@ export default function SettingsPage() {
                           {u.role === 'ADMIN' ? 'Admin' : 'Técnico'}
                         </span>
                       </td>
+                      <td className="muted">{u.jobTitle || (u.role === 'ADMIN' ? 'Administrador(a)' : 'Técnico(a)')}</td>
                       <td>
                         <span className={u.active ? 'badge badge-green' : 'badge badge-red'}>
                           {u.active ? 'Ativo' : 'Inativo'}
@@ -187,10 +189,15 @@ export default function SettingsPage() {
           </div>
           <div>
             <label className="input-label">Perfil</label>
-            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value }))} className="input">
+            <select value={form.role} onChange={e => setForm(f => ({ ...f, role: e.target.value, jobTitle: f.jobTitle || (e.target.value === 'ADMIN' ? 'Administrador(a)' : 'Técnico(a)') }))} className="input">
               <option value="TECHNICIAN">Técnico</option>
               <option value="ADMIN">Administrador</option>
             </select>
+          </div>
+          <div>
+            <label className="input-label">Cargo usado no WhatsApp</label>
+            <input type="text" value={form.jobTitle} onChange={e => setForm(f => ({ ...f, jobTitle: e.target.value }))} placeholder="Ex.: Técnico(a), Consultor(a), Supervisor(a)" className="input" />
+            <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 4 }}>A assinatura enviada ao cliente ficará em negrito, ex.: *{form.jobTitle || 'Técnico(a)'} {form.name || 'Nome'}:*</p>
           </div>
           {error && <p style={{ fontSize: 13, color: 'var(--red)' }}>{error}</p>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
