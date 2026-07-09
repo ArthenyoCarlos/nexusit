@@ -1,0 +1,8 @@
+{
+  "appId": "br.com.nexusit.support",
+  "appName": "NexusIT Suporte",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

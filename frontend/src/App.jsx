@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { AuthProvider } from './contexts/AuthContext'
 import { ToastProvider } from './contexts/ToastContext'
@@ -41,6 +42,8 @@ import TermoTemplatePage from './pages/TermoTemplatePage'
 import HermesPage from './pages/HermesPage'
 import ProtectedRoute from './components/ProtectedRoute'
 
+const isNative = Capacitor.isNativePlatform()
+
 export default function App() {
   return (
     <ThemeProvider>
@@ -50,48 +53,59 @@ export default function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />
-            <Route path="/dashboard/tv" element={<TvDashboardPage />} />
 
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/dashboard"  element={<DashboardPage />} />
-              <Route path="/dashboard/executive" element={<ExecutiveDashboardPage />} />
-              <Route path="/hermes"     element={<HermesPage />} />
-              <Route path="/monitoring" element={<MonitoringPage />} />
-              <Route path="/systems"        element={<SystemsPage />} />
-              <Route path="/dependency-map" element={<DependencyMapPage />} />
-              <Route path="/systems/:id"   element={<SystemDetailPage />} />
-              <Route path="/inventory"     element={<InventoryPage />} />
-              <Route path="/inventory/:id" element={<InventoryDetailPage />} />
-              <Route path="/tickets"    element={<TicketsPage />} />
-              <Route path="/notes"      element={<NotesPage />} />
-              <Route path="/planning"   element={<PlanningPage />} />
-              <Route path="/network"    element={<NetworkDocsPage />} />
-              <Route path="/profile"    element={<ProfilePage />} />
-              <Route path="/settings"        element={<SettingsPage />} />
-              <Route path="/vault"           element={<VaultPage />} />
-              <Route path="/ssh-console"     element={<SshConsolePage />} />
-              <Route path="/support-crm"     element={<SupportCrmPage />} />
-              <Route path="/team-tracking"   element={<TeamTrackingPage />} />
-              <Route path="/licenses"        element={<LicensesPage />} />
-              <Route path="/onboarding"           element={<OnboardingPage />} />
-              <Route path="/onboarding/templates" element={<OnboardingTemplatesPage />} />
-              <Route path="/onboarding/:id"       element={<OnboardingDetailPage />} />
-              <Route path="/url-monitor"          element={<UrlMonitorPage />} />
-              <Route path="/contracts"            element={<ContractsPage />} />
-              <Route path="/wiki"                 element={<WikiPage />} />
-              <Route path="/wiki/:id"             element={<WikiArticlePage />} />
-              <Route path="/maintenance-schedule" element={<MaintenanceSchedulePage />} />
-              <Route path="/financial"            element={<FinancialPage />} />
-              <Route path="/termos"               element={<TermosPage />} />
-              <Route path="/termos/novo"          element={<TermoNovoPage />} />
-              <Route path="/termos/template"      element={<TermoTemplatePage />} />
-              <Route path="/termos/:id"           element={<TermoDetalhePage />} />
-              <Route path="/termos/:id/assinar"   element={<TermoAssinarPage />} />
-              <Route path="/"               element={<Navigate to="/dashboard" replace />} />
-            </Route>
+            {isNative ? (
+              // App mobile: só o CRM de Suporte, sem o restante do NexusIT.
+              <Route element={<ProtectedRoute />}>
+                <Route path="/support-crm" element={<SupportCrmPage />} />
+                <Route path="*" element={<Navigate to="/support-crm" replace />} />
+              </Route>
+            ) : (
+              <>
+                <Route path="/dashboard/tv" element={<TvDashboardPage />} />
 
-            <Route path="*" element={<NotFoundPage />} />
+                {/* Protected routes */}
+                <Route element={<ProtectedRoute />}>
+                  <Route path="/dashboard"  element={<DashboardPage />} />
+                  <Route path="/dashboard/executive" element={<ExecutiveDashboardPage />} />
+                  <Route path="/hermes"     element={<HermesPage />} />
+                  <Route path="/monitoring" element={<MonitoringPage />} />
+                  <Route path="/systems"        element={<SystemsPage />} />
+                  <Route path="/dependency-map" element={<DependencyMapPage />} />
+                  <Route path="/systems/:id"   element={<SystemDetailPage />} />
+                  <Route path="/inventory"     element={<InventoryPage />} />
+                  <Route path="/inventory/:id" element={<InventoryDetailPage />} />
+                  <Route path="/tickets"    element={<TicketsPage />} />
+                  <Route path="/notes"      element={<NotesPage />} />
+                  <Route path="/planning"   element={<PlanningPage />} />
+                  <Route path="/network"    element={<NetworkDocsPage />} />
+                  <Route path="/profile"    element={<ProfilePage />} />
+                  <Route path="/settings"        element={<SettingsPage />} />
+                  <Route path="/vault"           element={<VaultPage />} />
+                  <Route path="/ssh-console"     element={<SshConsolePage />} />
+                  <Route path="/support-crm"     element={<SupportCrmPage />} />
+                  <Route path="/team-tracking"   element={<TeamTrackingPage />} />
+                  <Route path="/licenses"        element={<LicensesPage />} />
+                  <Route path="/onboarding"           element={<OnboardingPage />} />
+                  <Route path="/onboarding/templates" element={<OnboardingTemplatesPage />} />
+                  <Route path="/onboarding/:id"       element={<OnboardingDetailPage />} />
+                  <Route path="/url-monitor"          element={<UrlMonitorPage />} />
+                  <Route path="/contracts"            element={<ContractsPage />} />
+                  <Route path="/wiki"                 element={<WikiPage />} />
+                  <Route path="/wiki/:id"             element={<WikiArticlePage />} />
+                  <Route path="/maintenance-schedule" element={<MaintenanceSchedulePage />} />
+                  <Route path="/financial"            element={<FinancialPage />} />
+                  <Route path="/termos"               element={<TermosPage />} />
+                  <Route path="/termos/novo"          element={<TermoNovoPage />} />
+                  <Route path="/termos/template"      element={<TermoTemplatePage />} />
+                  <Route path="/termos/:id"           element={<TermoDetalhePage />} />
+                  <Route path="/termos/:id/assinar"   element={<TermoAssinarPage />} />
+                  <Route path="/"               element={<Navigate to="/dashboard" replace />} />
+                </Route>
+
+                <Route path="*" element={<NotFoundPage />} />
+              </>
+            )}
           </Routes>
         </BrowserRouter>
       </ToastProvider>

@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
+import { Capacitor } from '@capacitor/core'
 import Sidebar from './Sidebar'
 import GlobalSearch from './GlobalSearch'
 import NotificationBell from './NotificationBell'
 import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useAuth } from '../contexts/AuthContext'
 import { getProblems } from '../services/monitoring'
 import { getTickets } from '../services/glpi'
 import { getMine } from '../services/support'
@@ -18,6 +20,7 @@ function problemKey(p) {
 export default function Layout({ children }) {
   const { add: addToast } = useToast()
   const { theme, toggleTheme } = useTheme()
+  const { logout } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [isNavOpen, setIsNavOpen] = useState(false)
@@ -123,19 +126,25 @@ export default function Layout({ children }) {
     return () => clearInterval(t)
   }, [addToast, navigate])
 
+  const isNative = Capacitor.isNativePlatform()
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>
 
-      {/* Backdrop mobile */}
-      <div className={`nav-backdrop${isNavOpen ? ' open' : ''}`} onClick={() => setIsNavOpen(false)} />
+      {!isNative && (
+        <>
+          {/* Backdrop mobile */}
+          <div className={`nav-backdrop${isNavOpen ? ' open' : ''}`} onClick={() => setIsNavOpen(false)} />
 
-      {/* Sidebar fixo / drawer mobile */}
-      <div className={`app-sidebar-wrap${isNavOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 40 }}>
-        <Sidebar onNavigate={() => setIsNavOpen(false)} />
-      </div>
+          {/* Sidebar fixo / drawer mobile */}
+          <div className={`app-sidebar-wrap${isNavOpen ? ' open' : ''}`} style={{ position: 'fixed', top: 0, left: 0, height: '100vh', zIndex: 40 }}>
+            <Sidebar onNavigate={() => setIsNavOpen(false)} />
+          </div>
+        </>
+      )}
 
       {/* Conteúdo principal */}
-      <div className="app-content" style={{ flex: 1, minWidth: 0, marginLeft: 'var(--sidebar-w)', display: 'flex', flexDirection: 'column' }}>
+      <div className="app-content" style={{ flex: 1, minWidth: 0, marginLeft: isNative ? 0 : 'var(--sidebar-w)', display: 'flex', flexDirection: 'column' }}>
 
         {/* Topbar */}
         <header style={{
@@ -148,23 +157,27 @@ export default function Layout({ children }) {
           height: 54,
           display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10,
         }}>
-          <button
-            className="mobile-nav-toggle"
-            onClick={() => setIsNavOpen(o => !o)}
-            aria-label="Abrir menu"
-            style={{
-              alignItems: 'center', justifyContent: 'center',
-              width: 34, height: 34, borderRadius: 'var(--r-md)',
-              border: '1px solid var(--border)', background: 'var(--bg-surface)',
-              color: 'var(--text-secondary)', cursor: 'pointer',
-            }}
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
-          </button>
+          {isNative ? (
+            <p style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-primary)', fontFamily: 'var(--font-mono)' }}>NexusIT Suporte</p>
+          ) : (
+            <button
+              className="mobile-nav-toggle"
+              onClick={() => setIsNavOpen(o => !o)}
+              aria-label="Abrir menu"
+              style={{
+                alignItems: 'center', justifyContent: 'center',
+                width: 34, height: 34, borderRadius: 'var(--r-md)',
+                border: '1px solid var(--border)', background: 'var(--bg-surface)',
+                color: 'var(--text-secondary)', cursor: 'pointer',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+            </button>
+          )}
 
           <div style={{ flex: 1 }} />
 
-          <GlobalSearch />
+          {!isNative && <GlobalSearch />}
 
           <button
             onClick={toggleTheme}
@@ -185,6 +198,22 @@ export default function Layout({ children }) {
           </button>
 
           <NotificationBell />
+
+          {isNative && (
+            <button
+              onClick={logout}
+              aria-label="Sair"
+              title="Sair"
+              style={{
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                width: 34, height: 34, borderRadius: 'var(--r-md)', flexShrink: 0,
+                border: '1px solid var(--border)', background: 'var(--bg-surface)',
+                color: 'var(--text-secondary)', cursor: 'pointer',
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+            </button>
+          )}
         </header>
 
         <main style={{ flex: 1 }}>

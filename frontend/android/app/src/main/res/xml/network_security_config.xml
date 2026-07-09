@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- nexus.local usa certificado mkcert (autoassinado) -- Android não confia nele
+         por padrão, então fixamos explicitamente esse certificado como confiável.
+         Se o certificado for renovado (validade atual até 08/10/2028), é preciso
+         atualizar este arquivo com o novo .pem e recompilar o app. -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="false">nexus.local</domain>
+        <trust-anchors>
+            <certificates src="@raw/nexus_local_ca" />
+        </trust-anchors>
+    </domain-config>
+</network-security-config>
