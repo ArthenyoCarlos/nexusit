@@ -1,0 +1,11 @@
+# Maven build output
+backend/target/
+
+# IDE
+.idea
+*.iml
+.vscode/*
+!.vscode/extensions.json
+
+# OS
+.DS_Store
