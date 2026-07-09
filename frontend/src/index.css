@@ -768,6 +768,165 @@ select.input {
 .alert-blue   { background: var(--accent-light); border-color: var(--accent-ring); color: var(--accent-text); }
 .alert-green  { background: var(--green-bg); border-color: var(--green-border); color: var(--green); }
 
+/* ── Support CRM responsive chat layout ───────────────────── */
+.support-crm-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 340px) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+.support-crm-lists {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.support-thread-card {
+  display: flex;
+  flex-direction: column;
+  height: 75vh;
+  min-height: 560px;
+  overflow: hidden;
+}
+.support-thread-header-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--border-muted);
+}
+.support-thread-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.support-thread-tech-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+.support-thread-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+.support-message-row {
+  display: flex;
+  min-width: 0;
+}
+.support-message-row.is-tech { justify-content: flex-end; }
+.support-message-row.is-customer { justify-content: flex-start; }
+.support-message-row > div {
+  max-width: 75%;
+  overflow-wrap: anywhere;
+}
+.support-media-image {
+  display: block;
+  max-width: min(320px, 100%);
+  max-height: 300px;
+  width: 100%;
+  object-fit: contain;
+  background: rgba(255,255,255,.04);
+}
+.support-media-video {
+  display: block;
+  max-width: 420px;
+  width: 100%;
+  border-radius: 8px;
+}
+.support-reply-form {
+  padding: 12px 18px;
+  border-top: 1px solid var(--border-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.support-selected-file {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bg-muted);
+  border: 1px solid var(--border-muted);
+  min-width: 0;
+}
+.support-selected-file span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.support-composer-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.support-composer-input { flex: 1; min-width: 160px; }
+
+@media (max-width: 1180px) {
+  .support-crm-grid { grid-template-columns: minmax(250px, 300px) minmax(0, 1fr); }
+  .support-message-row > div { max-width: 82%; }
+  .support-composer-row { flex-wrap: wrap; }
+  .support-composer-input { flex: 1 1 100%; }
+  .support-composer-action { flex: 1 1 150px; }
+  .support-composer-send { flex: 1 1 120px; }
+}
+
+@media (max-width: 900px) {
+  .support-crm-grid { grid-template-columns: 1fr; }
+  .support-crm-lists {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .support-thread-card {
+    height: calc(100dvh - 240px);
+    min-height: 520px;
+  }
+}
+
+@media (max-width: 620px) {
+  .support-crm-lists { grid-template-columns: 1fr; }
+  .support-thread-card {
+    height: calc(100dvh - 150px);
+    min-height: 520px;
+    margin-left: -4px;
+    margin-right: -4px;
+    border-radius: var(--r-lg);
+  }
+  .support-thread-header-wrap { padding: 12px; }
+  .support-thread-header { align-items: stretch; flex-direction: column; }
+  .support-thread-tech-controls { flex-direction: column; align-items: stretch; }
+  .support-thread-header .btn { width: 100%; }
+  .support-thread-body { padding: 12px; gap: 8px; }
+  .support-message-row > div { max-width: 92%; }
+  .support-reply-form {
+    padding: 10px;
+    position: sticky;
+    bottom: 0;
+    background: var(--card-bg);
+  }
+  .support-composer-row { gap: 6px; }
+  .support-composer-action,
+  .support-composer-send { flex: 1 1 calc(50% - 6px); }
+  .support-selected-file { align-items: stretch; flex-direction: column; }
+  .support-selected-file .btn { width: 100%; }
+  .support-media-image { max-width: 100%; max-height: 240px; }
+}
+
+@media (max-width: 420px) {
+  .support-thread-card { height: calc(100dvh - 130px); min-height: 480px; }
+  .support-composer-action,
+  .support-composer-send { flex-basis: 100%; }
+  .support-message-row > div { max-width: 96%; }
+}
+
 /* ════════════════════════════════════════════════════════════
    RESPONSIVE / MOBILE
    ════════════════════════════════════════════════════════════ */

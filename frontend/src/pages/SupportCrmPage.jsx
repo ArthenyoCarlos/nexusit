@@ -104,7 +104,7 @@ function MediaAttachment({ message }) {
       <>
         <div style={boxStyle}>
           <button type="button" onClick={() => setPreviewOpen(true)} title="Abrir imagem" style={{ display: 'block', width: '100%', border: 0, padding: 0, cursor: 'zoom-in', background: 'transparent' }}>
-            <img src={url} alt={label} style={{ display: 'block', maxWidth: 320, maxHeight: 300, width: '100%', objectFit: 'contain', background: 'rgba(255,255,255,.04)' }} />
+            <img src={url} alt={label} className="support-media-image" />
           </button>
           <div style={actionStyle}>
             <span>{kind === 'sticker' ? 'Figurinha' : 'Imagem'} · {label}</span>
@@ -121,7 +121,7 @@ function MediaAttachment({ message }) {
     return (
       <>
         <div style={{ ...boxStyle, padding: 8 }}>
-          <video src={url} controls style={{ display: 'block', maxWidth: 420, width: '100%', borderRadius: 8 }} />
+          <video src={url} controls className="support-media-video" />
           <div style={{ ...actionStyle, paddingLeft: 0, paddingRight: 0 }}>
             <span>Vídeo · {label}</span>
             <button type="button" onClick={() => setPreviewOpen(true)} style={linkStyle}>Abrir</button>
@@ -334,10 +334,10 @@ export default function SupportCrmPage() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 340px) minmax(0, 1fr)', gap: 16, alignItems: 'start' }}>
+        <div className="support-crm-grid">
 
           {/* Lists */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className="support-crm-lists">
             <div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                 <p className="label-caps" style={{ margin: 0 }}>Fila</p>
@@ -386,13 +386,13 @@ export default function SupportCrmPage() {
           </div>
 
           {/* Thread */}
-          <div className="card" style={{ display: 'flex', flexDirection: 'column', height: '75vh' }}>
+          <div className="card support-thread-card">
             {!conversation ? (
               <div className="empty-state" style={{ margin: 'auto' }}><h3>Selecione um atendimento</h3><p>Escolha um item na fila ou em "Meus atendimentos".</p></div>
             ) : (
               <>
-                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-muted)', display: 'flex', flexDirection: 'column', gap: 10 }}>
-                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                <div className="support-thread-header-wrap">
+                  <div className="support-thread-header">
                     <div>
                       <p style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--text-primary)' }}>{conversation.contactName || conversation.contactPhone}</p>
                       <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
@@ -419,7 +419,7 @@ export default function SupportCrmPage() {
                   </div>
 
                   {canManage && (
-                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                    <div className="support-thread-tech-controls">
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <select value={addTechId} onChange={e => setAddTechId(e.target.value)} disabled={savingTech} className="input" style={{ fontSize: 12, height: 32, padding: '2px 8px' }}>
                           <option value="">+ Adicionar técnico...</option>
@@ -438,14 +438,14 @@ export default function SupportCrmPage() {
                   )}
                 </div>
 
-                <div style={{ flex: 1, overflowY: 'auto', padding: '14px 18px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                <div className="support-thread-body">
                   {detail.messages.map(m => {
                     const mine = m.author === 'TECH'
                     const system = m.author === 'HERMES'
                     return (
-                      <div key={m.id} style={{ display: 'flex', justifyContent: mine ? 'flex-end' : 'flex-start' }}>
+                      <div key={m.id} className={`support-message-row ${mine ? 'is-tech' : 'is-customer'}`}>
                         <div style={{
-                          maxWidth: '75%', padding: '8px 12px', borderRadius: 'var(--r-lg)',
+                          padding: '8px 12px', borderRadius: 'var(--r-lg)',
                           background: mine ? 'var(--accent)' : system ? 'var(--bg-muted)' : 'var(--bg-subtle)',
                           color: mine ? 'var(--text-inverse)' : 'var(--text-primary)',
                         }}>
@@ -459,20 +459,20 @@ export default function SupportCrmPage() {
                   <div ref={threadEndRef} />
                 </div>
 
-                <form onSubmit={handleSend} style={{ padding: '12px 18px', borderTop: '1px solid var(--border-muted)', display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <form onSubmit={handleSend} className="support-reply-form">
                   {selectedFile && (
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '8px 10px', borderRadius: 10, background: 'var(--bg-muted)', border: '1px solid var(--border-muted)' }}>
+                    <div className="support-selected-file">
                       <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>📎 {selectedFile.name} · {formatBytes(selectedFile.size)}</span>
                       <button type="button" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="btn btn-default btn-sm">Remover</button>
                     </div>
                   )}
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <div className="support-composer-row">
                     <input
                       value={message}
                       onChange={e => setMessage(e.target.value)}
                       disabled={!isMine}
                       placeholder={isMine ? 'Escreva uma resposta ou anexe algo...' : conversation.state === 'HUMAN_ACTIVE' ? 'Atendido por outro técnico' : 'Atendimento não está ativo'}
-                      className="input" style={{ flex: 1 }}
+                      className="input support-composer-input"
                     />
                     <input
                       ref={fileInputRef}
@@ -482,13 +482,13 @@ export default function SupportCrmPage() {
                       onChange={e => setSelectedFile(e.target.files?.[0] ?? null)}
                       style={{ display: 'none' }}
                     />
-                    <button type="button" disabled={!isMine || sending || recording} onClick={() => fileInputRef.current?.click()} className="btn btn-default">Anexar</button>
+                    <button type="button" disabled={!isMine || sending || recording} onClick={() => fileInputRef.current?.click()} className="btn btn-default support-composer-action">Anexar</button>
                     {recording ? (
-                      <button type="button" onClick={stopRecording} className="btn btn-danger">Parar áudio</button>
+                      <button type="button" onClick={stopRecording} className="btn btn-danger support-composer-action">Parar áudio</button>
                     ) : (
-                      <button type="button" disabled={!isMine || sending || selectedFile} onClick={startRecording} className="btn btn-default">Gravar áudio</button>
+                      <button type="button" disabled={!isMine || sending || selectedFile} onClick={startRecording} className="btn btn-default support-composer-action">Gravar áudio</button>
                     )}
-                    <button type="submit" disabled={!isMine || sending || recording || (!message.trim() && !selectedFile)} className="btn btn-primary">{sending ? 'Enviando...' : 'Enviar'}</button>
+                    <button type="submit" disabled={!isMine || sending || recording || (!message.trim() && !selectedFile)} className="btn btn-primary support-composer-send">{sending ? 'Enviando...' : 'Enviar'}</button>
                   </div>
                 </form>
               </>
