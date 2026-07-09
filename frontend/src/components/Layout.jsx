@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import Sidebar from './Sidebar'
 import GlobalSearch from './GlobalSearch'
 import NotificationBell from './NotificationBell'
@@ -7,7 +7,9 @@ import { useToast } from '../contexts/ToastContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { getProblems } from '../services/monitoring'
 import { getTickets } from '../services/glpi'
+import { getMine } from '../services/support'
 import { playAlertSound, unlockAlertSound } from '../utils/alertSound'
+import { requestNotificationPermission, showDesktopNotification } from '../utils/desktopNotify'
 
 function problemKey(p) {
   return String(p.id ?? p.problemid ?? p.eventid ?? `${p.hostName}:${p.name}:${p.clock}`)
@@ -17,14 +19,18 @@ export default function Layout({ children }) {
   const { add: addToast } = useToast()
   const { theme, toggleTheme } = useTheme()
   const location = useLocation()
+  const navigate = useNavigate()
   const [isNavOpen, setIsNavOpen] = useState(false)
   const prevProblemIdsRef = useRef(null)
   const prevTicketIdsRef = useRef(null)
+  const prevMessageAtRef = useRef(null)
+  const pathnameRef = useRef(location.pathname)
+  pathnameRef.current = location.pathname
 
   useEffect(() => { setIsNavOpen(false) }, [location.pathname])
 
   useEffect(() => {
-    const unlock = () => unlockAlertSound()
+    const unlock = () => { unlockAlertSound(); requestNotificationPermission() }
     window.addEventListener('pointerdown', unlock, { once: true })
     window.addEventListener('keydown', unlock, { once: true })
     return () => {
@@ -54,12 +60,22 @@ export default function Layout({ children }) {
         newProblems.forEach(p => {
           addToast(`Alerta Zabbix: ${p.name} [${p.hostName ?? 'host'}]`, 'error')
           playAlertSound(Number(p.severity))
+          showDesktopNotification('Alerta Zabbix', {
+            body: `${p.name} [${p.hostName ?? 'host'}]`,
+            tag: `zabbix-${problemKey(p)}`,
+            onClick: () => navigate('/monitoring'),
+          })
         })
 
         if (newTickets.length > 0) {
           const newest = newTickets[0]
           addToast(`Novo chamado GLPI #${newest.id}: ${newest.title ?? newest.name ?? 'sem título'}`, 'warning')
           playAlertSound(Number(newest.priority) >= 4 ? 4 : 3)
+          showDesktopNotification(`Novo chamado #${newest.id}`, {
+            body: newest.title ?? newest.name ?? 'sem título',
+            tag: `ticket-${newest.id}`,
+            onClick: () => navigate('/tickets'),
+          })
         }
 
         prevProblemIdsRef.current = new Set(currentProblems.map(problemKey))
@@ -70,6 +86,42 @@ export default function Layout({ children }) {
     const t = setInterval(poll, 60_000)
     return () => clearInterval(t)
   }, [addToast])
+
+  useEffect(() => {
+    async function pollMessages() {
+      try {
+        const conversations = await getMine()
+        const isBootstrap = prevMessageAtRef.current === null
+        const lastAtByConversation = isBootstrap ? new Map() : prevMessageAtRef.current
+
+        conversations.forEach(c => {
+          if (!c.lastMessageAt) return
+          const prevAt = lastAtByConversation.get(c.id)
+          const isNew = !isBootstrap && prevAt !== c.lastMessageAt && c.lastMessageAuthor !== 'TECH'
+          if (isNew) {
+            const from = c.contactName || c.contactPhone || 'cliente'
+            // Quando já está no CRM, a própria tela cuida do som da conversa aberta —
+            // evita tocar duas vezes para a mesma mensagem.
+            if (pathnameRef.current !== '/support-crm') {
+              addToast(`Nova mensagem de ${from}`, 'info')
+              playAlertSound(3)
+            }
+            showDesktopNotification(`Nova mensagem — ${from}`, {
+              body: c.lastMessagePreview || 'Enviou uma mensagem',
+              tag: `support-message-${c.id}`,
+              onClick: () => navigate('/support-crm'),
+            })
+          }
+          lastAtByConversation.set(c.id, c.lastMessageAt)
+        })
+
+        prevMessageAtRef.current = lastAtByConversation
+      } catch {}
+    }
+    pollMessages()
+    const t = setInterval(pollMessages, 15_000)
+    return () => clearInterval(t)
+  }, [addToast, navigate])
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>

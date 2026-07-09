@@ -41,7 +41,10 @@ public class SupportService {
     }
 
     public List<SupportConversationSummary> getMine(User user) {
-        return conversationRepo.findMine(user.getId()).stream().map(SupportConversationSummary::from).toList();
+        return conversationRepo.findMine(user.getId()).stream()
+                .map(c -> SupportConversationSummary.from(c, List.of(),
+                        messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null)))
+                .toList();
     }
 
     public SupportConversationDetail getDetail(UUID id) {

@@ -14,17 +14,25 @@ public record SupportConversationSummary(
         String claimedByName,
         List<TechnicianRef> technicians,
         LocalDateTime createdAt,
-        LocalDateTime claimedAt
+        LocalDateTime claimedAt,
+        LocalDateTime lastMessageAt,
+        String lastMessageAuthor,
+        String lastMessagePreview
 ) {
     public record TechnicianRef(UUID id, String name) {}
 
     public static SupportConversationSummary from(SupportConversation c) {
-        return from(c, List.of());
+        return from(c, List.of(), null);
     }
 
     public static SupportConversationSummary from(SupportConversation c, List<SupportConversationTechnician> extraTechnicians) {
+        return from(c, extraTechnicians, null);
+    }
+
+    public static SupportConversationSummary from(SupportConversation c, List<SupportConversationTechnician> extraTechnicians, SupportMessage lastMessage) {
         String contactName = c.getContact().getGlpiUserName() != null && !c.getContact().getGlpiUserName().isBlank()
                 ? c.getContact().getGlpiUserName() : c.getContact().getDisplayName();
+        String preview = lastMessage == null ? null : lastMessage.getContent();
         return new SupportConversationSummary(
                 c.getId(),
                 c.getContact().getPhoneNumber(),
@@ -35,7 +43,10 @@ public record SupportConversationSummary(
                 c.getClaimedBy() != null ? c.getClaimedBy().getName() : null,
                 extraTechnicians.stream().map(t -> new TechnicianRef(t.getUser().getId(), t.getUser().getName())).toList(),
                 c.getCreatedAt(),
-                c.getClaimedAt()
+                c.getClaimedAt(),
+                lastMessage != null ? lastMessage.getCreatedAt() : null,
+                lastMessage != null ? lastMessage.getAuthor().name() : null,
+                (preview != null && preview.length() > 140) ? preview.substring(0, 140) + "…" : preview
         );
     }
 }
