@@ -3,6 +3,7 @@ package br.com.nexusit.support;
 import br.com.nexusit.glpi.GlpiService;
 import br.com.nexusit.user.Role;
 import br.com.nexusit.user.User;
+import br.com.nexusit.user.UserRepository;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,6 +27,8 @@ class SupportServiceTest {
 
     @Mock SupportConversationRepository conversationRepo;
     @Mock SupportMessageRepository messageRepo;
+    @Mock SupportConversationTechnicianRepository technicianRepo;
+    @Mock UserRepository userRepo;
     @Mock GlpiService glpiService;
     @Mock EvolutionApiClient evolutionApiClient;
     @Mock BotAtendimentoTiStateStore stateStore;
@@ -34,7 +37,7 @@ class SupportServiceTest {
 
     @BeforeEach
     void setUp() {
-        service = new SupportService(conversationRepo, messageRepo, glpiService, evolutionApiClient, stateStore);
+        service = new SupportService(conversationRepo, messageRepo, technicianRepo, userRepo, glpiService, evolutionApiClient, stateStore);
         lenient().when(messageRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
     }
 

@@ -3,6 +3,7 @@ package br.com.nexusit.support;
 import br.com.nexusit.glpi.GlpiService;
 import br.com.nexusit.glpi.GlpiTicket;
 import br.com.nexusit.glpi.GlpiUserRef;
+import br.com.nexusit.push.PushNotificationService;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,16 +30,18 @@ class SupportConversationEngineTest {
     @Mock WhatsappContactRepository contactRepo;
     @Mock SupportConversationRepository conversationRepo;
     @Mock SupportMessageRepository messageRepo;
+    @Mock SupportConversationTechnicianRepository technicianRepo;
     @Mock GlpiService glpiService;
     @Mock EvolutionApiClient evolutionApiClient;
     @Mock BotAtendimentoTiStateStore stateStore;
     @Mock AudioTranscriptionService audioTranscriptionService;
+    @Mock PushNotificationService pushNotificationService;
 
     SupportConversationEngine engine;
 
     @BeforeEach
     void setUp() {
-        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, glpiService, evolutionApiClient, stateStore, audioTranscriptionService);
+        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, technicianRepo, glpiService, evolutionApiClient, stateStore, audioTranscriptionService, pushNotificationService);
         lenient().when(contactRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(conversationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(messageRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
@@ -128,7 +132,7 @@ class SupportConversationEngineTest {
         when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
         when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
         when(glpiService.getOpenTicketsForRequester(42)).thenReturn(List.of(
-                new GlpiTicket(777, "Impressora parada", 1, "Novo", 3, "Média", "Maria Silva", "", "", "", 1, "", "", "", "", 0)
+                new GlpiTicket(777, "Impressora parada", 1, "Novo", 3, "Média", 3, "Média", 3, "Médio", "", "Maria Silva", "", "", "", 1, "", "", "", "", 0)
         ));
 
         engine.onInboundMessage(textMessage("5511999999999", "2"));
@@ -226,17 +230,70 @@ class SupportConversationEngineTest {
     }
 
     @Test
-    void humanActive_neverAutoReplies_butStillLogsFollowupToGlpi() {
-        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999").build();
+    void menuExpired_closesOldConversation_startsFreshMenu_andDoesNotProcessStaleOption() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
+                .glpiUserId(42).glpiUserName("Maria Silva").build();
         SupportConversation conversation = SupportConversation.builder()
-                .id(UUID.randomUUID()).contact(contact).state(ConversationState.HUMAN_ACTIVE).glpiTicketId(777).build();
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.MENU)
+                .createdAt(LocalDateTime.now().minusHours(2)).build();
+        SupportMessage lastMessage = SupportMessage.builder()
+                .conversation(conversation).direction(MessageDirection.OUT).author(MessageAuthor.HERMES)
+                .content("menu").createdAt(LocalDateTime.now().minusMinutes(61)).build();
 
         when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
         when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(conversation.getId())).thenReturn(Optional.of(lastMessage));
 
-        engine.onInboundMessage(textMessage("5511999999999", "Ainda não foi resolvido"));
+        engine.onInboundMessage(textMessage("5511999999999", "1"));
 
+        assertEquals(ConversationState.CLOSED, conversation.getState());
+        assertNotNull(conversation.getClosedAt());
+        verify(glpiService, never()).createTicket(anyString(), anyString(), anyInt(), anyInt(), anyString());
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("expirou por inatividade"));
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("Como posso te ajudar"));
+    }
+
+    @Test
+    void awaitingDescriptionExpired_restartsMenuWithoutOpeningTicketFromLateText() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
+                .glpiUserId(42).glpiUserName("Maria Silva").build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.AWAITING_DESCRIPTION)
+                .createdAt(LocalDateTime.now().minusHours(3)).build();
+        SupportMessage lastMessage = SupportMessage.builder()
+                .conversation(conversation).direction(MessageDirection.OUT).author(MessageAuthor.HERMES)
+                .content("descreva").createdAt(LocalDateTime.now().minusHours(3)).build();
+
+        when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
+        when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(conversation.getId())).thenReturn(Optional.of(lastMessage));
+
+        engine.onInboundMessage(textMessage("5511999999999", "A impressora parou"));
+
+        assertEquals(ConversationState.CLOSED, conversation.getState());
+        verify(glpiService, never()).createTicket(anyString(), anyString(), anyInt(), anyInt(), anyString());
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("expirou por inatividade"));
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("Como posso te ajudar"));
+    }
+
+    @Test
+    void humanActiveWithinTimeout_remainsSilentAndLogsFollowup() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999").build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.HUMAN_ACTIVE).glpiTicketId(777)
+                .createdAt(LocalDateTime.now().minusDays(2)).build();
+        SupportMessage lastMessage = SupportMessage.builder()
+                .conversation(conversation).direction(MessageDirection.IN).author(MessageAuthor.EMPLOYEE)
+                .content("mensagem anterior").createdAt(LocalDateTime.now().minusDays(2)).build();
+
+        when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
+        when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(conversation.getId())).thenReturn(Optional.of(lastMessage));
+
+        engine.onInboundMessage(textMessage("5511999999999", "Ainda preciso de ajuda"));
+
+        assertEquals(ConversationState.HUMAN_ACTIVE, conversation.getState());
         verify(evolutionApiClient, never()).sendText(anyString(), anyString());
-        verify(glpiService).addFollowup(eq(777), contains("Ainda não foi resolvido"));
+        verify(glpiService).addFollowup(eq(777), contains("Ainda preciso de ajuda"));
     }
 }

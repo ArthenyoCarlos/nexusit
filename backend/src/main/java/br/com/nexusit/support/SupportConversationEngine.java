@@ -10,6 +10,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -34,6 +36,10 @@ public class SupportConversationEngine {
     private static final String ASK_DESCRIPTION = "Por favor, descreva seu problema. Você pode enviar fotos, vídeos ou áudio 📷🎧";
     private static final String WAIT_TECH = "Aguarde um momento, estou verificando a disponibilidade dos técnicos...";
     private static final String CLOSED_TEXT = "Atendimento encerrado. Caso precise de mais ajuda, é só me chamar novamente. Obrigado! 😊";
+    private static final String EXPIRED_TEXT = "Seu atendimento anterior expirou por inatividade. Vamos começar novamente?";
+    private static final Duration MENU_TIMEOUT = Duration.ofMinutes(60);
+    private static final Duration DESCRIPTION_TIMEOUT = Duration.ofHours(2);
+    private static final Duration HUMAN_ACTIVE_TIMEOUT = Duration.ofDays(7);
 
     private final WhatsappContactRepository contactRepo;
     private final SupportConversationRepository conversationRepo;
@@ -64,6 +70,13 @@ public class SupportConversationEngine {
                 });
 
         String transcription = transcribeIfAudio(msg);
+
+        if (!isNewConversation.get() && isExpired(conversation, LocalDateTime.now())) {
+            conversation = expireAndStartNewConversation(conversation, contact, msg, transcription);
+            persistState(conversation);
+            return;
+        }
+
         recordInboundMessage(conversation, contact, msg, transcription);
 
         if (!isNewConversation.get() && conversation.getState() == ConversationState.HUMAN_ACTIVE) {
@@ -88,6 +101,47 @@ public class SupportConversationEngine {
             case CLOSED -> log.debug("Mensagem recebida para conversa já fechada {}", conversation.getId());
         }
         persistState(conversation);
+    }
+
+    private boolean isExpired(SupportConversation conversation, LocalDateTime now) {
+        Duration timeout = timeoutFor(conversation.getState());
+        if (timeout == null || conversation.getId() == null) return false;
+        LocalDateTime lastActivity = messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(conversation.getId())
+                .map(SupportMessage::getCreatedAt)
+                .orElse(conversation.getCreatedAt());
+        return lastActivity != null && lastActivity.plus(timeout).isBefore(now);
+    }
+
+    private Duration timeoutFor(ConversationState state) {
+        if (state == null) return null;
+        return switch (state) {
+            case AWAITING_NAME, MENU -> MENU_TIMEOUT;
+            case AWAITING_DESCRIPTION -> DESCRIPTION_TIMEOUT;
+            case HUMAN_ACTIVE -> HUMAN_ACTIVE_TIMEOUT;
+            case PENDING_TECH, CLOSED -> null;
+        };
+    }
+
+    private SupportConversation expireAndStartNewConversation(SupportConversation expiredConversation, WhatsappContact contact,
+                                                               InboundWhatsappMessage msg, String transcription) {
+        expiredConversation.setState(ConversationState.CLOSED);
+        expiredConversation.setClosedAt(LocalDateTime.now());
+        conversationRepo.save(expiredConversation);
+        persistState(expiredConversation);
+
+        SupportConversation newConversation = conversationRepo.save(SupportConversation.builder()
+                .contact(contact)
+                .state(contact.getGlpiUserId() == null ? ConversationState.AWAITING_NAME : ConversationState.MENU)
+                .build());
+
+        recordInboundMessage(newConversation, contact, msg, transcription);
+        sendAndRecord(newConversation, EXPIRED_TEXT);
+        if (newConversation.getState() == ConversationState.AWAITING_NAME) {
+            sendAndRecord(newConversation, FIRST_CONTACT_TEXT);
+        } else {
+            sendAndRecord(newConversation, menuText(contact.getGlpiUserName()));
+        }
+        return newConversation;
     }
 
     private void handleAwaitingName(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String transcription) {
