@@ -49,6 +49,24 @@ public class SupportController {
         return service.claim(id, user);
     }
 
+    @PostMapping("/{id}/technicians")
+    public SupportConversationDetail addTechnician(@PathVariable UUID id, @Valid @RequestBody TechnicianRequest req,
+                                                     @AuthenticationPrincipal User user) {
+        return service.addTechnician(id, user, req.userId());
+    }
+
+    @DeleteMapping("/{id}/technicians/{technicianId}")
+    public SupportConversationDetail removeTechnician(@PathVariable UUID id, @PathVariable UUID technicianId,
+                                                        @AuthenticationPrincipal User user) {
+        return service.removeTechnician(id, user, technicianId);
+    }
+
+    @PostMapping("/{id}/transfer")
+    public SupportConversationDetail transfer(@PathVariable UUID id, @Valid @RequestBody TechnicianRequest req,
+                                                @AuthenticationPrincipal User user) {
+        return service.transfer(id, user, req.userId());
+    }
+
     @PostMapping(value = "/{id}/reply", consumes = MediaType.APPLICATION_JSON_VALUE)
     public SupportConversationDetail reply(@PathVariable UUID id, @Valid @RequestBody ReplyRequest req,
                                             @AuthenticationPrincipal User user) {

@@ -42,6 +42,9 @@ public class User implements UserDetails {
     @Column(name = "job_title", length = 120)
     private String jobTitle;
 
+    @Column(name = "glpi_user_id")
+    private Integer glpiUserId;
+
     @Column(nullable = false)
     private boolean active;
 

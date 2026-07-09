@@ -35,6 +35,24 @@ public class GlpiController {
         return service.getTechnicians();
     }
 
+    @GetMapping("/categories")
+    public List<Map<String, Object>> getCategories() {
+        return service.getCategories();
+    }
+
+    @PutMapping("/tickets/{id}/fields")
+    public ResponseEntity<Map<String, String>> updateTicketFields(
+            @PathVariable int id,
+            @RequestBody Map<String, Object> body) {
+        try {
+            service.updateTicket(id, body);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.warn("Failed to update fields of ticket {}: {}", id, describeGlpiError(e));
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", describeGlpiError(e)));
+        }
+    }
+
     @PostMapping("/tickets/{id}/followup")
     public ResponseEntity<Map<String, String>> addFollowup(
             @PathVariable int id,

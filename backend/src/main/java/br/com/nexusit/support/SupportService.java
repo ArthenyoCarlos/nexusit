@@ -3,6 +3,7 @@ package br.com.nexusit.support;
 import br.com.nexusit.glpi.GlpiService;
 import br.com.nexusit.user.Role;
 import br.com.nexusit.user.User;
+import br.com.nexusit.user.UserRepository;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -29,6 +30,8 @@ public class SupportService {
 
     private final SupportConversationRepository conversationRepo;
     private final SupportMessageRepository messageRepo;
+    private final SupportConversationTechnicianRepository technicianRepo;
+    private final UserRepository userRepository;
     private final GlpiService glpiService;
     private final EvolutionApiClient evolutionApiClient;
     private final BotAtendimentoTiStateStore stateStore;
@@ -45,7 +48,8 @@ public class SupportService {
         SupportConversation conversation = getOrThrow(id);
         List<SupportMessageResponse> messages = messageRepo.findByConversation(id).stream()
                 .map(SupportMessageResponse::from).toList();
-        return new SupportConversationDetail(SupportConversationSummary.from(conversation), messages);
+        List<SupportConversationTechnician> extraTechnicians = technicianRepo.findByConversation(id);
+        return new SupportConversationDetail(SupportConversationSummary.from(conversation, extraTechnicians), messages);
     }
 
     public SupportMessageMedia getMessageMedia(UUID messageId) {
@@ -71,8 +75,119 @@ public class SupportService {
         stateStore.save(conversation);
         if (conversation.getGlpiTicketId() != null) {
             glpiService.addFollowup(conversation.getGlpiTicketId(), "[NexusIT] Atendimento assumido por " + title + " " + user.getName());
+            Integer glpiUserId = resolveGlpiUserId(user);
+            if (glpiUserId != null) {
+                Integer ticketUserId = glpiService.assignTicket(conversation.getGlpiTicketId(), glpiUserId);
+                conversation.setGlpiTicketUserId(ticketUserId);
+                conversationRepo.save(conversation);
+            }
         }
         return getDetail(id);
+    }
+
+    @Transactional
+    public SupportConversationDetail addTechnician(UUID id, User actingUser, UUID technicianUserId) {
+        SupportConversation conversation = getOrThrow(id);
+        ensureCanManage(conversation, actingUser);
+        if (conversation.getClaimedBy() != null && conversation.getClaimedBy().getId().equals(technicianUserId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Este técnico já é o responsável pelo atendimento");
+        }
+        if (technicianRepo.findByConversationIdAndUserId(id, technicianUserId).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Técnico já adicionado a este atendimento");
+        }
+        User technician = userRepository.findById(technicianUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Técnico não encontrado"));
+
+        Integer glpiTicketUserId = null;
+        if (conversation.getGlpiTicketId() != null) {
+            Integer glpiUserId = resolveGlpiUserId(technician);
+            if (glpiUserId != null) {
+                glpiTicketUserId = glpiService.assignTicket(conversation.getGlpiTicketId(), glpiUserId);
+            }
+            glpiService.addFollowup(conversation.getGlpiTicketId(), "[NexusIT] " + supportTitle(technician) + " "
+                    + technician.getName() + " foi adicionado(a) ao atendimento por " + actingUser.getName() + ".");
+        }
+
+        technicianRepo.save(SupportConversationTechnician.builder()
+                .conversation(conversation)
+                .user(technician)
+                .glpiTicketUserId(glpiTicketUserId)
+                .build());
+
+        return getDetail(id);
+    }
+
+    @Transactional
+    public SupportConversationDetail removeTechnician(UUID id, User actingUser, UUID technicianUserId) {
+        SupportConversation conversation = getOrThrow(id);
+        ensureCanManage(conversation, actingUser);
+        SupportConversationTechnician link = technicianRepo.findByConversationIdAndUserId(id, technicianUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Técnico não está neste atendimento"));
+
+        if (conversation.getGlpiTicketId() != null) {
+            glpiService.unassignTicket(link.getGlpiTicketUserId());
+            glpiService.addFollowup(conversation.getGlpiTicketId(), "[NexusIT] " + link.getUser().getName()
+                    + " foi removido(a) do atendimento por " + actingUser.getName() + ".");
+        }
+        technicianRepo.delete(link);
+        return getDetail(id);
+    }
+
+    @Transactional
+    public SupportConversationDetail transfer(UUID id, User actingUser, UUID newTechnicianUserId) {
+        SupportConversation conversation = getOrThrow(id);
+        ensureCanManage(conversation, actingUser);
+        User newTechnician = userRepository.findById(newTechnicianUserId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Técnico não encontrado"));
+        User previous = conversation.getClaimedBy();
+        if (previous != null && previous.getId().equals(newTechnicianUserId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Atendimento já está com este técnico");
+        }
+
+        if (conversation.getGlpiTicketId() != null) {
+            glpiService.unassignTicket(conversation.getGlpiTicketUserId());
+            Integer glpiUserId = resolveGlpiUserId(newTechnician);
+            Integer newTicketUserId = glpiUserId != null
+                    ? glpiService.assignTicket(conversation.getGlpiTicketId(), glpiUserId) : null;
+            conversation.setGlpiTicketUserId(newTicketUserId);
+            glpiService.addFollowup(conversation.getGlpiTicketId(), "[NexusIT] Atendimento transferido de "
+                    + (previous != null ? previous.getName() : "-") + " para " + newTechnician.getName()
+                    + " por " + actingUser.getName() + ".");
+        }
+
+        conversation.setClaimedBy(newTechnician);
+        conversation.setClaimedAt(LocalDateTime.now());
+        conversationRepo.save(conversation);
+        stateStore.save(conversation);
+
+        String text = "🔁 Seu atendimento foi transferido para " + supportTitle(newTechnician) + " " + newTechnician.getName() + ".";
+        recordMessage(conversation, MessageDirection.OUT, MessageAuthor.HERMES, "Hermes", text);
+        evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), text);
+
+        return getDetail(id);
+    }
+
+    private void ensureCanManage(SupportConversation conversation, User actingUser) {
+        boolean isOwner = conversation.getClaimedBy() != null && conversation.getClaimedBy().getId().equals(actingUser.getId());
+        boolean isAdmin = actingUser.getRole() == Role.ADMIN;
+        if (!isOwner && !isAdmin) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Apenas o técnico responsável ou um administrador pode gerenciar este atendimento");
+        }
+    }
+
+    private Integer resolveGlpiUserId(User user) {
+        if (user.getGlpiUserId() != null) return user.getGlpiUserId();
+        return glpiService.findUserByName(user.getName())
+                .map(ref -> {
+                    user.setGlpiUserId(ref.id());
+                    userRepository.save(user);
+                    log.info("Vinculado técnico '{}' ao usuário GLPI #{} automaticamente", user.getName(), ref.id());
+                    return ref.id();
+                })
+                .orElseGet(() -> {
+                    log.warn("Não foi possível localizar o técnico '{}' no GLPI; atribuição automática pulada", user.getName());
+                    return null;
+                });
     }
 
     @Transactional

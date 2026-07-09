@@ -1,0 +1,1 @@
+ALTER TABLE users ADD COLUMN glpi_user_id INTEGER;

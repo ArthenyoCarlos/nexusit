@@ -104,6 +104,14 @@ public class GlpiClient {
         });
     }
 
+    public void delete(String path) {
+        withRetry(() -> {
+            restTemplate.exchange(url(path), HttpMethod.DELETE,
+                    new HttpEntity<>(buildBaseHeaders(session())), Void.class);
+            return null;
+        });
+    }
+
     @SuppressWarnings({"unchecked", "rawtypes"})
     public Map<String, Object> postMultipart(String path, org.springframework.util.MultiValueMap<String, Object> parts) {
         return withRetry(() -> {

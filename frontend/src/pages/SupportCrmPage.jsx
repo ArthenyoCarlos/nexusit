@@ -2,7 +2,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Layout from '../components/Layout'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation } from '../services/support'
+import { getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation, addTechnician, removeTechnician, transferConversation } from '../services/support'
+import { getUsers } from '../services/users'
 
 const STATE_LABEL = {
   AWAITING_NAME: 'Identificando', MENU: 'No menu', AWAITING_DESCRIPTION: 'Descrevendo problema',
@@ -172,6 +173,10 @@ export default function SupportCrmPage() {
   const [recording, setRecording] = useState(false)
   const [sending, setSending] = useState(false)
   const [closing, setClosing] = useState(false)
+  const [technicianOptions, setTechnicianOptions] = useState([])
+  const [addTechId, setAddTechId] = useState('')
+  const [transferTechId, setTransferTechId] = useState('')
+  const [savingTech, setSavingTech] = useState(false)
   const threadEndRef = useRef(null)
   const fileInputRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -188,6 +193,10 @@ export default function SupportCrmPage() {
     const t = setInterval(loadLists, 4000)
     return () => clearInterval(t)
   }, [loadLists])
+
+  useEffect(() => {
+    getUsers().then(setTechnicianOptions).catch(() => setTechnicianOptions([]))
+  }, [])
 
   const loadDetail = useCallback(async (id) => {
     if (!id) { setDetail(null); return }
@@ -270,8 +279,50 @@ export default function SupportCrmPage() {
     } finally { setClosing(false) }
   }
 
+  const handleAddTechnician = async () => {
+    if (!addTechId || !selectedId) return
+    setSavingTech(true)
+    try {
+      setDetail(await addTechnician(selectedId, addTechId))
+      setAddTechId('')
+      toast.add('Técnico adicionado ao atendimento.', 'success')
+    } catch (e) {
+      toast.add(e.response?.data?.message || 'Não foi possível adicionar o técnico.', 'error')
+    } finally { setSavingTech(false) }
+  }
+
+  const handleRemoveTechnician = async (technicianId) => {
+    if (!selectedId) return
+    setSavingTech(true)
+    try {
+      setDetail(await removeTechnician(selectedId, technicianId))
+      toast.add('Técnico removido do atendimento.', 'success')
+    } catch {
+      toast.add('Não foi possível remover o técnico.', 'error')
+    } finally { setSavingTech(false) }
+  }
+
+  const handleTransfer = async () => {
+    if (!transferTechId || !selectedId) return
+    setSavingTech(true)
+    try {
+      await transferConversation(selectedId, transferTechId)
+      setTransferTechId('')
+      toast.add('Atendimento transferido.', 'success')
+      loadLists(); loadDetail(selectedId)
+    } catch (e) {
+      toast.add(e.response?.data?.message || 'Não foi possível transferir o atendimento.', 'error')
+    } finally { setSavingTech(false) }
+  }
+
   const conversation = detail?.conversation
-  const isMine = conversation?.claimedByName === user?.name && conversation?.state === 'HUMAN_ACTIVE'
+  const isOwner = conversation?.claimedById === user?.id
+  const isAdmin = user?.role === 'ADMIN'
+  const canManage = (isOwner || isAdmin) && conversation?.state === 'HUMAN_ACTIVE'
+  const isMine = isOwner && conversation?.state === 'HUMAN_ACTIVE'
+  const assignedIds = new Set([conversation?.claimedById, ...(conversation?.technicians?.map(t => t.id) ?? [])].filter(Boolean))
+  const availableToAdd = technicianOptions.filter(t => t.active && !assignedIds.has(t.id))
+  const availableToTransfer = technicianOptions.filter(t => t.active && t.id !== conversation?.claimedById)
 
   return (
     <Layout>
@@ -340,15 +391,50 @@ export default function SupportCrmPage() {
               <div className="empty-state" style={{ margin: 'auto' }}><h3>Selecione um atendimento</h3><p>Escolha um item na fila ou em "Meus atendimentos".</p></div>
             ) : (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px', borderBottom: '1px solid var(--border-muted)' }}>
-                  <div>
-                    <p style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--text-primary)' }}>{conversation.contactName || conversation.contactPhone}</p>
-                    <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
-                      {conversation.contactPhone} · {conversation.glpiTicketId ? `Chamado #${conversation.glpiTicketId}` : 'sem chamado'} · {STATE_LABEL[conversation.state] ?? conversation.state}
-                    </p>
+                <div style={{ padding: '14px 18px', borderBottom: '1px solid var(--border-muted)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+                    <div>
+                      <p style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--text-primary)' }}>{conversation.contactName || conversation.contactPhone}</p>
+                      <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
+                        {conversation.contactPhone} · {conversation.glpiTicketId ? `Chamado #${conversation.glpiTicketId}` : 'sem chamado'} · {STATE_LABEL[conversation.state] ?? conversation.state}
+                      </p>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+                        {conversation.claimedByName && (
+                          <span className="badge badge-blue" style={{ fontSize: 10.5 }}>👨‍💻 {conversation.claimedByName}</span>
+                        )}
+                        {conversation.technicians?.map(t => (
+                          <span key={t.id} className="badge badge-gray" style={{ fontSize: 10.5, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                            {t.name}
+                            {canManage && (
+                              <button type="button" onClick={() => handleRemoveTechnician(t.id)} disabled={savingTech}
+                                style={{ background: 'none', border: 0, cursor: 'pointer', padding: 0, fontSize: 11, color: 'inherit', opacity: 0.7 }} title="Remover técnico">✕</button>
+                            )}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    {conversation.state === 'HUMAN_ACTIVE' && (
+                      <button onClick={handleClose} disabled={closing} className="btn btn-danger btn-sm">{closing ? 'Fechando...' : 'Fechar chamado'}</button>
+                    )}
                   </div>
-                  {conversation.state === 'HUMAN_ACTIVE' && (
-                    <button onClick={handleClose} disabled={closing} className="btn btn-danger btn-sm">{closing ? 'Fechando...' : 'Fechar chamado'}</button>
+
+                  {canManage && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16 }}>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <select value={addTechId} onChange={e => setAddTechId(e.target.value)} disabled={savingTech} className="input" style={{ fontSize: 12, height: 32, padding: '2px 8px' }}>
+                          <option value="">+ Adicionar técnico...</option>
+                          {availableToAdd.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <button onClick={handleAddTechnician} disabled={!addTechId || savingTech} className="btn btn-default btn-sm">Adicionar</button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                        <select value={transferTechId} onChange={e => setTransferTechId(e.target.value)} disabled={savingTech} className="input" style={{ fontSize: 12, height: 32, padding: '2px 8px' }}>
+                          <option value="">Transferir para...</option>
+                          {availableToTransfer.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                        </select>
+                        <button onClick={handleTransfer} disabled={!transferTechId || savingTech} className="btn btn-default btn-sm">Transferir</button>
+                      </div>
+                    </div>
                   )}
                 </div>
 

@@ -15,3 +15,6 @@ export const replyToConversation   = (id, message, file) => {
   return api.post(`/support/${id}/reply`, { message }).then(r => r.data)
 }
 export const closeConversation     = (id)     => api.post(`/support/${id}/close`).then(r => r.data)
+export const addTechnician         = (id, userId) => api.post(`/support/${id}/technicians`, { userId }).then(r => r.data)
+export const removeTechnician      = (id, technicianId) => api.delete(`/support/${id}/technicians/${technicianId}`).then(r => r.data)
+export const transferConversation  = (id, userId) => api.post(`/support/${id}/transfer`, { userId }).then(r => r.data)

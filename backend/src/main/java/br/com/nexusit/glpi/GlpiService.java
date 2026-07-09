@@ -44,6 +44,15 @@ public class GlpiService {
             6, "Crítica"
     );
 
+    // Urgência/Impacto: 1=Muito Baixa, 2=Baixa, 3=Média, 4=Alta, 5=Muito Alta
+    private static final Map<Integer, String> URGENCY_IMPACT_LABELS = Map.of(
+            1, "Muito Baixa",
+            2, "Baixa",
+            3, "Média",
+            4, "Alta",
+            5, "Muito Alta"
+    );
+
     // ── Tickets ───────────────────────────────────────────────────────────
 
     public List<GlpiTicket> getTickets(Integer status) {
@@ -118,13 +127,29 @@ public class GlpiService {
         client.put("/Ticket/" + ticketId, body);
     }
 
-    public void assignTicket(int ticketId, int glpiUserId) {
-        // Add assignment (type 2 = assigned tech)
-        Map<String, Object> body = Map.of("input", Map.of(
-                "tickets_id", ticketId,
-                "users_id", glpiUserId,
-                "type", 2));
-        client.post("/Ticket_User", body);
+    public void updateTicket(int ticketId, Map<String, Object> fields) {
+        client.put("/Ticket/" + ticketId, Map.of("input", fields));
+    }
+
+    public Integer assignTicket(int ticketId, int glpiUserId) {
+        // Add assignment (type 2 = assigned tech). Returns the created Ticket_User row id
+        // so it can be targeted later by unassignTicket (e.g. when transferring a ticket).
+        return safeCall(() -> {
+            Map<String, Object> body = Map.of("input", Map.of(
+                    "tickets_id", ticketId,
+                    "users_id", glpiUserId,
+                    "type", 2));
+            Map<String, Object> resp = client.post("/Ticket_User", body);
+            return resp == null ? null : intVal(resp, "id");
+        }, null);
+    }
+
+    public void unassignTicket(Integer ticketUserId) {
+        if (ticketUserId == null) return;
+        safeCall(() -> {
+            client.delete("/Ticket_User/" + ticketUserId);
+            return null;
+        }, null);
     }
 
     // ── Technicians ───────────────────────────────────────────────────────
@@ -144,6 +169,29 @@ public class GlpiService {
                         Map<String, Object> m = new LinkedHashMap<>();
                         m.put("id", intVal(u, "id"));
                         m.put("name", technicianDisplayName(u));
+                        return m;
+                    })
+                    .filter(m -> !String.valueOf(m.get("name")).isBlank())
+                    .sorted(Comparator.comparing(m -> String.valueOf(m.get("name")).toLowerCase()))
+                    .toList();
+        }, List.of());
+    }
+
+    public List<Map<String, Object>> getCategories() {
+        return safeCall(() -> {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("range", "0-299");
+
+            List<Map<String, Object>> raw = client.getList("/ITILCategory", params);
+            if (raw == null) return List.<Map<String, Object>>of();
+
+            return raw.stream()
+                    .filter(c -> intVal(c, "is_deleted") == 0)
+                    .map(c -> {
+                        Map<String, Object> m = new LinkedHashMap<>();
+                        m.put("id", intVal(c, "id"));
+                        String name = str(c, "completename");
+                        m.put("name", name.isBlank() ? str(c, "name") : name);
                         return m;
                     })
                     .filter(m -> !String.valueOf(m.get("name")).isBlank())
@@ -295,18 +343,25 @@ public class GlpiService {
     private GlpiTicket toTicket(Map<String, Object> t) {
         int status = intVal(t, "status");
         int priority = intVal(t, "priority");
+        int urgency = intVal(t, "urgency");
+        int impact = intVal(t, "impact");
         int type = intVal(t, "type");
 
         // GLPI with expand_dropdowns=true returns user names in _users_id_requester / _users_id_assign
         // For the list endpoint these may be absent; fall back to empty string
         String requester = firstNonEmpty(t, "_users_id_requester", "users_id_requester_1", "users_id_requester");
         String assignedTo = firstNonEmpty(t, "_users_id_assign", "users_id_assign_1", "users_id_assign");
+        // itilcategories_id also arrives expanded to its display name (or "0"/blank when uncategorized)
+        String category = nonZeroStr(t, "itilcategories_id");
 
         return new GlpiTicket(
                 intVal(t, "id"),
                 str(t, "name"),
                 status, STATUS_LABELS.getOrDefault(status, "?"),
                 priority, PRIORITY_LABELS.getOrDefault(priority, "?"),
+                urgency, URGENCY_IMPACT_LABELS.getOrDefault(urgency, "?"),
+                impact, URGENCY_IMPACT_LABELS.getOrDefault(impact, "?"),
+                category,
                 requester,
                 assignedTo,
                 str(t, "date"),

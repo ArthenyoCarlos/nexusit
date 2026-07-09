@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTickets, getTicket, addFollowup, closeTicket, assignTicket, getTechnicians } from '../services/glpi'
+import { getTickets, getTicket, addFollowup, closeTicket, assignTicket, getTechnicians, getCategories, updateTicketFields } from '../services/glpi'
 import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
 import { getTicketAssetLinks, createTicketAssetLink, deleteTicketAssetLink } from '../services/ticketAssetLinks'
@@ -29,6 +29,13 @@ const STATUS_OPTIONS = [
 const PRIORITY_OPTIONS = [
   { value: '',  label: 'Todas as prioridades' },
   { value: '6', label: 'Crítica' },
+  { value: '5', label: 'Muito Alta' },
+  { value: '4', label: 'Alta' },
+  { value: '3', label: 'Média' },
+  { value: '2', label: 'Baixa' },
+  { value: '1', label: 'Muito Baixa' },
+]
+const URGENCY_IMPACT_OPTIONS = [
   { value: '5', label: 'Muito Alta' },
   { value: '4', label: 'Alta' },
   { value: '3', label: 'Média' },
@@ -97,11 +104,30 @@ export default function TicketsPage() {
   const [assetPickerType, setAssetPickerType] = useState('SYSTEM')
   const [assetPickerId, setAssetPickerId] = useState('')
   const [assetLinking, setAssetLinking] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [editCategory, setEditCategory] = useState('')
+  const [editPriority, setEditPriority] = useState('')
+  const [editUrgency, setEditUrgency] = useState('')
+  const [editImpact, setEditImpact] = useState('')
+  const [classifyLoading, setClassifyLoading] = useState(false)
 
   useEffect(() => {
     if (!isAdmin) return
     getTechnicians().then(res => setTechnicians(res.data)).catch(() => setTechnicians([]))
   }, [isAdmin])
+
+  useEffect(() => {
+    getCategories().then(res => setCategories(res.data)).catch(() => setCategories([]))
+  }, [])
+
+  useEffect(() => {
+    if (!detail) return
+    setEditPriority(String(detail.ticket.priority || ''))
+    setEditUrgency(String(detail.ticket.urgency || ''))
+    setEditImpact(String(detail.ticket.impact || ''))
+    const match = categories.find(c => c.name === detail.ticket.category)
+    setEditCategory(match ? String(match.id) : '')
+  }, [detail, categories])
 
   useEffect(() => {
     getSystems().then(setSystemsList).catch(() => setSystemsList([]))
@@ -212,6 +238,22 @@ export default function TicketsPage() {
       setAssignUserId(''); const res = await getTicket(selected.id); setDetail(res.data)
     } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao atribuir técnico.') }) }
     finally { setActionLoading(false) }
+  }
+
+  const handleUpdateClassification = async () => {
+    if (!selected) return
+    setClassifyLoading(true)
+    try {
+      const fields = {}
+      fields.itilcategories_id = editCategory ? parseInt(editCategory) : 0
+      if (editPriority) fields.priority = parseInt(editPriority)
+      if (editUrgency) fields.urgency = parseInt(editUrgency)
+      if (editImpact) fields.impact = parseInt(editImpact)
+      await updateTicketFields(selected.id, fields)
+      setActionMsg({ type: 'success', text: 'Classificação do chamado atualizada.' })
+      await fetchTickets(); const res = await getTicket(selected.id); setDetail(res.data)
+    } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao atualizar classificação.') }) }
+    finally { setClassifyLoading(false) }
   }
 
   const copyToClipboard = async (text) => {
@@ -456,6 +498,43 @@ export default function TicketsPage() {
                 {detail.ticket.solvedAt && (
                   <div><span className="text-[var(--text-tertiary)] text-xs block">Resolução</span>{formatDate(detail.ticket.solvedAt)}</div>
                 )}
+              </div>
+            </div>
+
+            {/* Classification: category / priority / urgency / impact */}
+            <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider" style={{ margin: 0 }}>Classificação</p>
+                <button onClick={handleUpdateClassification} disabled={classifyLoading} className="btn btn-primary text-xs">
+                  {classifyLoading ? 'Salvando...' : 'Salvar classificação'}
+                </button>
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+                <div>
+                  <label className="input-label">Categoria</label>
+                  <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="input text-xs">
+                    <option value="">Sem categoria</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label">Prioridade</label>
+                  <select value={editPriority} onChange={e => setEditPriority(e.target.value)} className="input text-xs">
+                    {PRIORITY_OPTIONS.filter(o => o.value).map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label">Urgência</label>
+                  <select value={editUrgency} onChange={e => setEditUrgency(e.target.value)} className="input text-xs">
+                    {URGENCY_IMPACT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="input-label">Impacto</label>
+                  <select value={editImpact} onChange={e => setEditImpact(e.target.value)} className="input text-xs">
+                    {URGENCY_IMPACT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
               </div>
             </div>
 

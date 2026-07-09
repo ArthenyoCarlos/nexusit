@@ -17,3 +17,9 @@ export const assignTicket = (id, userId) =>
 
 export const getTechnicians = () =>
   api.get('/glpi/technicians')
+
+export const getCategories = () =>
+  api.get('/glpi/categories')
+
+export const updateTicketFields = (id, fields) =>
+  api.put(`/glpi/tickets/${id}/fields`, fields)

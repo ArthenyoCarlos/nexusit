@@ -35,6 +35,9 @@ public class SupportConversation {
     @JoinColumn(name = "claimed_by")
     private User claimedBy;
 
+    @Column(name = "glpi_ticket_user_id")
+    private Integer glpiTicketUserId;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 

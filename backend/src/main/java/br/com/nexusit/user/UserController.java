@@ -85,6 +85,7 @@ public class UserController {
         if (req.role() != null) user.setRole(req.role());
         if (req.jobTitle() != null) user.setJobTitle(normalizeJobTitle(req.jobTitle(), user.getRole()));
         if (req.active() != null) user.setActive(req.active());
+        if (req.glpiUserId() != null) user.setGlpiUserId(req.glpiUserId() == 0 ? null : req.glpiUserId());
         if (req.password() != null && !req.password().isBlank()) {
             user.setPasswordHash(passwordEncoder.encode(req.password()));
         }
@@ -122,5 +123,5 @@ public class UserController {
         }
     }
 
-    public record UpdateUserRequest(String name, Role role, String jobTitle, Boolean active, String password) {}
+    public record UpdateUserRequest(String name, Role role, String jobTitle, Boolean active, String password, Integer glpiUserId) {}
 }
