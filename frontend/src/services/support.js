@@ -18,3 +18,4 @@ export const closeConversation     = (id)     => api.post(`/support/${id}/close`
 export const addTechnician         = (id, userId) => api.post(`/support/${id}/technicians`, { userId }).then(r => r.data)
 export const removeTechnician      = (id, technicianId) => api.delete(`/support/${id}/technicians/${technicianId}`).then(r => r.data)
 export const transferConversation  = (id, userId) => api.post(`/support/${id}/transfer`, { userId }).then(r => r.data)
+export const getAllConversations   = (days = 30) => api.get('/support/all', { params: { days } }).then(r => r.data)

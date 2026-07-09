@@ -7,6 +7,7 @@ import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -27,6 +28,12 @@ public class SupportController {
 
     @GetMapping("/mine")
     public List<SupportConversationSummary> getMine(@AuthenticationPrincipal User user) { return service.getMine(user); }
+
+    @GetMapping("/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public List<SupportConversationSummary> getAll(@RequestParam(defaultValue = "30") int days) {
+        return service.getAll(days);
+    }
 
     @GetMapping("/{id}")
     public SupportConversationDetail getDetail(@PathVariable UUID id) { return service.getDetail(id); }

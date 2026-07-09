@@ -47,6 +47,11 @@ public class SupportService {
                 .toList();
     }
 
+    public List<SupportConversationSummary> getAll(int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(Math.max(1, days));
+        return conversationRepo.findAllSince(since).stream().map(SupportConversationSummary::from).toList();
+    }
+
     public SupportConversationDetail getDetail(UUID id) {
         SupportConversation conversation = getOrThrow(id);
         List<SupportMessageResponse> messages = messageRepo.findByConversation(id).stream()

@@ -22,6 +22,7 @@ import InventoryDetailPage from './pages/InventoryDetailPage'
 import VaultPage from './pages/VaultPage'
 import SshConsolePage from './pages/SshConsolePage'
 import SupportCrmPage from './pages/SupportCrmPage'
+import TeamTrackingPage from './pages/TeamTrackingPage'
 import LicensesPage from './pages/LicensesPage'
 import OnboardingPage from './pages/OnboardingPage'
 import OnboardingDetailPage from './pages/OnboardingDetailPage'
@@ -71,6 +72,7 @@ export default function App() {
               <Route path="/vault"           element={<VaultPage />} />
               <Route path="/ssh-console"     element={<SshConsolePage />} />
               <Route path="/support-crm"     element={<SupportCrmPage />} />
+              <Route path="/team-tracking"   element={<TeamTrackingPage />} />
               <Route path="/licenses"        element={<LicensesPage />} />
               <Route path="/onboarding"           element={<OnboardingPage />} />
               <Route path="/onboarding/templates" element={<OnboardingTemplatesPage />} />

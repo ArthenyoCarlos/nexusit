@@ -27,6 +27,10 @@ public interface SupportConversationRepository extends JpaRepository<SupportConv
             "ORDER BY c.createdAt ASC")
     List<SupportConversation> findQueue();
 
+    @Query("SELECT c FROM SupportConversation c LEFT JOIN FETCH c.contact LEFT JOIN FETCH c.claimedBy " +
+            "WHERE c.createdAt >= :since ORDER BY c.createdAt DESC")
+    List<SupportConversation> findAllSince(@Param("since") LocalDateTime since);
+
     @Query("SELECT c FROM SupportConversation c LEFT JOIN FETCH c.contact WHERE c.state = 'HUMAN_ACTIVE' " +
             "AND (c.claimedBy.id = :userId OR EXISTS (" +
             "  SELECT 1 FROM SupportConversationTechnician t WHERE t.conversation = c AND t.user.id = :userId" +

@@ -28,6 +28,7 @@ const NAV = [
       { label: 'Anotações',     path: '/notes',       Icon: IconNotes      },
       { label: 'Planejamento',  path: '/planning',    Icon: IconPlanning   },
       { label: 'Onboarding',    path: '/onboarding',  Icon: IconOnboarding },
+      { label: 'Acompanhamento', path: '/team-tracking', Icon: IconTeam, adminOnly: true },
     ],
   },
   {
@@ -162,4 +163,5 @@ function IconSchedule()   { return <svg {...i}><rect x="3" y="4" width="18" heig
 function IconWiki()       { return <svg {...i}><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 9h6M9 13h4"/></svg> }
 function IconFinancial()  { return <svg {...i}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> }
 function IconHermes()     { return <svg {...i}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> }
+function IconTeam()       { return <svg {...i}><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8 11l2 2 4-4"/></svg> }
 function IconExecutive()  { return <svg {...i}><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg> }

@@ -15,6 +15,7 @@ public record SupportConversationSummary(
         List<TechnicianRef> technicians,
         LocalDateTime createdAt,
         LocalDateTime claimedAt,
+        LocalDateTime closedAt,
         LocalDateTime lastMessageAt,
         String lastMessageAuthor,
         String lastMessagePreview
@@ -44,6 +45,7 @@ public record SupportConversationSummary(
                 extraTechnicians.stream().map(t -> new TechnicianRef(t.getUser().getId(), t.getUser().getName())).toList(),
                 c.getCreatedAt(),
                 c.getClaimedAt(),
+                c.getClosedAt(),
                 lastMessage != null ? lastMessage.getCreatedAt() : null,
                 lastMessage != null ? lastMessage.getAuthor().name() : null,
                 (preview != null && preview.length() > 140) ? preview.substring(0, 140) + "…" : preview
