@@ -47,11 +47,7 @@ export default function LoginPage() {
 
         {/* Logo */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, position: 'relative', zIndex: 1 }}>
-          <div style={{ width: 40, height: 40, borderRadius: 12, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 20px var(--accent-glow)' }}>
-            <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="var(--text-inverse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
+          <img src="/favicon.svg" alt="NexusIT" width="44" height="44" style={{ flexShrink: 0, filter: 'drop-shadow(0 6px 20px var(--accent-glow))' }} />
           <span style={{ color: 'var(--sidebar-text-hover)', fontWeight: 700, fontSize: 19, letterSpacing: '-0.02em', fontFamily: 'var(--font-mono)' }}>NexusIT</span>
         </div>
 
@@ -91,11 +87,7 @@ export default function LoginPage() {
 
           {/* Mobile logo */}
           <div className="lg-hide" style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 36 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 10, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 4px 14px var(--accent-glow)' }}>
-              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="var(--text-inverse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-              </svg>
-            </div>
+            <img src="/favicon.svg" alt="NexusIT" width="40" height="40" style={{ flexShrink: 0, filter: 'drop-shadow(0 4px 14px var(--accent-glow))' }} />
             <span style={{ color: 'var(--text-primary)', fontWeight: 700, fontSize: 18, letterSpacing: '-0.02em' }}>NexusIT</span>
           </div>
 

@@ -64,16 +64,7 @@ export default function Sidebar({ onNavigate }) {
       {/* Logo */}
       <div style={{ padding: '14px 12px 12px', borderBottom: '1px solid var(--sidebar-border)', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-          <div style={{
-            width: 30, height: 30, borderRadius: 'var(--r-md)', flexShrink: 0,
-            background: 'var(--accent)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 10px var(--accent-glow)',
-          }}>
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="var(--text-inverse)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-            </svg>
-          </div>
+          <img src="/favicon.svg" alt="NexusIT" width="34" height="34" style={{ flexShrink: 0, filter: 'drop-shadow(0 4px 10px var(--accent-glow))' }} />
           <div>
             <p style={{ color: 'var(--sidebar-text-hover)', fontWeight: 700, fontSize: 14, lineHeight: 1, letterSpacing: '-0.01em', fontFamily: 'var(--font-mono)' }}>NexusIT</p>
             <p style={{ color: 'var(--sidebar-label)', fontSize: 10.5, marginTop: 2.5 }}>Painel de TI</p>

@@ -1,18 +1,26 @@
 import { useEffect } from 'react'
 import { Capacitor } from '@capacitor/core'
 import { PushNotifications } from '@capacitor/push-notifications'
+import { StatusBar, Style } from '@capacitor/status-bar'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { registerDeviceToken } from '../services/devices'
 import { playAlertSound } from '../utils/alertSound'
 
-// Só existe dentro do app Android: registra o dispositivo pra receber push
-// notification de verdade (Firebase) e trata toque na notificação.
+// Só existe dentro do app Android: cuida da barra de status, registra o
+// dispositivo pra receber push notification de verdade (Firebase) e trata
+// toque na notificação.
 export default function NativePushBootstrap() {
   const { isAuthenticated } = useAuth()
   const { add: addToast } = useToast()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return
+    StatusBar.setStyle({ style: Style.Dark }).catch(() => {})
+    StatusBar.setBackgroundColor({ color: '#12151b' }).catch(() => {})
+  }, [])
 
   useEffect(() => {
     if (!Capacitor.isNativePlatform() || !isAuthenticated) return

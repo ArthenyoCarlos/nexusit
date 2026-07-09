@@ -2,7 +2,18 @@
   "appId": "br.com.nexusit.support",
   "appName": "NexusIT Suporte",
   "webDir": "dist",
+  "backgroundColor": "#12151b",
   "server": {
     "androidScheme": "https"
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#12151b",
+      "androidSplashResourceName": "splash",
+      "androidScaleType": "CENTER_CROP",
+      "showSpinner": false,
+      "launchAutoHide": true
+    }
   }
 }
