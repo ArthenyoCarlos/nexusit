@@ -274,8 +274,9 @@ export default function SupportCrmPage() {
       mediaRecorderRef.current = recorder
       recorder.start()
       setRecording(true)
-    } catch {
-      toast.add('Não foi possível acessar o microfone neste navegador.', 'error')
+    } catch (e) {
+      console.error('getUserMedia(audio) falhou:', e)
+      toast.add(`Não foi possível acessar o microfone (${e.name || e.message || 'erro desconhecido'}).`, 'error')
     }
   }
 
