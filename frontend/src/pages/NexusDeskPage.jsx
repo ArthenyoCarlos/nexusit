@@ -5,13 +5,9 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { getNexusDeskDevices, createNexusDeskDevice, updateNexusDeskDevice, deleteNexusDeskDevice, connectNexusDeskDevice, getNexusDeskSessions } from '../services/nexusdesk'
 import { getInventory } from '../services/inventory'
+import { buildRustDeskUri } from '../utils/rustdesk'
 
 const EMPTY_FORM = { name: '', rustdeskId: '', password: '', notes: '', inventoryItemId: '' }
-
-function buildRustDeskUri(rustdeskId, password) {
-  const id = (rustdeskId || '').trim().replace(/\s+/g, '')
-  return `rustdesk://${id}${password ? `?password=${encodeURIComponent(password)}` : ''}`
-}
 
 function timeAgo(iso) {
   if (!iso) return '—'
@@ -39,6 +35,7 @@ export default function NexusDeskPage() {
   const [connectingId, setConnectingId] = useState(null)
   const [adhocId, setAdhocId] = useState('')
   const [adhocPassword, setAdhocPassword] = useState('')
+  const [search, setSearch] = useState('')
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -108,6 +105,8 @@ export default function NexusDeskPage() {
     window.location.href = buildRustDeskUri(adhocId, adhocPassword)
   }
 
+  const filteredDevices = devices.filter(d => d.name.toLowerCase().includes(search.trim().toLowerCase()))
+
   return (
     <Layout>
       <div className="page fade-up">
@@ -135,15 +134,29 @@ export default function NexusDeskPage() {
           </form>
         </div>
 
+        {devices.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="input"
+              style={{ maxWidth: 320 }}
+              placeholder="Pesquisar máquina pelo nome..."
+            />
+          </div>
+        )}
+
         {loading ? (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {[...Array(3)].map((_, i) => <div key={i} className="skeleton" style={{ height: 84, borderRadius: 10 }} />)}
           </div>
         ) : devices.length === 0 ? (
           <div className="card empty-state"><h3>Nenhuma máquina cadastrada</h3><p>Clique em "+ Nova Máquina" para adicionar a primeira.</p></div>
+        ) : filteredDevices.length === 0 ? (
+          <div className="card empty-state"><h3>Nenhuma máquina encontrada</h3><p>Nenhum resultado para "{search}".</p></div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {devices.map(d => (
+            {filteredDevices.map(d => (
               <div key={d.id} className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>

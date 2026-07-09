@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Badge from '../components/Badge'
 import { getInventoryItem, getEtiqueta } from '../services/inventory'
 import { getMaintenance, createMaintenance, deleteMaintenance } from '../services/maintenance'
 import { getHosts } from '../services/monitoring'
+import { getNexusDeskDevices, connectNexusDeskDevice } from '../services/nexusdesk'
+import { buildRustDeskUri } from '../utils/rustdesk'
 import { useAuth } from '../contexts/AuthContext'
 
 function QrCode({ value, size = 160 }) {
@@ -82,6 +84,9 @@ export default function InventoryDetailPage() {
   const [mSaving, setMSaving]     = useState(false)
   const [mOpen, setMOpen]         = useState(false)
 
+  const [nexusDeskDevice, setNexusDeskDevice] = useState(null)
+  const [connecting, setConnecting] = useState(false)
+
   useEffect(() => {
     setLoading(true)
     Promise.allSettled([getInventoryItem(id), getHosts(), getMaintenance(id)])
@@ -93,6 +98,22 @@ export default function InventoryDetailPage() {
       })
       .finally(() => setLoading(false))
   }, [id])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    getNexusDeskDevices()
+      .then(devices => setNexusDeskDevice(devices.find(d => d.inventoryItemId === id) ?? null))
+      .catch(() => setNexusDeskDevice(null))
+  }, [id, isAdmin])
+
+  const handleNexusDeskConnect = async () => {
+    if (!nexusDeskDevice) return
+    setConnecting(true)
+    try {
+      const { rustdeskId, password } = await connectNexusDeskDevice(nexusDeskDevice.id)
+      window.location.href = buildRustDeskUri(rustdeskId, password)
+    } finally { setConnecting(false) }
+  }
 
   const handleAddMaintenance = async (e) => {
     e.preventDefault(); setMSaving(true)
@@ -272,6 +293,29 @@ export default function InventoryDetailPage() {
               </div>
             )}
           </div>
+
+          {/* NexusDesk */}
+          {isAdmin && (
+            <div className="card" style={{ padding: '20px 24px' }}>
+              <h3 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-secondary)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 16 }}>NexusDesk</h3>
+              {!nexusDeskDevice ? (
+                <div>
+                  <p style={{ fontSize: 13, color: 'var(--text-tertiary)', marginBottom: 10 }}>Nenhuma máquina NexusDesk vinculada a este equipamento.</p>
+                  <Link to="/nexusdesk" className="btn btn-default btn-sm">Cadastrar no NexusDesk</Link>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div>
+                    <p style={{ fontSize: 14, fontWeight: 600, color: 'var(--text-primary)' }}>{nexusDeskDevice.name}</p>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)', marginTop: 2 }}>ID {nexusDeskDevice.rustdeskId}</p>
+                  </div>
+                  <button onClick={handleNexusDeskConnect} disabled={connecting} className="btn btn-primary btn-sm">
+                    {connecting ? 'Conectando...' : 'Conectar'}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Observações */}
           {item.notes && (
