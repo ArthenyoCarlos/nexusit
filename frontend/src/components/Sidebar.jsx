@@ -1,5 +1,11 @@
+import { useEffect, useRef } from 'react'
 import { NavLink } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+
+// O Sidebar remonta a cada navegação (cada página envolve seu próprio
+// <Layout>), então o scroll do menu reseta pro topo a cada clique.
+// Guarda a posição fora do componente pra restaurar no próximo mount.
+let savedNavScrollTop = 0
 
 const NAV = [
   {
@@ -52,6 +58,11 @@ export default function Sidebar({ onNavigate }) {
   const { user, logout } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
   const initials = user?.name?.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase() ?? 'U'
+  const navRef = useRef(null)
+
+  useEffect(() => {
+    if (navRef.current) navRef.current.scrollTop = savedNavScrollTop
+  }, [])
 
   return (
     <aside onClick={onNavigate} style={{
@@ -74,7 +85,12 @@ export default function Sidebar({ onNavigate }) {
       </div>
 
       {/* Nav */}
-      <nav className="sidebar-nav" style={{ flex: 1, padding: '8px 7px', overflowY: 'auto' }}>
+      <nav
+        ref={navRef}
+        className="sidebar-nav"
+        style={{ flex: 1, padding: '8px 7px', overflowY: 'auto' }}
+        onScroll={e => { savedNavScrollTop = e.currentTarget.scrollTop }}
+      >
         {NAV.map(group => (
           <div key={group.section} style={{ marginBottom: 10 }}>
             <p style={{
