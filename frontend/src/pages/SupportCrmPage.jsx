@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation, addTechnician, removeTechnician, transferConversation } from '../services/support'
 import { getUsers } from '../services/users'
+import { playAlertSound } from '../utils/alertSound'
 
 const STATE_LABEL = {
   AWAITING_NAME: 'Identificando', MENU: 'No menu', AWAITING_DESCRIPTION: 'Descrevendo problema',
@@ -181,6 +182,7 @@ export default function SupportCrmPage() {
   const fileInputRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
+  const lastMessageCountRef = useRef(null)
 
   const loadLists = useCallback(async () => {
     const [q, m] = await Promise.all([getQueue(), getMine()])
@@ -203,7 +205,10 @@ export default function SupportCrmPage() {
     try { setDetail(await getConversation(id)) } catch { setDetail(null) }
   }, [])
 
-  useEffect(() => { loadDetail(selectedId) }, [selectedId, loadDetail])
+  useEffect(() => {
+    lastMessageCountRef.current = null
+    loadDetail(selectedId)
+  }, [selectedId, loadDetail])
 
   useEffect(() => {
     if (!selectedId) return
@@ -211,12 +216,23 @@ export default function SupportCrmPage() {
     return () => clearInterval(t)
   }, [selectedId, loadDetail])
 
+  useEffect(() => {
+    const messages = detail?.messages
+    if (!messages) return
+    const prevCount = lastMessageCountRef.current
+    lastMessageCountRef.current = messages.length
+    if (prevCount === null || messages.length <= prevCount) return
+    const newest = messages[messages.length - 1]
+    if (newest && newest.author !== 'TECH') playAlertSound(3)
+  }, [detail])
+
   useEffect(() => { threadEndRef.current?.scrollIntoView({ block: 'nearest' }) }, [detail])
 
   const handleClaim = async (id) => {
     setClaimingId(id)
     try {
       await claimConversation(id)
+      playAlertSound(4)
       toast.add('Atendimento assumido!', 'success')
       setSelectedId(id)
       loadLists()
