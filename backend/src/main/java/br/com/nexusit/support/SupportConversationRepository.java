@@ -28,7 +28,9 @@ public interface SupportConversationRepository extends JpaRepository<SupportConv
     List<SupportConversation> findQueue();
 
     @Query("SELECT c FROM SupportConversation c LEFT JOIN FETCH c.contact WHERE c.state = 'HUMAN_ACTIVE' " +
-            "AND c.claimedBy.id = :userId ORDER BY c.claimedAt DESC")
+            "AND (c.claimedBy.id = :userId OR EXISTS (" +
+            "  SELECT 1 FROM SupportConversationTechnician t WHERE t.conversation = c AND t.user.id = :userId" +
+            ")) ORDER BY c.claimedAt DESC")
     List<SupportConversation> findMine(@Param("userId") UUID userId);
 
     @Query("SELECT c FROM SupportConversation c LEFT JOIN FETCH c.contact LEFT JOIN FETCH c.claimedBy WHERE c.id = :id")

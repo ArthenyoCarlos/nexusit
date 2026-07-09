@@ -175,6 +175,15 @@ public class SupportService {
         }
     }
 
+    private void ensureCanReply(SupportConversation conversation, User actingUser) {
+        boolean isOwner = conversation.getClaimedBy() != null && conversation.getClaimedBy().getId().equals(actingUser.getId());
+        boolean isAdmin = actingUser.getRole() == Role.ADMIN;
+        boolean isSecondaryTechnician = technicianRepo.findByConversationIdAndUserId(conversation.getId(), actingUser.getId()).isPresent();
+        if (!isOwner && !isAdmin && !isSecondaryTechnician) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Você não está atribuído a este atendimento");
+        }
+    }
+
     private Integer resolveGlpiUserId(User user) {
         if (user.getGlpiUserId() != null) return user.getGlpiUserId();
         return glpiService.findUserByName(user.getName())
@@ -198,6 +207,7 @@ public class SupportService {
     @Transactional
     public SupportConversationDetail reply(UUID id, User user, String message, MultipartFile file) {
         SupportConversation conversation = getOrThrow(id);
+        ensureCanReply(conversation, user);
         if (conversation.getState() != ConversationState.HUMAN_ACTIVE) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Este atendimento não está mais ativo");
         }

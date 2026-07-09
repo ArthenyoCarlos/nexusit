@@ -318,8 +318,9 @@ export default function SupportCrmPage() {
   const conversation = detail?.conversation
   const isOwner = conversation?.claimedById === user?.id
   const isAdmin = user?.role === 'ADMIN'
+  const isSecondaryTechnician = conversation?.technicians?.some(t => t.id === user?.id) ?? false
   const canManage = (isOwner || isAdmin) && conversation?.state === 'HUMAN_ACTIVE'
-  const isMine = isOwner && conversation?.state === 'HUMAN_ACTIVE'
+  const isMine = (isOwner || isAdmin || isSecondaryTechnician) && conversation?.state === 'HUMAN_ACTIVE'
   const assignedIds = new Set([conversation?.claimedById, ...(conversation?.technicians?.map(t => t.id) ?? [])].filter(Boolean))
   const availableToAdd = technicianOptions.filter(t => t.active && !assignedIds.has(t.id))
   const availableToTransfer = technicianOptions.filter(t => t.active && t.id !== conversation?.claimedById)
