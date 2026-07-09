@@ -1,10 +1,19 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { Capacitor } from '@capacitor/core'
+import { VoiceRecorder } from '@independo/capacitor-voice-recorder'
 import Layout from '../components/Layout'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation, addTechnician, removeTechnician, transferConversation } from '../services/support'
 import { getUsers } from '../services/users'
 import { playAlertSound } from '../utils/alertSound'
+
+function base64ToBlob(base64, mimeType) {
+  const byteChars = atob(base64)
+  const byteNumbers = new Array(byteChars.length)
+  for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i)
+  return new Blob([new Uint8Array(byteNumbers)], { type: mimeType })
+}
 
 const STATE_LABEL = {
   AWAITING_NAME: 'Identificando', MENU: 'No menu', AWAITING_DESCRIPTION: 'Descrevendo problema',
@@ -256,6 +265,22 @@ export default function SupportCrmPage() {
   }
 
   const startRecording = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { value: allowed } = await VoiceRecorder.requestAudioRecordingPermission()
+        if (!allowed) {
+          toast.add('Permissão de microfone negada.', 'error')
+          return
+        }
+        await VoiceRecorder.startRecording()
+        setRecording(true)
+      } catch (e) {
+        console.error('VoiceRecorder.startRecording falhou:', e)
+        toast.add(`Não foi possível iniciar a gravação (${e.message || e}).`, 'error')
+      }
+      return
+    }
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       const preferredTypes = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm']
@@ -280,7 +305,22 @@ export default function SupportCrmPage() {
     }
   }
 
-  const stopRecording = () => {
+  const stopRecording = async () => {
+    if (Capacitor.isNativePlatform()) {
+      try {
+        const { value } = await VoiceRecorder.stopRecording()
+        const blob = base64ToBlob(value.recordDataBase64, value.mimeType)
+        const ext = value.fileExtension || 'm4a'
+        setSelectedFile(new File([blob], `audio-tecnico-${Date.now()}.${ext}`, { type: value.mimeType }))
+      } catch (e) {
+        console.error('VoiceRecorder.stopRecording falhou:', e)
+        toast.add(`Não foi possível finalizar a gravação (${e.message || e}).`, 'error')
+      } finally {
+        setRecording(false)
+      }
+      return
+    }
+
     const recorder = mediaRecorderRef.current
     if (recorder && recorder.state !== 'inactive') recorder.stop()
     else setRecording(false)

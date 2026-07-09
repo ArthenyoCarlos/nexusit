@@ -76,7 +76,10 @@ public class MainActivity extends BridgeActivity {
                         pendingCameraUri = FileProvider.getUriForFile(
                                 MainActivity.this, getPackageName() + ".fileprovider", photoFile);
                         cameraIntent.putExtra(MediaStore.EXTRA_OUTPUT, pendingCameraUri);
-                        cameraIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION);
+                        cameraIntent.addFlags(Intent.FLAG_GRANT_WRITE_URI_PERMISSION | Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                        // Sem isto, a WebView não consegue reabrir o arquivo pra ler os bytes
+                        // depois que a câmera devolve o controle — a foto "anexa" mas não envia.
+                        grantUriPermission(getPackageName(), pendingCameraUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
                         chooserIntent.putExtra(Intent.EXTRA_INITIAL_INTENTS, new Intent[]{cameraIntent});
                     } catch (IOException e) {
                         pendingCameraUri = null;
