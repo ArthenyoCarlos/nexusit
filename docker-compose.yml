@@ -77,6 +77,39 @@ services:
       - nexusit-internal
       - vps_proxy
 
+  # NexusDesk (acesso remoto) — servidor RustDesk self-hospedado.
+  # Falam TCP/UDP cru (não é HTTP), então não dá pra passar pelo nginx/vps_proxy
+  # como o resto — as portas precisam ser publicadas direto no host da VM.
+  nexusdesk-hbbs:
+    image: rustdesk/rustdesk-server:latest
+    container_name: nexusdesk-hbbs
+    restart: unless-stopped
+    command: hbbs -r ${NEXUSDESK_RELAY_HOST:-nexus.local}:21117
+    ports:
+      - "21115:21115"
+      - "21116:21116/tcp"
+      - "21116:21116/udp"
+      - "21118:21118"
+    volumes:
+      - /opt/data/nexusdesk:/root
+    networks:
+      - nexusit-internal
+    depends_on:
+      - nexusdesk-hbbr
+
+  nexusdesk-hbbr:
+    image: rustdesk/rustdesk-server:latest
+    container_name: nexusdesk-hbbr
+    restart: unless-stopped
+    command: hbbr
+    ports:
+      - "21117:21117"
+      - "21119:21119"
+    volumes:
+      - /opt/data/nexusdesk:/root
+    networks:
+      - nexusit-internal
+
 networks:
   nexusit-internal:
     driver: bridge

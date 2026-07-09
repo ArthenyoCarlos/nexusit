@@ -22,6 +22,7 @@ import SystemDetailPage from './pages/SystemDetailPage'
 import InventoryDetailPage from './pages/InventoryDetailPage'
 import VaultPage from './pages/VaultPage'
 import SshConsolePage from './pages/SshConsolePage'
+import NexusDeskPage from './pages/NexusDeskPage'
 import SupportCrmPage from './pages/SupportCrmPage'
 import TeamTrackingPage from './pages/TeamTrackingPage'
 import LicensesPage from './pages/LicensesPage'
@@ -85,6 +86,7 @@ export default function App() {
                   <Route path="/settings"        element={<SettingsPage />} />
                   <Route path="/vault"           element={<VaultPage />} />
                   <Route path="/ssh-console"     element={<SshConsolePage />} />
+                  <Route path="/nexusdesk"       element={<NexusDeskPage />} />
                   <Route path="/support-crm"     element={<SupportCrmPage />} />
                   <Route path="/team-tracking"   element={<TeamTrackingPage />} />
                   <Route path="/licenses"        element={<LicensesPage />} />

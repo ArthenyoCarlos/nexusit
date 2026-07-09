@@ -36,6 +36,7 @@ const NAV = [
     items: [
       { label: 'Cofre',         path: '/vault',                Icon: IconVault, adminOnly: true },
       { label: 'Console SSH',   path: '/ssh-console',          Icon: IconTerminal, adminOnly: true },
+      { label: 'NexusDesk',     path: '/nexusdesk',            Icon: IconRemoteDesktop, adminOnly: true },
       { label: 'Licenças',      path: '/licenses',             Icon: IconLicense    },
       { label: 'Contratos',     path: '/contracts',            Icon: IconContract   },
       { label: 'Termos Resp.',   path: '/termos',               Icon: IconContract   },
@@ -146,6 +147,7 @@ function IconSettings()   { return <svg {...i}><circle cx="12" cy="12" r="3"/><p
 function IconLogout()     { return <svg {...i}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg> }
 function IconVault()      { return <svg {...i}><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/><circle cx="12" cy="16" r="1"/></svg> }
 function IconTerminal()   { return <svg {...i}><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 9l4 3-4 3M13 15h5"/></svg> }
+function IconRemoteDesktop() { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M9 10l2 2-2 2M14 10l-2 2 2 2" strokeWidth="1.5"/></svg> }
 function IconLicense()    { return <svg {...i}><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg> }
 function IconOnboarding() { return <svg {...i}><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg> }
 function IconMonitorUrl() { return <svg {...i}><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> }
