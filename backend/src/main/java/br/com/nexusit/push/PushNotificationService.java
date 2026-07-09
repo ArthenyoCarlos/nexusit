@@ -62,6 +62,15 @@ public class PushNotificationService {
         }
     }
 
+    /** Manda para todo mundo com o app mobile instalado e logado — usado para avisar
+     * a fila inteira quando um chamado novo chega sem técnico ainda atribuído. */
+    public void broadcastToAllDevices(String title, String body, Map<String, String> data) {
+        if (messaging == null) return;
+        for (DeviceToken deviceToken : deviceTokenRepo.findAll()) {
+            send(deviceToken, title, body, data);
+        }
+    }
+
     private void send(DeviceToken deviceToken, String title, String body, Map<String, String> data) {
         try {
             Message.Builder builder = Message.builder()

@@ -132,6 +132,7 @@ public class SupportConversationEngine {
             conversation.setGlpiTicketId(ticketId);
             conversation.setState(ConversationState.PENDING_TECH);
             conversationRepo.save(conversation);
+            notifyQueueOfNewTicket(conversation, contact, ticketId);
             sendAndRecord(conversation, "✅ Solicitação urgente registrada no chamado #" + ticketId + ". Um técnico irá assumir em breve.");
             return;
         }
@@ -158,6 +159,7 @@ public class SupportConversationEngine {
             conversation.setState(ConversationState.PENDING_TECH);
             conversationRepo.save(conversation);
             attachMediaIfAny(ticketId, msg);
+            notifyQueueOfNewTicket(conversation, contact, ticketId);
             sendAndRecord(conversation, "✅ Chamado #" + ticketId + " aberto com sucesso! Um técnico irá atendê-lo em breve. Você será notificado aqui quando seu chamado for atendido.");
         } else {
             appendFollowupOnly(conversation, msg, transcription);
@@ -214,6 +216,14 @@ public class SupportConversationEngine {
         }
         technicianRepo.findByConversation(conversation.getId())
                 .forEach(t -> pushNotificationService.sendToUser(t.getUser().getId(), title, body, data));
+    }
+
+    private void notifyQueueOfNewTicket(SupportConversation conversation, WhatsappContact contact, int ticketId) {
+        String from = contact.getGlpiUserName() != null && !contact.getGlpiUserName().isBlank()
+                ? contact.getGlpiUserName() : contact.getDisplayName();
+        String body = (from == null || from.isBlank() ? "Alguém" : from) + " está aguardando atendimento";
+        Map<String, String> data = Map.of("conversationId", conversation.getId().toString(), "type", "support_queue");
+        pushNotificationService.broadcastToAllDevices("Novo chamado na fila — #" + ticketId, body, data);
     }
 
     private void recordMessage(SupportConversation conversation, MessageDirection direction, MessageAuthor author,
