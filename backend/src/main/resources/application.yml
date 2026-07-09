@@ -46,6 +46,8 @@ application:
     email: ${VAULTWARDEN_EMAIL:}
     master-password: ${VAULTWARDEN_MASTER_PASSWORD:}
     organization-name: ${VAULTWARDEN_ORG_NAME:Armazem Galdino}
+  firebase:
+    credentials-path: ${FIREBASE_CREDENTIALS_PATH:}
   whatsapp:
     base-url: ${EVOLUTION_API_BASE_URL:}
     api-key: ${EVOLUTION_API_KEY:}

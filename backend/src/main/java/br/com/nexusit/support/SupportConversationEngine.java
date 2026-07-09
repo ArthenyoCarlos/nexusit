@@ -3,6 +3,7 @@ package br.com.nexusit.support;
 import br.com.nexusit.glpi.GlpiService;
 import br.com.nexusit.glpi.GlpiTicket;
 import br.com.nexusit.glpi.GlpiUserRef;
+import br.com.nexusit.push.PushNotificationService;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -36,10 +38,12 @@ public class SupportConversationEngine {
     private final WhatsappContactRepository contactRepo;
     private final SupportConversationRepository conversationRepo;
     private final SupportMessageRepository messageRepo;
+    private final SupportConversationTechnicianRepository technicianRepo;
     private final GlpiService glpiService;
     private final EvolutionApiClient evolutionApiClient;
     private final BotAtendimentoTiStateStore stateStore;
     private final AudioTranscriptionService audioTranscriptionService;
+    private final PushNotificationService pushNotificationService;
 
     @Transactional
     public void onInboundMessage(InboundWhatsappMessage msg) {
@@ -61,6 +65,10 @@ public class SupportConversationEngine {
 
         String transcription = transcribeIfAudio(msg);
         recordInboundMessage(conversation, contact, msg, transcription);
+
+        if (!isNewConversation.get() && conversation.getState() == ConversationState.HUMAN_ACTIVE) {
+            notifyTechniciansOfNewMessage(conversation, contact, msg, transcription);
+        }
 
         if (isNewConversation.get()) {
             if (conversation.getState() == ConversationState.AWAITING_NAME) {
@@ -190,6 +198,22 @@ public class SupportConversationEngine {
         recordMessage(conversation, MessageDirection.IN, MessageAuthor.EMPLOYEE,
                 employeeDisplayName(contact, msg), inboundContent(msg, transcription),
                 msg.mediaBytes(), msg.mediaFilename(), msg.mediaMime(), msg.mediaKind(), transcription);
+    }
+
+    private void notifyTechniciansOfNewMessage(SupportConversation conversation, WhatsappContact contact,
+                                               InboundWhatsappMessage msg, String transcription) {
+        String from = employeeDisplayName(contact, msg);
+        String content = inboundContent(msg, transcription);
+        String preview = content.isBlank() ? "Enviou uma mensagem" : content;
+        final String body = preview.length() > 140 ? preview.substring(0, 140) + "…" : preview;
+        String title = "Nova mensagem — " + from;
+        Map<String, String> data = Map.of("conversationId", conversation.getId().toString(), "type", "support_message");
+
+        if (conversation.getClaimedBy() != null) {
+            pushNotificationService.sendToUser(conversation.getClaimedBy().getId(), title, body, data);
+        }
+        technicianRepo.findByConversation(conversation.getId())
+                .forEach(t -> pushNotificationService.sendToUser(t.getUser().getId(), title, body, data));
     }
 
     private void recordMessage(SupportConversation conversation, MessageDirection direction, MessageAuthor author,

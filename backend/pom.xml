@@ -133,6 +133,13 @@
             <type>pom</type>
         </dependency>
 
+        <!-- Firebase Admin SDK (push notification do app mobile) -->
+        <dependency>
+            <groupId>com.google.firebase</groupId>
+            <artifactId>firebase-admin</artifactId>
+            <version>9.4.3</version>
+        </dependency>
+
         <!-- Test -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

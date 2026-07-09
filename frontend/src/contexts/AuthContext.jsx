@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useCallback } from 'react'
 import api from '../services/api'
+import { unregisterDeviceToken } from '../services/devices'
 
 const AuthContext = createContext(null)
 
@@ -22,6 +23,11 @@ export function AuthProvider({ children }) {
   }, [])
 
   const logout = useCallback(() => {
+    const fcmToken = localStorage.getItem('fcm_token')
+    if (fcmToken) {
+      unregisterDeviceToken(fcmToken).catch(() => {})
+      localStorage.removeItem('fcm_token')
+    }
     localStorage.removeItem('token')
     localStorage.removeItem('user')
     setUser(null)

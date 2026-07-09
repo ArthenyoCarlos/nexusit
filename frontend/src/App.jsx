@@ -41,6 +41,7 @@ import TermoAssinarPage from './pages/TermoAssinarPage'
 import TermoTemplatePage from './pages/TermoTemplatePage'
 import HermesPage from './pages/HermesPage'
 import ProtectedRoute from './components/ProtectedRoute'
+import NativePushBootstrap from './components/NativePushBootstrap'
 
 const isNative = Capacitor.isNativePlatform()
 
@@ -50,6 +51,7 @@ export default function App() {
     <AuthProvider>
       <ToastProvider>
         <BrowserRouter>
+          {isNative && <NativePushBootstrap />}
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<LoginPage />} />

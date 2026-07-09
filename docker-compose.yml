@@ -53,10 +53,12 @@ services:
       OPENAI_TRANSCRIPTION_API_URL: ${OPENAI_TRANSCRIPTION_API_URL:-http://whisper:9000/asr}
       OPENAI_TRANSCRIPTION_MODEL: ${OPENAI_TRANSCRIPTION_MODEL:-small}
       OPENAI_TRANSCRIPTION_LANGUAGE: ${OPENAI_TRANSCRIPTION_LANGUAGE:-pt}
+      FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-/run/secrets/firebase-service-account.json}
     expose:
       - "8080"
     volumes:
       - /home/galdino/.hermes:/home/galdino/.hermes
+      - /home/galdino/.secrets/nexusit/firebase-service-account.json:/run/secrets/firebase-service-account.json:ro
     networks:
       - nexusit-internal
       - vps_proxy

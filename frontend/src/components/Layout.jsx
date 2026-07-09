@@ -91,6 +91,10 @@ export default function Layout({ children }) {
   }, [addToast])
 
   useEffect(() => {
+    // No app nativo, a notificação de mensagem nova já vem via push (Firebase) —
+    // não precisa desse polling nem duplicaria o aviso.
+    if (Capacitor.isNativePlatform()) return
+
     async function pollMessages() {
       try {
         const conversations = await getMine()
