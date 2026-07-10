@@ -65,21 +65,22 @@ public class SshWebSocketHandler extends TextWebSocketHandler {
             return;
         }
 
-        String password;
+        JSch jsch = new JSch();
         try {
-            password = crypto.decrypt(host.getEncryptedPassword());
+            configureIdentity(jsch, host);
         } catch (Exception e) {
-            log.warn("Falha ao descriptografar senha da máquina {}: {}", host.getId(), e.toString());
+            log.warn("Falha ao preparar credenciais SSH da máquina {}: {}", host.getId(), e.toString());
             closeQuietly(wsSession, 4005, "erro ao ler credenciais");
             return;
         }
 
-        JSch jsch = new JSch();
         Session jschSession = null;
         ChannelShell channel = null;
         try {
             jschSession = jsch.getSession(host.getUsername(), host.getHost(), host.getPort());
-            jschSession.setPassword(password);
+            if ((host.getAuthType() == null || host.getAuthType() == SshAuthType.PASSWORD) && host.getEncryptedPassword() != null) {
+                jschSession.setPassword(crypto.decrypt(host.getEncryptedPassword()));
+            }
             jschSession.setConfig("StrictHostKeyChecking", "no");
             jschSession.connect(CONNECT_TIMEOUT_MS);
 
@@ -153,6 +154,17 @@ public class SshWebSocketHandler extends TextWebSocketHandler {
         String path = wsSession.getUri().getPath();
         String idStr = path.substring(path.lastIndexOf('/') + 1);
         return UUID.fromString(idStr);
+    }
+
+    private void configureIdentity(JSch jsch, SshHost host) throws JSchException {
+        if (host.getAuthType() != SshAuthType.PRIVATE_KEY) return;
+        String privateKey = crypto.decrypt(host.getEncryptedPrivateKey());
+        byte[] passphrase = null;
+        if (host.getEncryptedPrivateKeyPassphrase() != null && !host.getEncryptedPrivateKeyPassphrase().isBlank()) {
+            passphrase = crypto.decrypt(host.getEncryptedPrivateKeyPassphrase()).getBytes(StandardCharsets.UTF_8);
+        }
+        jsch.addIdentity(host.getId() != null ? host.getId().toString() : host.getHost(),
+                privateKey.getBytes(StandardCharsets.UTF_8), null, passphrase);
     }
 
     private boolean isAdmin(WebSocketSession wsSession) {
