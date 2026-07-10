@@ -188,6 +188,8 @@ export default function SupportCrmPage() {
   const [transferTechId, setTransferTechId] = useState('')
   const [savingTech, setSavingTech] = useState(false)
   const threadEndRef = useRef(null)
+  const threadBodyRef = useRef(null)
+  const isNearBottomRef = useRef(true)
   const fileInputRef = useRef(null)
   const mediaRecorderRef = useRef(null)
   const audioChunksRef = useRef([])
@@ -216,8 +218,15 @@ export default function SupportCrmPage() {
 
   useEffect(() => {
     lastMessageCountRef.current = null
+    isNearBottomRef.current = true
     loadDetail(selectedId)
   }, [selectedId, loadDetail])
+
+  const handleThreadScroll = () => {
+    const el = threadBodyRef.current
+    if (!el) return
+    isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  }
 
   useEffect(() => {
     if (!selectedId) return
@@ -235,7 +244,9 @@ export default function SupportCrmPage() {
     if (newest && newest.author !== 'TECH') playAlertSound(3)
   }, [detail])
 
-  useEffect(() => { threadEndRef.current?.scrollIntoView({ block: 'nearest' }) }, [detail])
+  useEffect(() => {
+    if (isNearBottomRef.current) threadEndRef.current?.scrollIntoView({ block: 'nearest' })
+  }, [detail])
 
   const handleClaim = async (id) => {
     setClaimingId(id)
@@ -257,6 +268,7 @@ export default function SupportCrmPage() {
     if ((!message.trim() && !selectedFile) || !selectedId) return
     setSending(true)
     try {
+      isNearBottomRef.current = true
       setDetail(await replyToConversation(selectedId, message.trim(), selectedFile))
       setMessage('')
       setSelectedFile(null)
@@ -496,7 +508,7 @@ export default function SupportCrmPage() {
                   )}
                 </div>
 
-                <div className="support-thread-body">
+                <div className="support-thread-body" ref={threadBodyRef} onScroll={handleThreadScroll}>
                   {detail.messages.map(m => {
                     const mine = m.author === 'TECH'
                     const system = m.author === 'HERMES'
