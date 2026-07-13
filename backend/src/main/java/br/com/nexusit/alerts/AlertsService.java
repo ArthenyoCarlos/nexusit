@@ -28,16 +28,18 @@ public class AlertsService {
         hermesController.getSummary().attentionItems().forEach(a ->
                 items.add(new AlertItem(a.type(), a.severity(), a.message(), a.path())));
 
-        // GLPI: getTickets(null) já retorna só chamados em aberto (status 1-4)
-        // Nota: "sem técnico" não dá pra calcular aqui - GLPI só devolve o técnico
-        // atribuído via uma chamada extra por chamado (GlpiService.withResolvedAssignees),
-        // e esse endpoint é consultado a cada 1 min pelo sininho; ficaria pesado demais.
-        // Usado no Relatório de Chamados, que é gerado sob demanda.
+        // GLPI: getTickets(null) já retorna só chamados em aberto (status 1-4),
+        // com técnico/solicitante resolvidos em lote (ver GlpiService.fetchActorMaps)
         List<GlpiTicket> tickets = glpiService.getTickets(null);
         long criticalTickets = tickets.stream().filter(t -> t.priority() >= 4).count();
+        long unassignedTickets = tickets.stream()
+                .filter(t -> t.assignedTo() == null || t.assignedTo().isBlank()).count();
         if (criticalTickets > 0)
             items.add(new AlertItem("ticket", "critical",
                     criticalTickets + " chamado(s) crítico(s) em aberto", "/tickets"));
+        if (unassignedTickets > 0)
+            items.add(new AlertItem("ticket", "warning",
+                    unassignedTickets + " chamado(s) sem técnico", "/tickets"));
 
         // Zabbix: problemas ativos com severidade alta/desastre
         List<ZabbixProblem> problems = zabbixService.getProblems();

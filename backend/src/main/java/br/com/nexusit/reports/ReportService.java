@@ -94,9 +94,6 @@ public class ReportService {
                     return opened != null && !opened.isBefore(since);
                 })
                 .toList();
-        // GLPI não devolve o técnico atribuído nas chamadas em lote (ver GlpiService);
-        // resolve aqui, já com a lista filtrada pelo período, pra não gastar chamada à toa.
-        tickets = glpiService.withResolvedAssignees(tickets);
 
         long open = tickets.stream().filter(t -> t.status() <= 4).count();
         long done = tickets.size() - open;

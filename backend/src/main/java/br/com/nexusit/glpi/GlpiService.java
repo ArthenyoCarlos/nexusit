@@ -68,13 +68,15 @@ public class GlpiService {
             List<Map<String, Object>> raw = client.getList("/Ticket", params);
             if (raw == null) return List.of();
 
+            ActorMaps actors = fetchActorMaps();
+
             return raw.stream()
                     .filter(t -> {
                         int s = intVal(t, "status");
                         if (status != null) return s == status;
                         return s <= 4; // open: 1,2,3,4
                     })
-                    .map(this::toTicket)
+                    .map(t -> withActors(toTicket(t), actors))
                     .toList();
         }, List.of());
     }
@@ -112,20 +114,54 @@ public class GlpiService {
     }
 
     /**
-     * Reforça a lista com o técnico atribuído, fazendo uma chamada extra por chamado ao
-     * sub-recurso Ticket_User (ver resolveAssignedTechnician). Só compensa para listas
-     * pequenas/pontuais — não usar em telas que recarregam com frequência.
+     * GLPI não preenche "_users_id_assign"/"_users_id_requester" nas respostas de /Ticket
+     * (lista ou item único) — não são colunas reais da tabela do chamado, ficam na tabela
+     * pivô glpi_tickets_users (type 1 = solicitante, 2 = técnico), e expand_dropdowns não
+     * alcança isso. ActorMaps + fetchActorMaps() resolvem isso em UMA chamada bulk a
+     * /Ticket_User (sem N+1) pra usar em getTickets(); getTicketById() resolve só o chamado
+     * aberto, então usa o sub-recurso por ticket (mais barato pra um item só).
      */
-    public List<GlpiTicket> withResolvedAssignees(List<GlpiTicket> tickets) {
-        return tickets.stream().map(this::withResolvedAssignee).toList();
+    private record ActorMaps(Map<Integer, String> assignees, Map<Integer, String> requesters) {}
+
+    private ActorMaps fetchActorMaps() {
+        return safeCall(() -> {
+            Map<String, String> params = new LinkedHashMap<>();
+            params.put("range", "0-1999");
+            params.put("expand_dropdowns", "true");
+            params.put("get_hateoas", "false");
+            params.put("order", "DESC");
+            params.put("sort", "id"); // se truncar pelo range, prioriza os vinculos mais recentes
+            List<Map<String, Object>> rows = client.getList("/Ticket_User", params);
+
+            Map<Integer, String> assignees = new LinkedHashMap<>();
+            Map<Integer, String> requesters = new LinkedHashMap<>();
+            if (rows != null) {
+                for (Map<String, Object> r : rows) {
+                    String name = str(r, "users_id");
+                    if (name == null || name.isBlank()) continue;
+                    int ticketId = intVal(r, "tickets_id");
+                    int type = intVal(r, "type");
+                    if (type == 2) assignees.putIfAbsent(ticketId, name);
+                    else if (type == 1) requesters.putIfAbsent(ticketId, name);
+                }
+            }
+            return new ActorMaps(assignees, requesters);
+        }, new ActorMaps(Map.of(), Map.of()));
     }
 
-    /**
-     * GLPI não preenche "_users_id_assign" nas respostas de /Ticket (lista ou item único) —
-     * não é uma coluna real da tabela do chamado, o técnico atribuído fica na tabela pivô
-     * glpi_tickets_users, e expand_dropdowns não alcança isso. Resolve via o mesmo
-     * sub-recurso Ticket_User que assignTicket()/unassignTicket() já escrevem.
-     */
+    private GlpiTicket withActors(GlpiTicket t, ActorMaps actors) {
+        String assignedTo = (t.assignedTo() == null || t.assignedTo().isBlank())
+                ? actors.assignees().get(t.id()) : t.assignedTo();
+        String requester = (t.requester() == null || t.requester().isBlank())
+                ? actors.requesters().get(t.id()) : t.requester();
+        if (assignedTo == null) assignedTo = t.assignedTo();
+        if (requester == null) requester = t.requester();
+        return new GlpiTicket(t.id(), t.title(), t.status(), t.statusLabel(), t.priority(), t.priorityLabel(),
+                t.urgency(), t.urgencyLabel(), t.impact(), t.impactLabel(), t.category(), requester,
+                assignedTo, t.openedAt(), t.solvedAt(), t.ticketType(), t.slaTtoName(), t.slaTtrName(),
+                t.timeToOwn(), t.timeToResolve(), t.slaWaitingDuration());
+    }
+
     private GlpiTicket withResolvedAssignee(GlpiTicket t) {
         if (t.assignedTo() != null && !t.assignedTo().isBlank()) return t;
         String resolved = resolveAssignedTechnician(t.id());
