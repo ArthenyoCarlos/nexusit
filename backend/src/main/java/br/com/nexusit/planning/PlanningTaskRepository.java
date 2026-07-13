@@ -8,6 +8,12 @@ import java.util.UUID;
 
 public interface PlanningTaskRepository extends JpaRepository<PlanningTask, UUID> {
 
-    @Query("SELECT t FROM PlanningTask t LEFT JOIN FETCH t.assignee ORDER BY t.columnName, t.columnOrder, t.createdAt")
+    @Query("""
+            SELECT DISTINCT t FROM PlanningTask t
+            LEFT JOIN FETCH t.assignee
+            LEFT JOIN FETCH t.members m
+            LEFT JOIN FETCH m.user
+            ORDER BY t.columnName, t.columnOrder, t.createdAt
+            """)
     List<PlanningTask> findAllWithAssignee();
 }

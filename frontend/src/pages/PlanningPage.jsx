@@ -16,7 +16,7 @@ const COLUMNS = [
   { id: 'Concluído',     label: 'Concluído',     color: 'var(--green)',        bg: 'var(--green-bg)' },
 ]
 
-const EMPTY_FORM = { title: '', description: '', columnName: 'Backlog', dueDate: '', assigneeId: '' }
+const EMPTY_FORM = { title: '', description: '', columnName: 'Backlog', dueDate: '', assigneeId: '', memberIds: [] }
 
 const today = new Date().toISOString().split('T')[0]
 
@@ -69,8 +69,11 @@ function DraggableCard({ task, onEdit, onDelete }) {
         </div>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, gap: 6 }}>
-        {task.assigneeName && (
-          <span style={{ fontSize: 11.5, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{task.assigneeName}</span>
+        {(task.assigneeName || task.members?.length > 0) && (
+          <span style={{ fontSize: 11.5, color: 'var(--text-tertiary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {task.assigneeName || 'Sem responsável'}
+            {task.members?.length > 0 && ` +${task.members.length}`}
+          </span>
         )}
         {task.dueDate && (
           <span style={{ fontSize: 11, padding: '2px 7px', borderRadius: 20, fontWeight: 500, flexShrink: 0, background: overdue ? 'var(--red-bg)' : 'var(--bg-muted)', color: overdue ? 'var(--red)' : 'var(--text-secondary)' }}>
@@ -201,6 +204,7 @@ export default function PlanningPage() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTask, setEditingTask] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
+  const [memberToAdd, setMemberToAdd] = useState('')
   const [saving, setSaving] = useState(false)
 
   const sensors = useSensors(
@@ -222,7 +226,18 @@ export default function PlanningPage() {
   function openCreate(columnName = 'Backlog') {
     setEditingTask(null)
     setForm({ ...EMPTY_FORM, columnName })
+    setMemberToAdd('')
     setModalOpen(true)
+  }
+
+  function addMember() {
+    if (!memberToAdd || form.memberIds.includes(memberToAdd) || memberToAdd === form.assigneeId) return
+    setForm(f => ({ ...f, memberIds: [...f.memberIds, memberToAdd] }))
+    setMemberToAdd('')
+  }
+
+  function removeMember(userId) {
+    setForm(f => ({ ...f, memberIds: f.memberIds.filter(id => id !== userId) }))
   }
 
   function openEdit(task) {
@@ -233,7 +248,9 @@ export default function PlanningPage() {
       columnName: task.columnName,
       dueDate: task.dueDate || '',
       assigneeId: task.assigneeId || '',
+      memberIds: task.members?.map(m => m.id) || [],
     })
+    setMemberToAdd('')
     setModalOpen(true)
   }
 
@@ -387,11 +404,37 @@ export default function PlanningPage() {
           <div>
             <label className="input-label">Responsável</label>
             <select value={form.assigneeId}
-              onChange={e => setForm(f => ({ ...f, assigneeId: e.target.value }))}
+              onChange={e => setForm(f => ({ ...f, assigneeId: e.target.value, memberIds: f.memberIds.filter(id => id !== e.target.value) }))}
               className="input">
               <option value="">Sem responsável</option>
               {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
+          </div>
+          <div>
+            <label className="input-label">Outros integrantes</label>
+            <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+              <select value={memberToAdd} onChange={e => setMemberToAdd(e.target.value)} className="input" style={{ flex: 1 }}>
+                <option value="">Selecionar pessoa...</option>
+                {users
+                  .filter(u => u.id !== form.assigneeId && !form.memberIds.includes(u.id))
+                  .map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              <button type="button" onClick={addMember} disabled={!memberToAdd} className="btn btn-default btn-sm">+ Adicionar</button>
+            </div>
+            {form.memberIds.length > 0 && (
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {form.memberIds.map(id => {
+                  const u = users.find(x => x.id === id)
+                  if (!u) return null
+                  return (
+                    <span key={id} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 12, padding: '3px 8px', borderRadius: 20, background: 'var(--bg-muted)', color: 'var(--text-secondary)' }}>
+                      {u.name}
+                      <button type="button" onClick={() => removeMember(id)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-tertiary)', fontSize: 13, lineHeight: 1, padding: 0 }}>×</button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
             <button onClick={() => setModalOpen(false)} className="btn btn-default">

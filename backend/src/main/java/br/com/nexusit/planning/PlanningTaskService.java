@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -57,6 +58,16 @@ public class PlanningTaskService {
         task.setDueDate(req.dueDate());
         task.setAssignee(req.assigneeId() != null
                 ? userRepository.findById(req.assigneeId()).orElse(null) : null);
+
+        if (task.getMembers() == null) task.setMembers(new ArrayList<>());
+        task.getMembers().clear();
+        if (req.memberIds() != null) {
+            req.memberIds().stream()
+                    .distinct()
+                    .filter(uid -> req.assigneeId() == null || !uid.equals(req.assigneeId()))
+                    .forEach(uid -> userRepository.findById(uid).ifPresent(u ->
+                            task.getMembers().add(PlanningTaskMember.builder().task(task).user(u).build())));
+        }
         return task;
     }
 

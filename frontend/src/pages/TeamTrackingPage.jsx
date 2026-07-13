@@ -73,7 +73,7 @@ export default function TeamTrackingPage() {
           .map(c => new Date(c.closedAt) - new Date(c.claimedAt))
         const avgDuration = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : null
 
-        const myTasks = tasks.filter(t => t.assigneeId === u.id)
+        const myTasks = tasks.filter(t => t.assigneeId === u.id || t.members?.some(m => m.id === u.id))
         const doneTasks = myTasks.filter(t => t.columnName === 'Concluído')
         const overdueTasks = myTasks.filter(t => t.dueDate && t.dueDate < today && t.columnName !== 'Concluído')
 
