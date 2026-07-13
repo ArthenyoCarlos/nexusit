@@ -5,7 +5,7 @@ import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { SkeletonCard } from '../components/Skeleton'
 import { useAuth } from '../contexts/AuthContext'
-import { getArticles, createArticle, updateArticle, deleteArticle } from '../services/wiki'
+import { getArticles, searchWiki, createArticle, updateArticle, deleteArticle } from '../services/wiki'
 
 const CATEGORIES = ['Geral', 'Servidores', 'Rede', 'Sistemas', 'Procedimentos', 'Segurança', 'Hardware']
 const EMPTY = { title: '', category: 'Geral', content: '', tags: '' }
@@ -15,6 +15,8 @@ export default function WikiPage() {
   const navigate = useNavigate()
   const [articles, setArticles] = useState([])
   const [category, setCategory] = useState('')
+  const [query, setQuery]       = useState('')
+  const [searching, setSearching] = useState(false)
   const [loading, setLoading]   = useState(true)
   const [modal, setModal]       = useState(false)
   const [form, setForm]         = useState(EMPTY)
@@ -23,7 +25,17 @@ export default function WikiPage() {
   const [confirm, setConfirm]   = useState(null)
 
   const load = (cat) => getArticles(cat).then(setArticles).finally(() => setLoading(false))
-  useEffect(() => { load(category) }, [category])
+  useEffect(() => { if (!query.trim()) load(category) }, [category])
+
+  useEffect(() => {
+    if (!query.trim()) { setSearching(false); return }
+    setSearching(true)
+    setLoading(true)
+    const t = setTimeout(() => {
+      searchWiki(query.trim()).then(setArticles).finally(() => setLoading(false))
+    }, 350)
+    return () => clearTimeout(t)
+  }, [query])
 
   const openCreate = () => { setForm(EMPTY); setEditing(null); setModal(true) }
   const openEdit   = a => { setForm({ title: a.title, category: a.category, content: a.content, tags: a.tags ?? '' }); setEditing(a.id); setModal(true) }
@@ -50,12 +62,12 @@ export default function WikiPage() {
         {/* Sidebar categorias */}
         <div className="card" style={{ padding: '12px 8px', position: 'sticky', top: 76 }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0 8px', marginBottom: 8 }}>Categorias</p>
-          <button onClick={() => setCategory('')} className={`nav-item${!category ? ' active' : ''}`} style={{ width: '100%', justifyContent: 'space-between' }}>
+          <button onClick={() => { setQuery(''); setCategory('') }} className={`nav-item${!category && !query ? ' active' : ''}`} style={{ width: '100%', justifyContent: 'space-between' }}>
             <span>Todos</span>
             <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{articles.length}</span>
           </button>
           {CATEGORIES.map(c => (
-            <button key={c} onClick={() => setCategory(c)} className={`nav-item${category === c ? ' active' : ''}`} style={{ width: '100%', justifyContent: 'space-between' }}>
+            <button key={c} onClick={() => { setQuery(''); setCategory(c) }} className={`nav-item${!query && category === c ? ' active' : ''}`} style={{ width: '100%', justifyContent: 'space-between' }}>
               <span>{c}</span>
               {catCounts[c] > 0 && <span style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{catCounts[c]}</span>}
             </button>
@@ -67,9 +79,26 @@ export default function WikiPage() {
           <div className="page-header" style={{ marginBottom: 16 }}>
             <div className="page-header-left">
               <h1>Base de Conhecimento</h1>
-              <p>{articles.length} artigo(s){category ? ` em ${category}` : ''}</p>
+              <p>
+                {searching
+                  ? `${articles.length} resultado(s) para "${query.trim()}"`
+                  : `${articles.length} artigo(s)${category ? ` em ${category}` : ''}`}
+              </p>
             </div>
             <button onClick={openCreate} className="btn btn-primary">+ Novo Artigo</button>
+          </div>
+
+          <div style={{ position: 'relative', marginBottom: 16 }}>
+            <svg width="15" height="15" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-tertiary)' }}>
+              <circle cx="11" cy="11" r="8" /><path d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              value={query}
+              onChange={e => setQuery(e.target.value)}
+              placeholder="Buscar por assunto, palavra-chave ou termo relacionado..."
+              className="input"
+              style={{ paddingLeft: 36, width: '100%' }}
+            />
           </div>
 
           {loading ? (
@@ -78,7 +107,9 @@ export default function WikiPage() {
             </div>
           ) : articles.length === 0 ? (
             <div className="card" style={{ padding: 40, textAlign: 'center' }}>
-              <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>Nenhum artigo encontrado. Crie o primeiro!</p>
+              <p style={{ fontSize: 13, color: 'var(--text-tertiary)' }}>
+                {searching ? `Nenhum artigo encontrado para "${query.trim()}".` : 'Nenhum artigo encontrado. Crie o primeiro!'}
+              </p>
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
