@@ -101,7 +101,11 @@ async function runUpdate() {
   await ensureSafeGitDirectory()
   const opts = { cwd: REPO_PATH, timeout: 15 * 60 * 1000, maxBuffer: 1024 * 1024 * 20 }
   const compose = `docker compose --env-file ${shellQuote(COMPOSE_ENV_FILE)} -f ${shellQuote(COMPOSE_FILE)} --project-directory ${shellQuote(REPO_PATH)}`
-  await execAsync('git pull origin main', opts)
+  // fetch + reset --hard em vez de "git pull": esta pasta e so um checkout de deploy,
+  // nao deve ter historico proprio -- assim nunca trava por branch divergente (ex:
+  // um merge local antigo que nunca foi enviado de volta pro origin).
+  await execAsync('git fetch origin main --quiet', opts)
+  await execAsync('git reset --hard origin/main', opts)
   await execAsync(`${compose} build`, opts)
   await execAsync(`${compose} up -d`, opts)
 }
