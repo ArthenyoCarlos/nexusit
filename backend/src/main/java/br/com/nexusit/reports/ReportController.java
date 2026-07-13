@@ -22,6 +22,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.io.ByteArrayOutputStream;
@@ -38,6 +39,7 @@ public class ReportController {
 
     private final InventoryRepository inventoryRepo;
     private final LicenseRepository licenseRepo;
+    private final ReportService reportService;
 
     @Value("${app.company-name:Armazém Galdino}")
     private String companyName;
@@ -125,6 +127,33 @@ public class ReportController {
                 .contentType(MediaType.APPLICATION_PDF)
                 .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filename + "\"")
                 .body(baos.toByteArray());
+    }
+
+    @GetMapping("/tickets/pdf")
+    public ResponseEntity<byte[]> ticketsPdf(@RequestParam(defaultValue = "30") int days) {
+        return pdfResponse(reportService.ticketsReport(days), "relatorio-chamados-" + LocalDate.now());
+    }
+
+    @GetMapping("/financial/pdf")
+    public ResponseEntity<byte[]> financialPdf(@RequestParam(defaultValue = "3") int months) {
+        return pdfResponse(reportService.financialReport(months), "relatorio-financeiro-" + LocalDate.now());
+    }
+
+    @GetMapping("/licenses-contracts/pdf")
+    public ResponseEntity<byte[]> licensesContractsPdf() {
+        return pdfResponse(reportService.licensesContractsReport(), "relatorio-licencas-contratos-" + LocalDate.now());
+    }
+
+    @GetMapping("/inventory/pdf")
+    public ResponseEntity<byte[]> inventoryPdf() {
+        return pdfResponse(reportService.inventoryReport(), "relatorio-inventario-" + LocalDate.now());
+    }
+
+    private ResponseEntity<byte[]> pdfResponse(byte[] data, String filenameBase) {
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + filenameBase + ".pdf\"")
+                .body(data);
     }
 
     private String csv(String v) {

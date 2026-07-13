@@ -45,6 +45,7 @@ const NAV = [
       { label: 'Console SSH',   path: '/ssh-console',          Icon: IconTerminal, adminOnly: true },
       { label: 'NexusDesk',     path: '/nexusdesk',            Icon: IconRemoteDesktop, adminOnly: true },
       { label: 'Auditoria',     path: '/audit',                Icon: IconAudit, adminOnly: true },
+      { label: 'Relatórios',    path: '/reports',              Icon: IconReports, adminOnly: true },
       { label: 'Licenças',      path: '/licenses',             Icon: IconLicense    },
       { label: 'Contratos',     path: '/contracts',            Icon: IconContract   },
       { label: 'Termos Resp.',   path: '/termos',               Icon: IconContract   },
@@ -162,6 +163,7 @@ function IconCrm()        { return <svg {...i}><path d="M21 15a2 2 0 01-2 2H7l-4
 function IconNotes()      { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
 function IconMeetings()   { return <svg {...i}><path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg> }
 function IconAudit()      { return <svg {...i}><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> }
+function IconReports()    { return <svg {...i}><path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 8h6m-6 4h6"/></svg> }
 function IconPlanning()   { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18M9 16l2 2 4-4"/></svg> }
 function IconSettings()   { return <svg {...i}><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg> }
 function IconLogout()     { return <svg {...i}><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg> }

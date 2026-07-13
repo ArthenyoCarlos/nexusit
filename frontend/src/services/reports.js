@@ -16,3 +16,19 @@ export const downloadInventoryCsv = () =>
 export const downloadWeeklyReport = () =>
   api.get('/reports/weekly', { responseType: 'blob' })
     .then(r => triggerDownload(r.data, 'relatorio-semanal.pdf'))
+
+export const downloadTicketsReport = (days) =>
+  api.get('/reports/tickets/pdf', { params: { days }, responseType: 'blob' })
+    .then(r => triggerDownload(r.data, `relatorio-chamados-${days}d.pdf`))
+
+export const downloadFinancialReport = (months) =>
+  api.get('/reports/financial/pdf', { params: { months }, responseType: 'blob' })
+    .then(r => triggerDownload(r.data, `relatorio-financeiro-${months}m.pdf`))
+
+export const downloadLicensesContractsReport = () =>
+  api.get('/reports/licenses-contracts/pdf', { responseType: 'blob' })
+    .then(r => triggerDownload(r.data, 'relatorio-licencas-contratos.pdf'))
+
+export const downloadInventoryReport = () =>
+  api.get('/reports/inventory/pdf', { responseType: 'blob' })
+    .then(r => triggerDownload(r.data, 'relatorio-inventario.pdf'))
