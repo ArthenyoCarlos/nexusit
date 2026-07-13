@@ -1,5 +1,9 @@
 package br.com.nexusit.sshconsole;
 
+import br.com.nexusit.audit.AuditModule;
+import br.com.nexusit.audit.AuditService;
+import br.com.nexusit.user.User;
+import br.com.nexusit.user.UserRepository;
 import br.com.nexusit.vault.CryptoService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -41,6 +45,8 @@ public class SshWebSocketHandler extends TextWebSocketHandler {
     private final SshHostRepository hostRepo;
     private final CryptoService crypto;
     private final ObjectMapper objectMapper;
+    private final UserRepository userRepo;
+    private final AuditService auditService;
 
     private final Map<String, Bridge> bridges = new ConcurrentHashMap<>();
 
@@ -92,6 +98,8 @@ public class SshWebSocketHandler extends TextWebSocketHandler {
                 log.info("SSH: chave do host {} ({}) registrada na primeira conexão", host.getName(), host.getHost());
             } else if (!stored.equals(fingerprint)) {
                 log.warn("SSH: chave do host {} ({}) mudou! esperado={} recebido={}", host.getName(), host.getHost(), stored, fingerprint);
+                auditService.log(AuditModule.SSH_CONSOLE, "HOST_KEY_MISMATCH", resolveUser(wsSession), "SSH_HOST", host.getId(), host.getName(),
+                        "esperado=" + stored + " recebido=" + fingerprint);
                 jschSession.disconnect();
                 closeQuietly(wsSession, 4006, "chave do host mudou");
                 return;
@@ -104,6 +112,8 @@ public class SshWebSocketHandler extends TextWebSocketHandler {
 
             log.info("SSH: usuário {} abriu console em {} ({}@{}:{})",
                     principalName(wsSession), host.getName(), host.getUsername(), host.getHost(), host.getPort());
+            auditService.log(AuditModule.SSH_CONSOLE, "CONNECT", resolveUser(wsSession), "SSH_HOST", host.getId(), host.getName(),
+                    host.getUsername() + "@" + host.getHost() + ":" + host.getPort());
 
             Bridge bridge = new Bridge(jschSession, channel);
             bridges.put(wsSession.getId(), bridge);
@@ -177,6 +187,11 @@ public class SshWebSocketHandler extends TextWebSocketHandler {
 
     private String principalName(WebSocketSession wsSession) {
         return wsSession.getPrincipal() != null ? wsSession.getPrincipal().getName() : "desconhecido";
+    }
+
+    private User resolveUser(WebSocketSession wsSession) {
+        if (wsSession.getPrincipal() == null) return null;
+        return userRepo.findByEmail(wsSession.getPrincipal().getName()).orElse(null);
     }
 
     private void closeQuietly(WebSocketSession wsSession, int code, String reason) {

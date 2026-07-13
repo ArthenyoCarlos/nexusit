@@ -1,5 +1,7 @@
 package br.com.nexusit.vault;
 
+import br.com.nexusit.audit.AuditModule;
+import br.com.nexusit.audit.AuditService;
 import br.com.nexusit.user.User;
 import br.com.nexusit.user.UserRepository;
 import br.com.nexusit.vault.bitwarden.VaultwardenSyncService;
@@ -19,6 +21,7 @@ public class CredentialService {
     private final UserRepository userRepository;
     private final CryptoService crypto;
     private final VaultwardenSyncService vaultwardenSync;
+    private final AuditService auditService;
 
     public List<CredentialResponse> findAll(String search, String type) {
         return repository.findByFilters(
@@ -27,9 +30,11 @@ public class CredentialService {
         ).stream().map(CredentialResponse::from).toList();
     }
 
-    public String reveal(UUID id) {
+    @Transactional
+    public String reveal(UUID id, User currentUser) {
         Credential c = repository.findById(id)
                 .orElseThrow(() -> new jakarta.persistence.EntityNotFoundException("Credencial não encontrada"));
+        auditService.log(AuditModule.VAULT, "REVEAL_SECRET", currentUser, "CREDENTIAL", c.getId(), c.getTitle(), null);
         return crypto.decrypt(c.getSecret());
     }
 

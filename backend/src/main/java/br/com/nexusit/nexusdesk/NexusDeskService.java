@@ -1,5 +1,7 @@
 package br.com.nexusit.nexusdesk;
 
+import br.com.nexusit.audit.AuditModule;
+import br.com.nexusit.audit.AuditService;
 import br.com.nexusit.inventory.InventoryItem;
 import br.com.nexusit.inventory.InventoryRepository;
 import br.com.nexusit.user.User;
@@ -21,6 +23,7 @@ public class NexusDeskService {
     private final NexusDeskSessionRepository sessionRepo;
     private final InventoryRepository inventoryRepo;
     private final CryptoService crypto;
+    private final AuditService auditService;
 
     public List<NexusDeskDeviceResponse> findAll() {
         return deviceRepo.findAllWithRelations().stream().map(NexusDeskDeviceResponse::from).toList();
@@ -68,6 +71,8 @@ public class NexusDeskService {
                 .user(currentUser)
                 .glpiTicketId(glpiTicketId)
                 .build());
+        auditService.log(AuditModule.NEXUSDESK, "CONNECT", currentUser, "NEXUSDESK_DEVICE", device.getId(), device.getName(),
+                glpiTicketId != null ? "chamado #" + glpiTicketId : null);
 
         return new NexusDeskConnectResponse(device.getRustdeskId(), password);
     }

@@ -14,6 +14,7 @@ import TvDashboardPage from './pages/TvDashboardPage'
 import TicketsPage from './pages/TicketsPage'
 import NotesPage from './pages/NotesPage'
 import MeetingsPage from './pages/MeetingsPage'
+import AuditPage from './pages/AuditPage'
 import PlanningPage from './pages/PlanningPage'
 import NetworkDocsPage from './pages/NetworkDocsPage'
 import ProfilePage from './pages/ProfilePage'
@@ -82,6 +83,7 @@ export default function App() {
                   <Route path="/tickets"    element={<TicketsPage />} />
                   <Route path="/notes"      element={<NotesPage />} />
                   <Route path="/meetings"   element={<MeetingsPage />} />
+                  <Route path="/audit"      element={<AuditPage />} />
                   <Route path="/planning"   element={<PlanningPage />} />
                   <Route path="/network"    element={<NetworkDocsPage />} />
                   <Route path="/profile"    element={<ProfilePage />} />

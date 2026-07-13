@@ -1,5 +1,8 @@
 package br.com.nexusit.vault.bitwarden;
 
+import br.com.nexusit.audit.AuditModule;
+import br.com.nexusit.audit.AuditService;
+import br.com.nexusit.user.User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,6 +27,7 @@ public class VaultwardenReadService {
     private final VaultwardenProperties props;
     private final VaultwardenClient client;
     private final VaultwardenSessionService sessionService;
+    private final AuditService auditService;
 
     public List<VaultwardenCipherSummary> listOrganizationLogins() {
         if (!props.isConfigured()) {
@@ -63,7 +67,7 @@ public class VaultwardenReadService {
         }
     }
 
-    public String revealPassword(String cipherId) {
+    public String revealPassword(String cipherId, User currentUser) {
         VaultwardenSessionService.Session session = sessionService.getSession();
         Map<String, Object> sync = client.sync(session.accessToken());
         List<Map<String, Object>> ciphers = listOf(sync.get("Ciphers"), sync.get("ciphers"));
@@ -72,6 +76,10 @@ public class VaultwardenReadService {
                 .filter(c -> cipherId.equals(String.valueOf(field(c, "Id", "id"))))
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Item não encontrado no Vaultwarden"));
+
+        String name = decryptOrNull((String) field(cipher, "Name", "name"), session);
+        auditService.log(AuditModule.VAULT, "REVEAL_SECRET", currentUser, "VAULTWARDEN_ITEM", null,
+                name != null ? name : cipherId, null);
 
         Map<String, Object> login = asMap(field(cipher, "Login", "login"));
         String encryptedPassword = login != null ? (String) field(login, "Password", "password") : null;

@@ -30,8 +30,8 @@ public class CredentialController {
     }
 
     @GetMapping("/vaultwarden/{id}/reveal")
-    public Map<String, String> revealVaultwardenItem(@PathVariable String id) {
-        return Map.of("secret", vaultwardenReadService.revealPassword(id));
+    public Map<String, String> revealVaultwardenItem(@PathVariable String id, @AuthenticationPrincipal User user) {
+        return Map.of("secret", vaultwardenReadService.revealPassword(id, user));
     }
 
     @GetMapping
@@ -43,8 +43,8 @@ public class CredentialController {
     }
 
     @GetMapping("/{id}/reveal")
-    public Map<String, String> reveal(@PathVariable UUID id) {
-        return Map.of("secret", service.reveal(id));
+    public Map<String, String> reveal(@PathVariable UUID id, @AuthenticationPrincipal User user) {
+        return Map.of("secret", service.reveal(id, user));
     }
 
     @PostMapping
