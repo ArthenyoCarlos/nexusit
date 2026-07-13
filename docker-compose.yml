@@ -54,6 +54,8 @@ services:
       OPENAI_TRANSCRIPTION_MODEL: ${OPENAI_TRANSCRIPTION_MODEL:-small}
       OPENAI_TRANSCRIPTION_LANGUAGE: ${OPENAI_TRANSCRIPTION_LANGUAGE:-pt}
       FIREBASE_CREDENTIALS_PATH: ${FIREBASE_CREDENTIALS_PATH:-/run/secrets/firebase-service-account.json}
+      UPDATER_URL: ${UPDATER_URL:-http://nexusupdater:9000}
+      UPDATER_TOKEN: ${UPDATER_TOKEN:-}
     expose:
       - "8080"
     volumes:
@@ -107,6 +109,24 @@ services:
       - "21119:21119"
     volumes:
       - /opt/data/nexusdesk:/root
+    networks:
+      - nexusit-internal
+
+  # NexusUpdater — servico auxiliar separado que verifica e aplica atualizacoes
+  # (git pull + docker compose rebuild). Fica fora do container do backend de proposito:
+  # so ele tem acesso ao socket do Docker e ao checkout real do repo no host.
+  nexusupdater:
+    build: ./nexusupdater
+    container_name: nexusupdater
+    restart: unless-stopped
+    environment:
+      UPDATER_TOKEN: ${UPDATER_TOKEN:-}
+      REPO_PATH: ${NEXUSIT_REPO_PATH:-/opt/nexusit}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ${NEXUSIT_REPO_PATH:-/opt/nexusit}:${NEXUSIT_REPO_PATH:-/opt/nexusit}
+    expose:
+      - "9000"
     networks:
       - nexusit-internal
 

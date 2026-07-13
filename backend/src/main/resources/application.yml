@@ -66,6 +66,9 @@ app:
   alert-email: ${ALERT_EMAIL:}
   vault:
     encryption-key: ${VAULT_ENCRYPTION_KEY:nexusit-default-key-CHANGE-IN-PROD!!}
+  updater:
+    url: ${UPDATER_URL:http://nexusupdater:9000}
+    token: ${UPDATER_TOKEN:}
 
 server:
   port: 8080

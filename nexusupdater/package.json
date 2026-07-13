@@ -1,0 +1,13 @@
+{
+  "name": "nexusupdater",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servico auxiliar do NexusIT: verifica e aplica atualizacoes (git pull + docker compose rebuild) fora do container principal.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
