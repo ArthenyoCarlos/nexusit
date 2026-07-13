@@ -86,7 +86,7 @@ public class GlpiService {
                     "get_hateoas", "false"
             );
             Map<String, Object> raw = client.getOne("/Ticket/" + id, params);
-            GlpiTicket ticket = toTicket(raw);
+            GlpiTicket ticket = withResolvedAssignee(toTicket(raw));
             String content = str(raw, "content");
 
             // Followups
@@ -109,6 +109,46 @@ public class GlpiService {
 
             return new GlpiTicketDetail(ticket, content, followups);
         }, null);
+    }
+
+    /**
+     * Reforça a lista com o técnico atribuído, fazendo uma chamada extra por chamado ao
+     * sub-recurso Ticket_User (ver resolveAssignedTechnician). Só compensa para listas
+     * pequenas/pontuais — não usar em telas que recarregam com frequência.
+     */
+    public List<GlpiTicket> withResolvedAssignees(List<GlpiTicket> tickets) {
+        return tickets.stream().map(this::withResolvedAssignee).toList();
+    }
+
+    /**
+     * GLPI não preenche "_users_id_assign" nas respostas de /Ticket (lista ou item único) —
+     * não é uma coluna real da tabela do chamado, o técnico atribuído fica na tabela pivô
+     * glpi_tickets_users, e expand_dropdowns não alcança isso. Resolve via o mesmo
+     * sub-recurso Ticket_User que assignTicket()/unassignTicket() já escrevem.
+     */
+    private GlpiTicket withResolvedAssignee(GlpiTicket t) {
+        if (t.assignedTo() != null && !t.assignedTo().isBlank()) return t;
+        String resolved = resolveAssignedTechnician(t.id());
+        if (resolved.isBlank()) return t;
+        return new GlpiTicket(t.id(), t.title(), t.status(), t.statusLabel(), t.priority(), t.priorityLabel(),
+                t.urgency(), t.urgencyLabel(), t.impact(), t.impactLabel(), t.category(), t.requester(),
+                resolved, t.openedAt(), t.solvedAt(), t.ticketType(), t.slaTtoName(), t.slaTtrName(),
+                t.timeToOwn(), t.timeToResolve(), t.slaWaitingDuration());
+    }
+
+    private String resolveAssignedTechnician(int ticketId) {
+        return safeCall(() -> {
+            List<Map<String, Object>> rows = client.getList(
+                    "/Ticket/" + ticketId + "/Ticket_User",
+                    Map.of("expand_dropdowns", "true", "get_hateoas", "false"));
+            if (rows == null) return "";
+            return rows.stream()
+                    .filter(r -> intVal(r, "type") == 2)
+                    .map(r -> str(r, "users_id"))
+                    .filter(s -> s != null && !s.isBlank())
+                    .findFirst()
+                    .orElse("");
+        }, "");
     }
 
     // ── Actions ───────────────────────────────────────────────────────────
