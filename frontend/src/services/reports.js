@@ -32,3 +32,15 @@ export const downloadLicensesContractsReport = () =>
 export const downloadInventoryReport = () =>
   api.get('/reports/inventory/pdf', { responseType: 'blob' })
     .then(r => triggerDownload(r.data, 'relatorio-inventario.pdf'))
+
+export const downloadSecurityReport = (days) =>
+  api.get('/reports/security/pdf', { params: { days }, responseType: 'blob' })
+    .then(r => triggerDownload(r.data, `relatorio-seguranca-${days}d.pdf`))
+
+export const downloadTeamReport = (days) =>
+  api.get('/reports/team/pdf', { params: { days }, responseType: 'blob' })
+    .then(r => triggerDownload(r.data, `relatorio-equipe-${days}d.pdf`))
+
+export const downloadMonitoringReport = () =>
+  api.get('/reports/monitoring/pdf', { responseType: 'blob' })
+    .then(r => triggerDownload(r.data, 'relatorio-monitoramento.pdf'))

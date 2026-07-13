@@ -149,6 +149,21 @@ public class ReportController {
         return pdfResponse(reportService.inventoryReport(), "relatorio-inventario-" + LocalDate.now());
     }
 
+    @GetMapping("/security/pdf")
+    public ResponseEntity<byte[]> securityPdf(@RequestParam(defaultValue = "30") int days) {
+        return pdfResponse(reportService.securityReport(days), "relatorio-seguranca-" + LocalDate.now());
+    }
+
+    @GetMapping("/team/pdf")
+    public ResponseEntity<byte[]> teamPdf(@RequestParam(defaultValue = "30") int days) {
+        return pdfResponse(reportService.teamReport(days), "relatorio-equipe-" + LocalDate.now());
+    }
+
+    @GetMapping("/monitoring/pdf")
+    public ResponseEntity<byte[]> monitoringPdf() {
+        return pdfResponse(reportService.monitoringReport(), "relatorio-monitoramento-" + LocalDate.now());
+    }
+
     private ResponseEntity<byte[]> pdfResponse(byte[] data, String filenameBase) {
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_PDF)

@@ -4,6 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   downloadWeeklyReport, downloadInventoryCsv, downloadInventoryReport,
   downloadTicketsReport, downloadFinancialReport, downloadLicensesContractsReport,
+  downloadSecurityReport, downloadTeamReport, downloadMonitoringReport,
 } from '../services/reports'
 
 function ReportCard({ icon, title, description, children, onDownload, downloading, label = 'Baixar PDF' }) {
@@ -31,6 +32,8 @@ export default function ReportsPage() {
   const isAdmin = user?.role === 'ADMIN'
   const [ticketDays, setTicketDays] = useState(30)
   const [financialMonths, setFinancialMonths] = useState(3)
+  const [securityDays, setSecurityDays] = useState(30)
+  const [teamDays, setTeamDays] = useState(30)
   const [busy, setBusy] = useState('')
 
   async function run(key, fn) {
@@ -129,6 +132,42 @@ export default function ReportsPage() {
             onDownload={() => run('csv', downloadInventoryCsv)}
             downloading={busy === 'csv'}
             label="Baixar CSV"
+          />
+
+          <ReportCard
+            icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>}
+            title="Relatório de Segurança"
+            description="Eventos de auditoria: Cofre, Console SSH e NexusDesk"
+            onDownload={() => run('security', () => downloadSecurityReport(securityDays))}
+            downloading={busy === 'security'}
+          >
+            <select value={securityDays} onChange={e => setSecurityDays(Number(e.target.value))} className="input" style={{ height: 32, width: 'auto' }}>
+              <option value={7}>Últimos 7 dias</option>
+              <option value={30}>Últimos 30 dias</option>
+              <option value={90}>Últimos 90 dias</option>
+            </select>
+          </ReportCard>
+
+          <ReportCard
+            icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2M9 11a4 4 0 100-8 4 4 0 000 8zM23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75"/></svg>}
+            title="Relatório de Equipe"
+            description="Produtividade por pessoa: chamados, tempo médio e tarefas"
+            onDownload={() => run('team', () => downloadTeamReport(teamDays))}
+            downloading={busy === 'team'}
+          >
+            <select value={teamDays} onChange={e => setTeamDays(Number(e.target.value))} className="input" style={{ height: 32, width: 'auto' }}>
+              <option value={7}>Últimos 7 dias</option>
+              <option value={30}>Últimos 30 dias</option>
+              <option value={90}>Últimos 90 dias</option>
+            </select>
+          </ReportCard>
+
+          <ReportCard
+            icon={<svg width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>}
+            title="Relatório de Monitoramento"
+            description="Problemas ativos do Zabbix e disponibilidade das URLs monitoradas"
+            onDownload={() => run('monitoring', downloadMonitoringReport)}
+            downloading={busy === 'monitoring'}
           />
         </div>
       </div>

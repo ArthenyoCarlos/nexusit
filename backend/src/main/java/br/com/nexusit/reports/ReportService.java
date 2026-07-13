@@ -1,5 +1,7 @@
 package br.com.nexusit.reports;
 
+import br.com.nexusit.audit.AuditEvent;
+import br.com.nexusit.audit.AuditEventRepository;
 import br.com.nexusit.contracts.Contract;
 import br.com.nexusit.contracts.ContractRepository;
 import br.com.nexusit.contracts.ContractResponse;
@@ -12,6 +14,16 @@ import br.com.nexusit.inventory.InventoryRepository;
 import br.com.nexusit.licenses.License;
 import br.com.nexusit.licenses.LicenseRepository;
 import br.com.nexusit.licenses.LicenseResponse;
+import br.com.nexusit.monitoring.ZabbixProblem;
+import br.com.nexusit.monitoring.ZabbixService;
+import br.com.nexusit.planning.PlanningTask;
+import br.com.nexusit.planning.PlanningTaskRepository;
+import br.com.nexusit.support.ConversationState;
+import br.com.nexusit.support.SupportConversation;
+import br.com.nexusit.support.SupportConversationRepository;
+import br.com.nexusit.urlmonitor.MonitoredUrl;
+import br.com.nexusit.urlmonitor.MonitoredUrlRepository;
+import br.com.nexusit.user.User;
 import com.itextpdf.io.font.constants.StandardFonts;
 import com.itextpdf.kernel.colors.ColorConstants;
 import com.itextpdf.kernel.colors.DeviceRgb;
@@ -36,10 +48,12 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -50,12 +64,19 @@ public class ReportService {
     private final InventoryRepository inventoryRepo;
     private final LicenseRepository licenseRepo;
     private final ContractRepository contractRepo;
+    private final AuditEventRepository auditEventRepo;
+    private final SupportConversationRepository conversationRepo;
+    private final PlanningTaskRepository planningTaskRepo;
+    private final MonitoredUrlRepository monitoredUrlRepo;
+    private final ZabbixService zabbixService;
 
     @Value("${app.company-name:Armazém Galdino}")
     private String companyName;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("dd/MM/yyyy");
+    private static final DateTimeFormatter DATETIME_FMT = DateTimeFormatter.ofPattern("dd/MM HH:mm");
     private static final DateTimeFormatter GLPI_DATETIME_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
+    private static final String DONE_COLUMN = "Concluído";
 
     // ── Relatório de Chamados (GLPI) ─────────────────────────────────────────
 
@@ -110,11 +131,7 @@ public class ReportService {
         doc.add(twoColTable(pdf, "Prioridade", "Qtde", byPriority));
 
         doc.add(sectionTitle(pdf, "Por técnico"));
-        Map<String, Long> topTechs = byTechnician.entrySet().stream()
-                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
-                .limit(10)
-                .collect(LinkedHashMap::new, (m, e) -> m.put(e.getKey(), e.getValue()), Map::putAll);
-        doc.add(twoColTable(pdf, "Técnico", "Chamados", topTechs));
+        doc.add(twoColTable(pdf, "Técnico", "Chamados", topEntries(byTechnician, 10)));
 
         return finish(pdf);
     }
@@ -245,6 +262,192 @@ public class ReportService {
         return finish(pdf);
     }
 
+    // ── Relatório de Segurança/Auditoria ─────────────────────────────────────
+
+    public byte[] securityReport(int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(Math.max(1, days));
+        List<AuditEvent> events = auditEventRepo.findRecent(since, null);
+
+        Map<String, Long> byModule = new LinkedHashMap<>();
+        Map<String, Long> byAction = new LinkedHashMap<>();
+        Map<String, Long> byActor = new LinkedHashMap<>();
+        long mismatches = 0;
+        for (AuditEvent e : events) {
+            byModule.merge(e.getModule().name(), 1L, Long::sum);
+            byAction.merge(e.getAction(), 1L, Long::sum);
+            byActor.merge(e.getActorName() != null ? e.getActorName() : "Desconhecido", 1L, Long::sum);
+            if ("HOST_KEY_MISMATCH".equals(e.getAction())) mismatches++;
+        }
+
+        ReportPdf pdf = newPdf("Relatório de Segurança — últimos " + days + " dia(s)");
+        Document doc = pdf.doc;
+
+        doc.add(kpiLine(pdf, events.size() + " evento(s) de auditoria no período"
+                + (mismatches > 0 ? " | " + mismatches + " alerta(s) de chave SSH alterada" : "")));
+
+        doc.add(sectionTitle(pdf, "Por módulo"));
+        doc.add(twoColTable(pdf, "Módulo", "Eventos", byModule));
+
+        doc.add(sectionTitle(pdf, "Por ação"));
+        doc.add(twoColTable(pdf, "Ação", "Eventos", byAction));
+
+        doc.add(sectionTitle(pdf, "Por usuário"));
+        doc.add(twoColTable(pdf, "Usuário", "Eventos", topEntries(byActor, 10)));
+
+        doc.add(sectionTitle(pdf, "Eventos recentes"));
+        Table table = new Table(new float[]{2, 2, 2, 3, 3});
+        table.setWidth(UnitValue.createPercentValue(100));
+        for (String h : List.of("Data", "Módulo", "Ação", "Usuário", "Alvo"))
+            table.addHeaderCell(headerCell(pdf, h));
+        events.stream()
+                .sorted(Comparator.comparing(AuditEvent::getCreatedAt).reversed())
+                .limit(50)
+                .forEach(e -> {
+                    table.addCell(bodyCell(pdf, e.getCreatedAt().format(DATETIME_FMT)));
+                    table.addCell(bodyCell(pdf, e.getModule().name()));
+                    table.addCell(bodyCell(pdf, e.getAction()));
+                    table.addCell(bodyCell(pdf, e.getActorName()));
+                    table.addCell(bodyCell(pdf, e.getTargetLabel()));
+                });
+        doc.add(table.setMarginBottom(16));
+
+        return finish(pdf);
+    }
+
+    // ── Relatório de Equipe (Produtividade) ──────────────────────────────────
+
+    private static class TechStats {
+        String name;
+        long conversationsClaimed;
+        long conversationsClosed;
+        final List<Long> resolutionMinutes = new ArrayList<>();
+        long tasksTotal;
+        long tasksDone;
+        long tasksOverdue;
+    }
+
+    public byte[] teamReport(int days) {
+        LocalDateTime since = LocalDateTime.now().minusDays(Math.max(1, days));
+        Map<UUID, TechStats> stats = new LinkedHashMap<>();
+
+        conversationRepo.findAllSince(since).forEach(c -> {
+            User tech = c.getClaimedBy();
+            if (tech == null) return;
+            TechStats s = stats.computeIfAbsent(tech.getId(), id -> newStats(tech.getName()));
+            s.conversationsClaimed++;
+            if (c.getState() == ConversationState.CLOSED) {
+                s.conversationsClosed++;
+                if (c.getClaimedAt() != null && c.getClosedAt() != null) {
+                    s.resolutionMinutes.add(ChronoUnit.MINUTES.between(c.getClaimedAt(), c.getClosedAt()));
+                }
+            }
+        });
+
+        LocalDate today = LocalDate.now();
+        planningTaskRepo.findAllWithAssignee().forEach(t -> {
+            List<User> people = new ArrayList<>();
+            if (t.getAssignee() != null) people.add(t.getAssignee());
+            t.getMembers().forEach(m -> people.add(m.getUser()));
+            boolean done = DONE_COLUMN.equals(t.getColumnName());
+            boolean overdue = t.getDueDate() != null && t.getDueDate().isBefore(today) && !done;
+            people.forEach(p -> {
+                TechStats s = stats.computeIfAbsent(p.getId(), id -> newStats(p.getName()));
+                s.tasksTotal++;
+                if (done) s.tasksDone++;
+                if (overdue) s.tasksOverdue++;
+            });
+        });
+
+        ReportPdf pdf = newPdf("Relatório de Equipe — últimos " + days + " dia(s)");
+        Document doc = pdf.doc;
+
+        doc.add(kpiLine(pdf, stats.size() + " pessoa(s) com atividade registrada no período"));
+
+        doc.add(sectionTitle(pdf, "Produtividade por pessoa"));
+        Table table = new Table(new float[]{3, 1.5f, 1.5f, 2, 1.5f, 1.5f, 1.5f});
+        table.setWidth(UnitValue.createPercentValue(100));
+        for (String h : List.of("Pessoa", "Chamados", "Fechados", "Tempo médio", "Tarefas", "Concluídas", "Atrasadas"))
+            table.addHeaderCell(headerCell(pdf, h));
+        stats.values().stream()
+                .sorted(Comparator.comparingLong((TechStats s) -> s.conversationsClaimed).reversed())
+                .forEach(s -> {
+                    Double avg = s.resolutionMinutes.isEmpty() ? null
+                            : s.resolutionMinutes.stream().mapToLong(Long::longValue).average().orElse(0);
+                    table.addCell(bodyCell(pdf, s.name));
+                    table.addCell(bodyCell(pdf, String.valueOf(s.conversationsClaimed)));
+                    table.addCell(bodyCell(pdf, String.valueOf(s.conversationsClosed)));
+                    table.addCell(bodyCell(pdf, avg != null ? formatMinutes(avg.longValue()) : "—"));
+                    table.addCell(bodyCell(pdf, String.valueOf(s.tasksTotal)));
+                    table.addCell(bodyCell(pdf, String.valueOf(s.tasksDone)));
+                    table.addCell(bodyCell(pdf, String.valueOf(s.tasksOverdue)));
+                });
+        doc.add(table.setMarginBottom(16));
+
+        return finish(pdf);
+    }
+
+    private TechStats newStats(String name) {
+        TechStats s = new TechStats();
+        s.name = name;
+        return s;
+    }
+
+    // ── Relatório de Monitoramento e Disponibilidade ─────────────────────────
+
+    public byte[] monitoringReport() {
+        List<ZabbixProblem> problems = zabbixService.getProblems();
+        Map<String, Long> bySeverity = new LinkedHashMap<>();
+        problems.forEach(p -> bySeverity.merge(p.severityLabel(), 1L, Long::sum));
+
+        List<MonitoredUrl> urls = monitoredUrlRepo.findAllByOrderByNameAsc();
+        long urlsDown = urls.stream()
+                .filter(u -> Boolean.TRUE.equals(u.getEnabled()) && u.getLastStatus() != null && u.getLastStatus() >= 400)
+                .count();
+        List<BigDecimal> uptimes = urls.stream().map(MonitoredUrl::getUptimePct)
+                .filter(java.util.Objects::nonNull).toList();
+        BigDecimal avgUptime = uptimes.isEmpty() ? null
+                : sum2(uptimes.stream()).divide(BigDecimal.valueOf(uptimes.size()), 2, java.math.RoundingMode.HALF_UP);
+
+        ReportPdf pdf = newPdf("Relatório de Monitoramento e Disponibilidade");
+        Document doc = pdf.doc;
+
+        doc.add(kpiLine(pdf, problems.size() + " problema(s) ativo(s) no Zabbix"
+                + " | " + urls.size() + " URL(s) monitorada(s), " + urlsDown + " fora do ar"
+                + (avgUptime != null ? " | uptime médio " + avgUptime + "%" : "")));
+
+        doc.add(sectionTitle(pdf, "Problemas ativos por severidade"));
+        doc.add(twoColTable(pdf, "Severidade", "Qtde", bySeverity));
+
+        doc.add(sectionTitle(pdf, "Problemas ativos"));
+        Table pTable = new Table(new float[]{3, 3, 2});
+        pTable.setWidth(UnitValue.createPercentValue(100));
+        for (String h : List.of("Host", "Problema", "Severidade"))
+            pTable.addHeaderCell(headerCell(pdf, h));
+        problems.stream()
+                .sorted(Comparator.comparingInt(ZabbixProblem::severity).reversed())
+                .forEach(p -> {
+                    pTable.addCell(bodyCell(pdf, p.hostName()));
+                    pTable.addCell(bodyCell(pdf, p.name()));
+                    pTable.addCell(bodyCell(pdf, p.severityLabel()));
+                });
+        doc.add(pTable.setMarginBottom(16));
+
+        doc.add(sectionTitle(pdf, "URLs monitoradas"));
+        Table uTable = new Table(new float[]{3, 2, 2, 2});
+        uTable.setWidth(UnitValue.createPercentValue(100));
+        for (String h : List.of("Nome", "Status", "Último check", "Uptime"))
+            uTable.addHeaderCell(headerCell(pdf, h));
+        urls.forEach(u -> {
+            uTable.addCell(bodyCell(pdf, u.getName()));
+            uTable.addCell(bodyCell(pdf, u.getLastStatus() != null ? String.valueOf(u.getLastStatus()) : "—"));
+            uTable.addCell(bodyCell(pdf, u.getLastCheck() != null ? u.getLastCheck().format(DATETIME_FMT) : "—"));
+            uTable.addCell(bodyCell(pdf, u.getUptimePct() != null ? u.getUptimePct() + "%" : "—"));
+        });
+        doc.add(uTable.setMarginBottom(16));
+
+        return finish(pdf);
+    }
+
     // ── PDF helpers ───────────────────────────────────────────────────────────
 
     private record ReportPdf(Document doc, ByteArrayOutputStream out, PdfFont fontBold, PdfFont fontRegular, DeviceRgb blue) {}
@@ -349,5 +552,12 @@ public class ReportService {
 
     private String fmtMoney(BigDecimal value) {
         return value.setScale(2, java.math.RoundingMode.HALF_UP).toPlainString();
+    }
+
+    private Map<String, Long> topEntries(Map<String, Long> data, int limit) {
+        return data.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(limit)
+                .collect(LinkedHashMap::new, (m, e) -> m.put(e.getKey(), e.getValue()), Map::putAll);
     }
 }
