@@ -33,15 +33,18 @@ public class SshHostService {
 
     @Transactional
     public SshHostResponse create(SshHostRequest req, User currentUser) {
-        if (req.password() == null || req.password().isBlank()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha é obrigatória ao cadastrar uma máquina");
-        }
+        SshAuthType authType = SshAuthType.fromNullable(req.authType());
+        validateCreateCredential(req, authType);
+
         SshHost host = SshHost.builder()
                 .name(req.name())
                 .host(req.host())
                 .port(req.port())
                 .username(req.username())
-                .encryptedPassword(crypto.encrypt(req.password()))
+                .authType(authType)
+                .encryptedPassword(authType == SshAuthType.PASSWORD ? crypto.encrypt(req.password()) : null)
+                .encryptedPrivateKey(authType == SshAuthType.PRIVATE_KEY ? crypto.encrypt(req.privateKey()) : null)
+                .encryptedPrivateKeyPassphrase(encryptOptional(req.privateKeyPassphrase()))
                 .description(req.description())
                 .inventoryItem(resolveInventoryItem(req.inventoryItemId()))
                 .createdBy(currentUser)
@@ -52,14 +55,33 @@ public class SshHostService {
     @Transactional
     public SshHostResponse update(UUID id, SshHostRequest req) {
         SshHost host = getOrThrow(id);
+        SshAuthType authType = SshAuthType.fromNullable(req.authType());
         host.setName(req.name());
         host.setHost(req.host());
         host.setPort(req.port());
         host.setUsername(req.username());
+        host.setAuthType(authType);
         host.setDescription(req.description());
         host.setInventoryItem(resolveInventoryItem(req.inventoryItemId()));
-        if (req.password() != null && !req.password().isBlank()) {
-            host.setEncryptedPassword(crypto.encrypt(req.password()));
+
+        if (authType == SshAuthType.PASSWORD) {
+            host.setEncryptedPrivateKey(null);
+            host.setEncryptedPrivateKeyPassphrase(null);
+            if (req.password() != null && !req.password().isBlank()) {
+                host.setEncryptedPassword(crypto.encrypt(req.password()));
+            } else if (host.getEncryptedPassword() == null || host.getEncryptedPassword().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha é obrigatória para autenticação por senha");
+            }
+        } else {
+            host.setEncryptedPassword(null);
+            if (req.privateKey() != null && !req.privateKey().isBlank()) {
+                host.setEncryptedPrivateKey(crypto.encrypt(req.privateKey()));
+            } else if (host.getEncryptedPrivateKey() == null || host.getEncryptedPrivateKey().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chave privada é obrigatória para autenticação por chave");
+            }
+            if (req.privateKeyPassphrase() != null) {
+                host.setEncryptedPrivateKeyPassphrase(encryptOptional(req.privateKeyPassphrase()));
+            }
         }
         return SshHostResponse.from(repo.save(host));
     }
@@ -75,6 +97,19 @@ public class SshHostService {
     public void delete(UUID id) {
         if (!repo.existsById(id)) throw new EntityNotFoundException("Máquina não encontrada");
         repo.deleteById(id);
+    }
+
+    private void validateCreateCredential(SshHostRequest req, SshAuthType authType) {
+        if (authType == SshAuthType.PASSWORD && (req.password() == null || req.password().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Senha é obrigatória para autenticação por senha");
+        }
+        if (authType == SshAuthType.PRIVATE_KEY && (req.privateKey() == null || req.privateKey().isBlank())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Chave privada é obrigatória para autenticação por chave");
+        }
+    }
+
+    private String encryptOptional(String value) {
+        return value == null || value.isBlank() ? null : crypto.encrypt(value);
     }
 
     private SshHost getOrThrow(UUID id) {

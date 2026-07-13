@@ -10,7 +10,10 @@ public record SshHostRequest(
         @NotBlank String host,
         @NotNull Integer port,
         @NotBlank String username,
+        String authType,
         String password,
+        String privateKey,
+        String privateKeyPassphrase,
         String description,
         UUID inventoryItemId
 ) {}

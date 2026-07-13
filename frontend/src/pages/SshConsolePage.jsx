@@ -7,7 +7,10 @@ import { useAuth } from '../contexts/AuthContext'
 import { getSshHosts, createSshHost, updateSshHost, deleteSshHost, resetHostKey } from '../services/sshHosts'
 import { getInventory } from '../services/inventory'
 
-const EMPTY_FORM = { name: '', host: '', port: 22, username: '', password: '', description: '', inventoryItemId: '' }
+const EMPTY_FORM = {
+  name: '', host: '', port: 22, username: '', authType: 'PASSWORD',
+  password: '', privateKey: '', privateKeyPassphrase: '', description: '', inventoryItemId: ''
+}
 
 export default function SshConsolePage() {
   const { user } = useAuth()
@@ -54,7 +57,18 @@ export default function SshConsolePage() {
   const openCreate = () => { setEditingId(null); setForm(EMPTY_FORM); setModalOpen(true) }
   const openEdit = (h) => {
     setEditingId(h.id)
-    setForm({ name: h.name, host: h.host, port: h.port, username: h.username, password: '', description: h.description ?? '', inventoryItemId: h.inventoryItemId ?? '' })
+    setForm({
+      name: h.name,
+      host: h.host,
+      port: h.port,
+      username: h.username,
+      authType: h.authType ?? 'PASSWORD',
+      password: '',
+      privateKey: '',
+      privateKeyPassphrase: '',
+      description: h.description ?? '',
+      inventoryItemId: h.inventoryItemId ?? ''
+    })
     setModalOpen(true)
   }
 
@@ -63,7 +77,14 @@ export default function SshConsolePage() {
   const handleSave = async (e) => {
     e.preventDefault(); setSaving(true)
     try {
-      const payload = { ...form, port: Number(form.port), inventoryItemId: form.inventoryItemId || null }
+      const payload = {
+        ...form,
+        port: Number(form.port),
+        inventoryItemId: form.inventoryItemId || null,
+        password: form.authType === 'PASSWORD' ? form.password : '',
+        privateKey: form.authType === 'PRIVATE_KEY' ? form.privateKey : '',
+        privateKeyPassphrase: form.authType === 'PRIVATE_KEY' ? form.privateKeyPassphrase : ''
+      }
       if (editingId) await updateSshHost(editingId, payload)
       else await createSshHost(payload)
       setModalOpen(false); load()
@@ -102,10 +123,13 @@ export default function SshConsolePage() {
             {hosts.map(h => (
               <div key={h.id} className="card" style={{ padding: '16px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
                     <p style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--text-primary)' }}>{h.name}</p>
                     <span className={h.hostKeyTrusted ? 'badge badge-green' : 'badge badge-amber'} style={{ fontSize: 10.5 }}>
-                      {h.hostKeyTrusted ? 'Chave confirmada' : 'Nunca conectado'}
+                      {h.hostKeyTrusted ? 'Chave do host confirmada' : 'Nunca conectado'}
+                    </span>
+                    <span className="badge badge-blue" style={{ fontSize: 10.5 }}>
+                      {h.authType === 'PRIVATE_KEY' ? 'Chave SSH' : 'Senha'}
                     </span>
                   </div>
                   <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{h.username}@{h.host}:{h.port}</p>
@@ -132,12 +156,12 @@ export default function SshConsolePage() {
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div>
             <label className="input-label">Nome *</label>
-            <input required value={form.name} onChange={f('name')} className="input" placeholder="Ex: Servidor GLPI" />
+            <input required value={form.name} onChange={f('name')} className="input" placeholder="Ex: Servidor Interno NexusIT" />
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 100px', gap: 14 }}>
             <div>
               <label className="input-label">Host / IP *</label>
-              <input required value={form.host} onChange={f('host')} className="input" placeholder="192.168.1.10" />
+              <input required value={form.host} onChange={f('host')} className="input" placeholder="192.168.2.210" />
             </div>
             <div>
               <label className="input-label">Porta *</label>
@@ -147,13 +171,43 @@ export default function SshConsolePage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
             <div>
               <label className="input-label">Usuário *</label>
-              <input required value={form.username} onChange={f('username')} className="input" placeholder="root" />
+              <input required value={form.username} onChange={f('username')} className="input" placeholder="galdino" />
             </div>
+            <div>
+              <label className="input-label">Autenticação *</label>
+              <select required value={form.authType} onChange={f('authType')} className="input">
+                <option value="PASSWORD">Senha</option>
+                <option value="PRIVATE_KEY">Chave privada SSH</option>
+              </select>
+            </div>
+          </div>
+
+          {form.authType === 'PASSWORD' ? (
             <div>
               <label className="input-label">Senha {editingId ? '(deixe em branco para manter)' : '*'}</label>
               <input required={!editingId} type="password" value={form.password} onChange={f('password')} className="input" />
             </div>
-          </div>
+          ) : (
+            <>
+              <div>
+                <label className="input-label">Chave privada {editingId ? '(deixe em branco para manter)' : '*'}</label>
+                <textarea
+                  required={!editingId}
+                  value={form.privateKey}
+                  onChange={f('privateKey')}
+                  rows={8}
+                  className="input"
+                  style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}
+                  placeholder={'Cole aqui o conteúdo do arquivo id_ed25519, começando por -----BEGIN OPENSSH PRIVATE KEY-----'}
+                />
+              </div>
+              <div>
+                <label className="input-label">Senha da chave / passphrase (se houver)</label>
+                <input type="password" value={form.privateKeyPassphrase} onChange={f('privateKeyPassphrase')} className="input" />
+              </div>
+            </>
+          )}
+
           <div>
             <label className="input-label">Equipamento (Inventário)</label>
             <select value={form.inventoryItemId} onChange={f('inventoryItemId')} className="input">

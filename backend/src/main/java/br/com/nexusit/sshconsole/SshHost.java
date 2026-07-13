@@ -33,8 +33,19 @@ public class SshHost {
     @Column(nullable = false)
     private String username;
 
-    @Column(name = "encrypted_password", nullable = false, columnDefinition = "TEXT")
+    @Enumerated(EnumType.STRING)
+    @Column(name = "auth_type", nullable = false, length = 30)
+    @Builder.Default
+    private SshAuthType authType = SshAuthType.PASSWORD;
+
+    @Column(name = "encrypted_password", columnDefinition = "TEXT")
     private String encryptedPassword;
+
+    @Column(name = "encrypted_private_key", columnDefinition = "TEXT")
+    private String encryptedPrivateKey;
+
+    @Column(name = "encrypted_private_key_passphrase", columnDefinition = "TEXT")
+    private String encryptedPrivateKeyPassphrase;
 
     @Column(name = "host_key_fingerprint", length = 128)
     private String hostKeyFingerprint;
@@ -59,9 +70,13 @@ public class SshHost {
     @PrePersist
     void prePersist() {
         if (createdAt == null) createdAt = LocalDateTime.now();
+        if (authType == null) authType = SshAuthType.PASSWORD;
         updatedAt = LocalDateTime.now();
     }
 
     @PreUpdate
-    void preUpdate() { updatedAt = LocalDateTime.now(); }
+    void preUpdate() {
+        if (authType == null) authType = SshAuthType.PASSWORD;
+        updatedAt = LocalDateTime.now();
+    }
 }
