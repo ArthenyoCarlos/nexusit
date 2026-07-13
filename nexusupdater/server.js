@@ -12,6 +12,7 @@ const REPO_PATH = process.env.REPO_PATH || '/opt/nexusit'
 const COMPOSE_ENV_FILE = process.env.COMPOSE_ENV_FILE || '/opt/env/nexusit/.env'
 const COMPOSE_FILE = path.join(REPO_PATH, 'docker-compose.yml')
 const CHANGELOG_PATH = path.join(REPO_PATH, 'CHANGELOG.md')
+const BACKEND_HEALTH_URL = process.env.BACKEND_HEALTH_URL || 'http://nexusit-backend:8080/actuator/health'
 
 const state = {
   updating: false,
@@ -97,6 +98,22 @@ app.post('/update', (req, res) => {
     })
 })
 
+async function waitForBackendHealthy(retries = 12, delayMs = 10000) {
+  for (let i = 0; i < retries; i++) {
+    try {
+      const res = await fetch(BACKEND_HEALTH_URL, { signal: AbortSignal.timeout(5000) })
+      if (res.ok) {
+        const body = await res.json()
+        if (body.status === 'UP') return true
+      }
+    } catch (e) {
+      // backend ainda subindo (container reiniciando, app inicializando) -- tenta de novo
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs))
+  }
+  return false
+}
+
 async function runUpdate() {
   await ensureSafeGitDirectory()
   const opts = { cwd: REPO_PATH, timeout: 15 * 60 * 1000, maxBuffer: 1024 * 1024 * 20 }
@@ -108,6 +125,11 @@ async function runUpdate() {
   await execAsync('git reset --hard origin/main', opts)
   await execAsync(`${compose} build`, opts)
   await execAsync(`${compose} up -d`, opts)
+
+  const healthy = await waitForBackendHealthy()
+  if (!healthy) {
+    throw new Error('Atualização aplicada, mas o backend não respondeu como saudável em até 2 minutos. Verifique os logs do container (docker compose logs nexusit-backend).')
+  }
 }
 
 app.listen(PORT, () => {

@@ -41,6 +41,7 @@ public class SecurityConfig {
             .csrf(AbstractHttpConfigurer::disable)
             .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
+                .requestMatchers("/actuator/health").permitAll()
                 .requestMatchers("/api/monitoring/**").permitAll()
                 .requestMatchers("/api/glpi/**").permitAll()
                 .requestMatchers("/api/termos/*/pdf").permitAll()

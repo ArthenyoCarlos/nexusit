@@ -29,6 +29,12 @@
             <artifactId>spring-boot-starter-web</artifactId>
         </dependency>
 
+        <!-- Health check (usado pelo NexusUpdater pra confirmar que o backend subiu depois de uma atualização) -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
         <!-- WebSocket (console SSH) -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

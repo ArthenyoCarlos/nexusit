@@ -73,6 +73,15 @@ app:
 server:
   port: 8080
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
 springdoc:
   api-docs:
     path: /api/v3/api-docs
