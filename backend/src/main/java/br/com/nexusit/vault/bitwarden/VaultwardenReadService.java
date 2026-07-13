@@ -77,7 +77,12 @@ public class VaultwardenReadService {
                 .findFirst()
                 .orElseThrow(() -> new IllegalArgumentException("Item não encontrado no Vaultwarden"));
 
-        String name = decryptOrNull((String) field(cipher, "Name", "name"), session);
+        String name;
+        try {
+            name = decryptOrNull((String) field(cipher, "Name", "name"), session);
+        } catch (Exception e) {
+            name = null;
+        }
         auditService.log(AuditModule.VAULT, "REVEAL_SECRET", currentUser, "VAULTWARDEN_ITEM", null,
                 name != null ? name : cipherId, null);
 
