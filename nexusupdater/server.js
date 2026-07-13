@@ -9,6 +9,7 @@ const execAsync = util.promisify(exec)
 const PORT = process.env.PORT || 9000
 const TOKEN = process.env.UPDATER_TOKEN || ''
 const REPO_PATH = process.env.REPO_PATH || '/opt/nexusit'
+const COMPOSE_ENV_FILE = process.env.COMPOSE_ENV_FILE || '/opt/env/nexusit/.env'
 const COMPOSE_FILE = path.join(REPO_PATH, 'docker-compose.yml')
 const CHANGELOG_PATH = path.join(REPO_PATH, 'CHANGELOG.md')
 
@@ -30,6 +31,14 @@ app.use((req, res, next) => {
   next()
 })
 
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'"'"'`)}'`
+}
+
+async function ensureSafeGitDirectory() {
+  await execAsync(`git config --global --add safe.directory ${shellQuote(REPO_PATH)}`)
+}
+
 function readLatestChangelogSection() {
   try {
     const text = fs.readFileSync(CHANGELOG_PATH, 'utf8')
@@ -46,6 +55,7 @@ function readLatestChangelogSection() {
 
 app.get('/status', async (req, res) => {
   try {
+    await ensureSafeGitDirectory()
     await execAsync('git fetch origin main --quiet', { cwd: REPO_PATH, timeout: 30000 })
     const { stdout: current } = await execAsync('git rev-parse HEAD', { cwd: REPO_PATH })
     const { stdout: latest } = await execAsync('git rev-parse origin/main', { cwd: REPO_PATH })
@@ -88,10 +98,12 @@ app.post('/update', (req, res) => {
 })
 
 async function runUpdate() {
+  await ensureSafeGitDirectory()
   const opts = { cwd: REPO_PATH, timeout: 15 * 60 * 1000, maxBuffer: 1024 * 1024 * 20 }
+  const compose = `docker compose --env-file ${shellQuote(COMPOSE_ENV_FILE)} -f ${shellQuote(COMPOSE_FILE)} --project-directory ${shellQuote(REPO_PATH)}`
   await execAsync('git pull origin main', opts)
-  await execAsync(`docker compose -f "${COMPOSE_FILE}" --project-directory "${REPO_PATH}" build`, opts)
-  await execAsync(`docker compose -f "${COMPOSE_FILE}" --project-directory "${REPO_PATH}" up -d`, opts)
+  await execAsync(`${compose} build`, opts)
+  await execAsync(`${compose} up -d`, opts)
 }
 
 app.listen(PORT, () => {
