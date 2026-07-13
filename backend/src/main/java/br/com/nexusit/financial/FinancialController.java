@@ -1,6 +1,7 @@
 package br.com.nexusit.financial;
 
 import br.com.nexusit.user.User;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,8 +17,8 @@ public class FinancialController {
     @GetMapping("/summary") public Map<String, Object> summary() { return service.summary(); }
     @GetMapping("/bills")   public List<BillResponse> list() { return service.findAll(); }
     @GetMapping("/bills/pending") public List<BillResponse> pending() { return service.findPending(); }
-    @PostMapping("/bills")  public BillResponse create(@RequestBody BillRequest req, @AuthenticationPrincipal User user) { return service.create(req, user); }
-    @PutMapping("/bills/{id}") public BillResponse update(@PathVariable UUID id, @RequestBody BillRequest req) { return service.update(id, req); }
+    @PostMapping("/bills")  public BillResponse create(@Valid @RequestBody BillRequest req, @AuthenticationPrincipal User user) { return service.create(req, user); }
+    @PutMapping("/bills/{id}") public BillResponse update(@PathVariable UUID id, @Valid @RequestBody BillRequest req) { return service.update(id, req); }
     @PatchMapping("/bills/{id}/pay") public BillResponse pay(@PathVariable UUID id) { return service.markPaid(id); }
     @DeleteMapping("/bills/{id}") public ResponseEntity<Void> delete(@PathVariable UUID id) { service.delete(id); return ResponseEntity.noContent().build(); }
 }

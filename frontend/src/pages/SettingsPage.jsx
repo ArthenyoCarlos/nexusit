@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { getUsers, createUser, updateUser, deleteUser } from '../services/users'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
@@ -15,6 +16,7 @@ const EMPTY_FORM = { name: '', email: '', password: '', role: 'TECHNICIAN', jobT
 
 export default function SettingsPage() {
   const { user: me } = useAuth()
+  const toast = useToast()
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [refreshInterval, setRefreshInterval] = useState(() => Number(localStorage.getItem(REFRESH_KEY) ?? 60))
@@ -51,12 +53,22 @@ export default function SettingsPage() {
   }
 
   async function handleToggleActive(u) {
-    try { await updateUser(u.id, { active: !u.active }); loadUsers() } catch {}
+    try {
+      await updateUser(u.id, { active: !u.active })
+      loadUsers()
+    } catch (err) {
+      toast.add(err?.response?.data?.message ?? `Não foi possível ${u.active ? 'desativar' : 'ativar'} "${u.name}".`, 'error')
+    }
   }
 
   async function handleDelete(u) {
     if (!window.confirm(`Excluir "${u.name}"?`)) return
-    try { await deleteUser(u.id); loadUsers() } catch {}
+    try {
+      await deleteUser(u.id)
+      loadUsers()
+    } catch (err) {
+      toast.add(err?.response?.data?.message ?? `Não foi possível excluir "${u.name}".`, 'error')
+    }
   }
 
   if (me?.role !== 'ADMIN') {

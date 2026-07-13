@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import { getDocs, createDoc, updateDoc, deleteDoc } from '../services/networkDocs'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import Layout from '../components/Layout'
 
 const SECTIONS = [
@@ -20,6 +21,7 @@ function fmt(iso) {
 
 export default function NetworkDocsPage() {
   const { user } = useAuth()
+  const toast = useToast()
   const [docs, setDocs] = useState([])
   const [loading, setLoading] = useState(true)
   const [section, setSection] = useState(SECTIONS[0].id)
@@ -51,7 +53,9 @@ export default function NetworkDocsPage() {
         const { data } = await updateDoc(selected.id, form)
         setDocs(prev => prev.map(d => d.id === data.id ? data : d)); setSelected(data); setEditing(false)
       }
-    } catch {}
+    } catch (err) {
+      toast.add(err?.response?.data?.message ?? 'Não foi possível salvar o documento.', 'error')
+    }
     finally { setSaving(false) }
   }
 
@@ -61,7 +65,9 @@ export default function NetworkDocsPage() {
       await deleteDoc(doc.id)
       setDocs(prev => prev.filter(d => d.id !== doc.id))
       if (selected?.id === doc.id) { setSelected(null); setEditing(false) }
-    } catch {}
+    } catch (err) {
+      toast.add(err?.response?.data?.message ?? `Não foi possível excluir "${doc.title}".`, 'error')
+    }
   }
 
   return (

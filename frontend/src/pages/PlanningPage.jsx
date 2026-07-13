@@ -6,6 +6,7 @@ import {
 import { CSS } from '@dnd-kit/utilities'
 import { getTasks, createTask, updateTask, moveTask, deleteTask } from '../services/planning'
 import { getUsers } from '../services/users'
+import { useToast } from '../contexts/ToastContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
 
@@ -196,6 +197,7 @@ function MiniCalendar({ tasks }) {
 // ── Main Page ─────────────────────────────────────────────────────────────
 
 export default function PlanningPage() {
+  const toast = useToast()
   const [tasks, setTasks] = useState([])
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -217,7 +219,9 @@ export default function PlanningPage() {
       const [tasksRes, usersRes] = await Promise.all([getTasks(), getUsers()])
       setTasks(tasksRes.data)
       setUsers(usersRes)
-    } catch { /* silent */ }
+    } catch {
+      toast.add('Não foi possível carregar o quadro de planejamento.', 'error')
+    }
     finally { setLoading(false) }
   }, [])
 
@@ -272,14 +276,20 @@ export default function PlanningPage() {
       }
       setModalOpen(false)
       fetch()
-    } catch { /* silent */ }
+    } catch (err) {
+      toast.add(err?.response?.data?.message ?? 'Não foi possível salvar a tarefa.', 'error')
+    }
     finally { setSaving(false) }
   }
 
   async function handleDelete(id) {
     if (!window.confirm('Excluir esta tarefa?')) return
-    await deleteTask(id)
-    fetch()
+    try {
+      await deleteTask(id)
+      fetch()
+    } catch (err) {
+      toast.add(err?.response?.data?.message ?? 'Não foi possível excluir a tarefa.', 'error')
+    }
   }
 
   function handleDragStart({ active }) {
@@ -300,6 +310,7 @@ export default function PlanningPage() {
     try {
       await moveTask(active.id, { columnName: targetCol.id, columnOrder: colCount })
     } catch {
+      toast.add('Não foi possível mover a tarefa.', 'error')
       fetch() // revert on error
     }
   }
