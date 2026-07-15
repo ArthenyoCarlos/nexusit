@@ -19,40 +19,96 @@ function Kpi({ label, value, tone = 'healthy', hint, detail }) {
   const s = statusStyle[tone] ?? statusStyle.healthy
   const canOpen = Boolean(detail)
   return (
-    <div className="stat-card" style={{ border: `1px solid ${s.border}`, padding: 0, overflow: 'hidden' }}>
-      <button
-        type="button"
-        disabled={!canOpen}
-        onClick={() => canOpen && setOpen(v => !v)}
-        style={{ width: '100%', border: 'none', background: 'transparent', color: 'inherit', textAlign: 'left', cursor: canOpen ? 'pointer' : 'default', padding: '14px 16px' }}
-        title={canOpen ? 'Clique para entender como esse indicador foi calculado' : undefined}
-      >
-        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
-          <div>
-            <div className="stat-value" style={{ color: s.color }}>{value}</div>
-            <div className="stat-label">{label}</div>
-            {hint && <p style={{ marginTop: 5, fontSize: 11.5, color: 'var(--text-tertiary)' }}>{hint}</p>}
-          </div>
-          {canOpen && <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{open ? 'fechar' : 'entender'}</span>}
-        </div>
-      </button>
-      {open && detail && (
-        <div style={{ borderTop: '1px solid var(--border-muted)', padding: '0 16px 14px', display: 'grid', gap: 9, fontSize: 12.5, lineHeight: 1.4 }}>
-          <DetailText title="O que significa" text={detail.meaning} />
-          <DetailText title="Como foi calculado" text={detail.calculation} />
-          {(detail.affected ?? []).length > 0 ? (
+    <>
+      <div className="stat-card" style={{ border: `1px solid ${s.border}`, padding: 0, overflow: 'hidden' }}>
+        <button
+          type="button"
+          disabled={!canOpen}
+          onClick={() => canOpen && setOpen(true)}
+          style={{ width: '100%', height: '100%', border: 'none', background: 'transparent', color: 'inherit', textAlign: 'left', cursor: canOpen ? 'pointer' : 'default', padding: '14px 16px' }}
+          title={canOpen ? 'Clique para abrir a explicação deste indicador' : undefined}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
             <div>
-              <p className="label-caps" style={{ marginBottom: 5 }}>{detail.affectedTitle || 'APs relacionados'}</p>
-              <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--text-secondary)' }}>
-                {detail.affected.slice(0, 10).map(item => <li key={item}>{item}</li>)}
-              </ul>
+              <div className="stat-value" style={{ color: s.color }}>{value}</div>
+              <div className="stat-label">{label}</div>
+              {hint && <p style={{ marginTop: 5, fontSize: 11.5, color: 'var(--text-tertiary)' }}>{hint}</p>}
             </div>
-          ) : (
-            <InfoLine label={detail.affectedTitle || 'APs relacionados'} value="nenhum" />
-          )}
-          <DetailText title="O que fazer" text={detail.action} />
+            {canOpen && <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>abrir</span>}
+          </div>
+        </button>
+      </div>
+      {open && detail && <KpiExplanationModal label={label} value={value} tone={tone} detail={detail} onClose={() => setOpen(false)} />}
+    </>
+  )
+}
+
+function KpiExplanationModal({ label, value, tone = 'healthy', detail, onClose }) {
+  const s = statusStyle[tone] ?? statusStyle.healthy
+  useEffect(() => {
+    const onKey = event => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Explicação do card ${label}`}
+      onMouseDown={onClose}
+      style={{ position: 'fixed', inset: 0, zIndex: 9500, background: 'rgba(2,8,23,.72)', backdropFilter: 'blur(5px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 18 }}
+    >
+      <div
+        onMouseDown={event => event.stopPropagation()}
+        style={{ width: 'min(720px, 96vw)', maxHeight: '88vh', overflow: 'auto', borderRadius: 22, border: `1px solid ${s.border}`, background: 'linear-gradient(180deg, var(--bg-surface), var(--bg-subtle))', boxShadow: '0 28px 90px rgba(0,0,0,.46)', padding: 0 }}
+      >
+        <div style={{ padding: '20px 22px 16px', borderBottom: '1px solid var(--border-muted)', display: 'flex', gap: 16, alignItems: 'flex-start', justifyContent: 'space-between' }}>
+          <div>
+            <p className="label-caps" style={{ color: s.color, marginBottom: 6 }}>Explicação do indicador</p>
+            <h2 style={{ color: 'var(--text-primary)', fontSize: 24, lineHeight: 1.1, margin: 0 }}>{detail.title || label}</h2>
+            <p style={{ color: 'var(--text-tertiary)', marginTop: 6, fontSize: 13 }}>Valor atual: <strong style={{ color: s.color, fontFamily: 'var(--font-mono)' }}>{value}</strong></p>
+          </div>
+          <button type="button" onClick={onClose} style={{ border: '1px solid var(--border-muted)', background: 'var(--bg-subtle)', color: 'var(--text-secondary)', borderRadius: 12, padding: '8px 11px', cursor: 'pointer', fontWeight: 800 }}>Fechar</button>
         </div>
-      )}
+
+        <div style={{ padding: 22, display: 'grid', gap: 14 }}>
+          <ModalSection title="O que significa" text={detail.meaning} />
+          <ModalSection title="Como foi calculado" text={detail.calculation} />
+
+          <div style={{ padding: 14, borderRadius: 14, background: 'var(--bg-surface)', border: '1px solid var(--border-muted)' }}>
+            <p className="label-caps" style={{ marginBottom: 9 }}>{detail.affectedTitle || 'APs relacionados'}</p>
+            {(detail.affected ?? []).length > 0 ? (
+              <div style={{ display: 'grid', gap: 7 }}>
+                {detail.affected.slice(0, 12).map(item => (
+                  <div key={item} style={{ display: 'flex', gap: 9, alignItems: 'center', color: 'var(--text-secondary)', fontSize: 13 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: 99, background: s.color, boxShadow: `0 0 0 4px ${s.bg}`, flexShrink: 0 }} />
+                    <span>{item}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 13 }}>Nenhum AP relacionado neste momento.</p>
+            )}
+          </div>
+
+          <div style={{ padding: 14, borderRadius: 14, background: s.bg, border: `1px solid ${s.border}` }}>
+            <p className="label-caps" style={{ color: s.color, marginBottom: 6 }}>O que fazer</p>
+            <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5, fontSize: 13.5 }}>{detail.action}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ModalSection({ title, text }) {
+  return (
+    <div style={{ padding: 14, borderRadius: 14, background: 'var(--bg-subtle)', border: '1px solid var(--border-muted)' }}>
+      <p className="label-caps" style={{ marginBottom: 6 }}>{title}</p>
+      <p style={{ color: 'var(--text-secondary)', lineHeight: 1.5, fontSize: 13.5 }}>{text}</p>
     </div>
   )
 }
