@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
 import { getUnifiApPanel } from '../services/monitoring'
-import { analyzeMonitoredClients, buildApSummary, enrichAps, explainApLast24h, explainUnifiEvent, formatDuration, formatMs, formatRateKbps, normalizeMac, statusLabel } from '../utils/unifiApPanel'
+import { analyzeMonitoredClients, buildApSummary, enrichAps, explainApLast24h, explainKpiSummary, explainUnifiEvent, formatDuration, formatMs, formatRateKbps, normalizeMac, statusLabel } from '../utils/unifiApPanel'
 
 const statusStyle = {
   healthy: { color: 'var(--green)', bg: 'var(--green-bg)', border: 'rgba(34,197,94,.32)' },
@@ -14,13 +14,45 @@ function formatClock(ts) {
   return new Date(ts * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-function Kpi({ label, value, tone = 'healthy', hint }) {
+function Kpi({ label, value, tone = 'healthy', hint, detail }) {
+  const [open, setOpen] = useState(false)
   const s = statusStyle[tone] ?? statusStyle.healthy
+  const canOpen = Boolean(detail)
   return (
-    <div className="stat-card" style={{ border: `1px solid ${s.border}` }}>
-      <div className="stat-value" style={{ color: s.color }}>{value}</div>
-      <div className="stat-label">{label}</div>
-      {hint && <p style={{ marginTop: 5, fontSize: 11.5, color: 'var(--text-tertiary)' }}>{hint}</p>}
+    <div className="stat-card" style={{ border: `1px solid ${s.border}`, padding: 0, overflow: 'hidden' }}>
+      <button
+        type="button"
+        disabled={!canOpen}
+        onClick={() => canOpen && setOpen(v => !v)}
+        style={{ width: '100%', border: 'none', background: 'transparent', color: 'inherit', textAlign: 'left', cursor: canOpen ? 'pointer' : 'default', padding: '14px 16px' }}
+        title={canOpen ? 'Clique para entender como esse indicador foi calculado' : undefined}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, alignItems: 'flex-start' }}>
+          <div>
+            <div className="stat-value" style={{ color: s.color }}>{value}</div>
+            <div className="stat-label">{label}</div>
+            {hint && <p style={{ marginTop: 5, fontSize: 11.5, color: 'var(--text-tertiary)' }}>{hint}</p>}
+          </div>
+          {canOpen && <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{open ? 'fechar' : 'entender'}</span>}
+        </div>
+      </button>
+      {open && detail && (
+        <div style={{ borderTop: '1px solid var(--border-muted)', padding: '0 16px 14px', display: 'grid', gap: 9, fontSize: 12.5, lineHeight: 1.4 }}>
+          <DetailText title="O que significa" text={detail.meaning} />
+          <DetailText title="Como foi calculado" text={detail.calculation} />
+          {(detail.affected ?? []).length > 0 ? (
+            <div>
+              <p className="label-caps" style={{ marginBottom: 5 }}>{detail.affectedTitle || 'APs relacionados'}</p>
+              <ul style={{ margin: 0, paddingLeft: 16, color: 'var(--text-secondary)' }}>
+                {detail.affected.slice(0, 10).map(item => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+          ) : (
+            <InfoLine label={detail.affectedTitle || 'APs relacionados'} value="nenhum" />
+          )}
+          <DetailText title="O que fazer" text={detail.action} />
+        </div>
+      )}
     </div>
   )
 }
@@ -359,6 +391,17 @@ export default function UnifiApMonitoringPage() {
 
   const aps = useMemo(() => enrichAps(payload?.aps ?? []), [payload])
   const summary = useMemo(() => buildApSummary(aps), [aps])
+  const kpiDetails = useMemo(() => ({
+    total: explainKpiSummary('total', aps, summary),
+    healthy: explainKpiSummary('healthy', aps, summary),
+    warning: explainKpiSummary('warning', aps, summary),
+    down: explainKpiSummary('down', aps, summary),
+    avgLoss: explainKpiSummary('avgLoss', aps, summary),
+    maxLatency: explainKpiSummary('maxLatency', aps, summary),
+    reboots: explainKpiSummary('reboots', aps, summary),
+    events: explainKpiSummary('events', aps, summary),
+    unmapped: explainKpiSummary('unmapped', aps, summary),
+  }), [aps, summary])
   const generatedAt = payload?.generatedAt ? new Date(payload.generatedAt * 1000) : null
   const stale = generatedAt ? Date.now() - generatedAt.getTime() > 5 * 60_000 : false
 
@@ -379,15 +422,15 @@ export default function UnifiApMonitoringPage() {
         {error && <div className="card" style={{ padding: 16, borderColor: 'var(--red)', color: 'var(--red)' }}>{error}</div>}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 22 }}>
-          <Kpi label="APs monitorados" value={summary.total} hint="Coleta a cada 1 minuto" />
-          <Kpi label="Saudáveis" value={summary.healthy} tone="healthy" />
-          <Kpi label="Atenção" value={summary.warning} tone={summary.warning > 0 ? 'warning' : 'healthy'} />
-          <Kpi label="Críticos" value={summary.down} tone={summary.down > 0 ? 'down' : 'healthy'} />
-          <Kpi label="Perda média 24h" value={`${summary.avgLoss.toFixed(1)}%`} tone={summary.avgLoss > 0 ? 'warning' : 'healthy'} />
-          <Kpi label="Maior latência" value={formatMs(summary.maxLatency)} tone={summary.maxLatency > 50 ? 'warning' : 'healthy'} />
-          <Kpi label="Reboots 24h" value={summary.reboots24h} tone={summary.reboots24h > 0 ? 'warning' : 'healthy'} />
-          <Kpi label="Eventos UniFi" value={summary.controllerEvents24h} hint="Clique nos eventos para entender" />
-          <Kpi label="Porta pendente" value={summary.unmapped} tone={summary.unmapped > 0 ? 'warning' : 'healthy'} />
+          <Kpi label="APs monitorados" value={summary.total} hint="Coleta a cada 1 minuto" detail={kpiDetails.total} />
+          <Kpi label="Saudáveis" value={summary.healthy} tone="healthy" detail={kpiDetails.healthy} />
+          <Kpi label="Atenção" value={summary.warning} tone={summary.warning > 0 ? 'warning' : 'healthy'} detail={kpiDetails.warning} />
+          <Kpi label="Críticos" value={summary.down} tone={summary.down > 0 ? 'down' : 'healthy'} detail={kpiDetails.down} />
+          <Kpi label="Perda média 24h" value={`${summary.avgLoss.toFixed(1)}%`} tone={summary.avgLoss > 0 ? 'warning' : 'healthy'} detail={kpiDetails.avgLoss} />
+          <Kpi label="Maior latência" value={formatMs(summary.maxLatency)} tone={summary.maxLatency > 50 ? 'warning' : 'healthy'} detail={kpiDetails.maxLatency} />
+          <Kpi label="Reboots 24h" value={summary.reboots24h} tone={summary.reboots24h > 0 ? 'warning' : 'healthy'} detail={kpiDetails.reboots} />
+          <Kpi label="Eventos UniFi" value={summary.controllerEvents24h} hint="Clique para entender" detail={kpiDetails.events} />
+          <Kpi label="Porta pendente" value={summary.unmapped} tone={summary.unmapped > 0 ? 'warning' : 'healthy'} detail={kpiDetails.unmapped} />
         </div>
 
         <section className="card" style={{ padding: 16, marginBottom: 22 }}>

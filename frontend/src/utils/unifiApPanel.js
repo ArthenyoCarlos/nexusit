@@ -54,6 +54,119 @@ export function enrichAps(aps = []) {
     })
 }
 
+function topAps(aps = [], selector, limit = 5) {
+  return [...aps]
+    .map(ap => ({ ap, value: Number(selector(ap) ?? 0) }))
+    .filter(item => item.value > 0)
+    .sort((a, b) => b.value - a.value || String(a.ap.name).localeCompare(String(b.ap.name), 'pt-BR'))
+    .slice(0, limit)
+}
+
+export function explainKpiSummary(kind, aps = [], summary = buildApSummary(aps)) {
+  const statusAps = status => aps.filter(ap => (ap.status ?? classifyAp(ap)) === status)
+  const names = list => list.map(ap => ap.name).filter(Boolean)
+  const latencyTop = topAps(aps, ap => ap.maxRttMs ?? ap.avgRttMs, 5)
+  const lossTop = topAps(aps, ap => ap.avgLossPct ?? ap.lastLossPct, 5)
+  const rebootTop = topAps(aps, ap => ap.reboots24h, 8)
+  const eventTop = topAps(aps, ap => ap.controllerEvents24h, 8)
+  const unmapped = aps.filter(ap => !ap.switchPort || ap.switchPort === 'unknown')
+
+  const base = {
+    title: 'Indicador do painel',
+    tone: 'healthy',
+    meaning: 'Indicador consolidado do monitoramento de APs UniFi.',
+    calculation: 'Calculado a partir do snapshot atual dos APs.',
+    affectedTitle: 'APs relacionados',
+    affected: [],
+    action: 'Clique nos cards dos APs abaixo para ver detalhes individuais.',
+  }
+
+  if (kind === 'total') return {
+    ...base,
+    title: 'APs monitorados',
+    meaning: 'Quantidade total de APs que entram no snapshot UniFi/Zabbix/ICMP do NexusIT.',
+    calculation: `Conta todos os APs recebidos no snapshot atual: ${summary.total}.`,
+    affected: names(aps),
+    action: 'Se faltar algum AP, verificar se ele está cadastrado no coletor do painel e no monitoramento.',
+  }
+  if (kind === 'healthy') return {
+    ...base,
+    title: 'APs saudáveis',
+    meaning: 'APs sem queda, sem perda, sem latência alta, sem reboot recente e com SNMP OK.',
+    calculation: `Conta APs classificados como Saudável: ${summary.healthy} de ${summary.total}.`,
+    affected: names(statusAps('healthy')),
+    action: 'Nenhuma ação necessária para esses APs agora.',
+  }
+  if (kind === 'warning') return {
+    ...base,
+    title: 'APs em atenção',
+    tone: summary.warning > 0 ? 'warning' : 'healthy',
+    meaning: 'APs que responderam, mas têm algum ponto para olhar: perda parcial, latência alta, reboot ou SNMP indisponível.',
+    calculation: `Conta APs classificados como Atenção: ${summary.warning}.`,
+    affected: names(statusAps('warning')),
+    action: 'Abrir o card de cada AP em atenção e verificar Últimas 24h, switch/porta, SNMP e eventos.',
+  }
+  if (kind === 'down') return {
+    ...base,
+    title: 'APs críticos',
+    tone: summary.down > 0 ? 'down' : 'healthy',
+    meaning: 'APs classificados como críticos porque estão com alerta/problem ou perda total no último teste.',
+    calculation: `Conta APs classificados como Crítico: ${summary.down}.`,
+    affected: names(statusAps('down')),
+    action: 'Priorizar checagem de energia PoE, porta do switch, cabo e reachability do AP.',
+  }
+  if (kind === 'avgLoss') return {
+    ...base,
+    title: 'Perda média 24h',
+    tone: summary.avgLoss > 0 ? 'warning' : 'healthy',
+    meaning: 'Mostra a média de perda dos APs no período. Ajuda a identificar instabilidade geral.',
+    calculation: `Soma a perda média de cada AP e divide pelo total de APs: ${summary.avgLoss.toFixed(1)}%.`,
+    affectedTitle: 'APs que mais contribuíram para perda',
+    affected: lossTop.map(({ ap, value }) => `${ap.name}: ${value.toFixed(1)}%`),
+    action: lossTop.length ? 'Começar pelos APs com maior perda e verificar switch/porta/cabo/PoE.' : 'Sem perda registrada no período.',
+  }
+  if (kind === 'maxLatency') return {
+    ...base,
+    title: 'Maior latência',
+    tone: summary.maxLatency > 50 ? 'warning' : 'healthy',
+    meaning: 'Mostra o maior tempo de resposta registrado entre os APs. Não é média geral; é o pior AP no snapshot.',
+    calculation: `Compara maxRttMs/avgRttMs de todos os APs e pega o maior valor: ${formatMs(summary.maxLatency)}.`,
+    affectedTitle: 'APs com maior latência',
+    affected: latencyTop.map(({ ap, value }) => `${ap.name}: ${formatMs(value)}`),
+    action: latencyTop.length ? 'Verificar primeiro o AP no topo da lista: porta do switch, cabo, uplink, carga e distância até o gateway.' : 'Sem latência registrada.',
+  }
+  if (kind === 'reboots') return {
+    ...base,
+    title: 'Reboots 24h',
+    tone: summary.reboots24h > 0 ? 'warning' : 'healthy',
+    meaning: 'Quantidade de reinícios detectados nos APs nas últimas 24h.',
+    calculation: `Soma o campo reboots24h de todos os APs: ${summary.reboots24h}.`,
+    affectedTitle: 'APs que reiniciaram',
+    affected: rebootTop.map(({ ap, value }) => `${ap.name}: ${value} reboot(s)`),
+    action: rebootTop.length ? 'Se não foi manutenção/update, verificar PoE, fonte, cabo, porta do switch e logs da controladora.' : 'Nenhum reboot detectado nas últimas 24h.',
+  }
+  if (kind === 'events') return {
+    ...base,
+    title: 'Eventos UniFi',
+    tone: summary.controllerEvents24h > 0 ? 'warning' : 'healthy',
+    meaning: 'Quantidade de eventos da controladora relacionados aos APs: cliente conectou, roaming, login, reboot, provisionamento etc.',
+    calculation: `Soma controllerEvents24h de todos os APs: ${summary.controllerEvents24h}.`,
+    affectedTitle: 'APs com mais eventos',
+    affected: eventTop.map(({ ap, value }) => `${ap.name}: ${value} evento(s)`),
+    action: 'Eventos não são problema sozinhos. Clique nos eventos da controladora para ver se são informativos ou indicam falha.',
+  }
+  if (kind === 'unmapped') return {
+    ...base,
+    title: 'Porta pendente',
+    tone: summary.unmapped > 0 ? 'warning' : 'healthy',
+    meaning: 'APs que ainda não têm switch/porta identificados no painel.',
+    calculation: `Conta APs sem switchPort ou com switchPort = unknown: ${summary.unmapped}.`,
+    affected: names(unmapped),
+    action: 'Mapear AP → switch → porta para acelerar diagnóstico quando houver queda ou reboot.',
+  }
+  return base
+}
+
 export function explainApLast24h(ap = {}) {
   const samples = Number(ap.samples24h ?? 0)
   const down = Number(ap.downSamples24h ?? 0)

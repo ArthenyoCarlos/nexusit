@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { analyzeMonitoredClients, buildApSummary, classifyAp, enrichAps, explainApLast24h, explainUnifiEvent, formatDuration, normalizeMac, statusLabel } from './unifiApPanel.js'
+import { analyzeMonitoredClients, buildApSummary, classifyAp, enrichAps, explainApLast24h, explainKpiSummary, explainUnifiEvent, formatDuration, normalizeMac, statusLabel } from './unifiApPanel.js'
 
 assert.equal(formatDuration(65), '1m')
 assert.equal(formatDuration(3660), '1h 1m')
@@ -26,6 +26,14 @@ assert.equal(summary.unmapped, 1)
 assert.equal(summary.reboots24h, 1)
 assert.equal(summary.controllerEvents24h, 2)
 assert.equal(summary.maxLatency, 90)
+const latencyInfo = explainKpiSummary('maxLatency', enrichAps(aps), summary)
+assert.equal(latencyInfo.title, 'Maior latência')
+assert.match(latencyInfo.calculation, /90\.0 ms/)
+assert.equal(latencyInfo.affected[0], 'CAMARA: 90.0 ms')
+const rebootInfo = explainKpiSummary('reboots', enrichAps(aps), summary)
+assert.equal(rebootInfo.affected[0], 'CAMARA: 1 reboot(s)')
+const unmappedInfo = explainKpiSummary('unmapped', enrichAps(aps), summary)
+assert.deepEqual(unmappedInfo.affected, ['ADM'])
 assert.deepEqual(enrichAps(aps).map(ap => ap.name), ['ADM', 'CAMARA', 'RUA 3'])
 
 const login = explainUnifiEvent({ message: 'Admin[admin] log in from 192.168.2.210' })
