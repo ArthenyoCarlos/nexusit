@@ -15,6 +15,7 @@ const NAV = [
       { label: 'Dash. Executivo', path: '/dashboard/executive', Icon: IconExecutive, adminOnly: true },
       { label: 'NexusAI',       path: '/hermes',     Icon: IconHermes     },
       { label: 'Monitoramento', path: '/monitoring', Icon: IconMonitor    },
+      { label: 'APs UniFi',     path: '/monitoring/aps', Icon: IconWifi   },
     ],
   },
   {
@@ -154,6 +155,7 @@ export default function Sidebar({ onNavigate }) {
 const i = { width: 15, height: 15, fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, viewBox: '0 0 24 24', strokeLinecap: 'round', strokeLinejoin: 'round' }
 function IconDashboard()  { return <svg {...i}><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg> }
 function IconMonitor()    { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg> }
+function IconWifi()       { return <svg {...i}><path d="M5 12.55a11 11 0 0114.08 0"/><path d="M1.42 9a16 16 0 0121.16 0"/><path d="M8.53 16.11a6 6 0 016.95 0"/><circle cx="12" cy="20" r="1"/></svg> }
 function IconSystems()    { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><circle cx="7" cy="10" r="1"/><circle cx="12" cy="10" r="1"/></svg> }
 function IconDependencyMap() { return <svg {...i}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><path d="M8.5 7.5L15.5 10.5M8.5 16.5L15.5 13.5"/></svg> }
 function IconInventory()  { return <svg {...i}><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/><path d="M12 3v18M3 6l9 3 9-3"/></svg> }
