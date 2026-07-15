@@ -155,7 +155,25 @@ class SupportConversationEngineTest {
 
         assertEquals(ConversationState.PENDING_TECH, conversation.getState());
         assertEquals(888, conversation.getGlpiTicketId());
-        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("Aguarde um momento"));
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("fila para um técnico assumir"));
+    }
+
+    @Test
+    void menu_directProblemText_createsStructuredTicketWithoutAskingMenuAgain() {
+        WhatsappContact contact = WhatsappContact.builder().id(UUID.randomUUID()).phoneNumber("5511999999999")
+                .glpiUserId(42).glpiUserName("Maria Silva").build();
+        SupportConversation conversation = SupportConversation.builder()
+                .id(UUID.randomUUID()).contact(contact).state(ConversationState.MENU).build();
+
+        when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
+        when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
+        when(glpiService.createTicket(anyString(), contains("Checklist inicial sugerido"), eq(42), eq(4), eq("Rede/Internet"))).thenReturn(889);
+
+        engine.onInboundMessage(textMessage("5511999999999", "Sem internet no setor do caixa, todos parados"));
+
+        assertEquals(ConversationState.PENDING_TECH, conversation.getState());
+        assertEquals(889, conversation.getGlpiTicketId());
+        verify(evolutionApiClient).sendText(eq("5511999999999"), contains("Prioridade inicial: *Alta*"));
     }
 
     @Test

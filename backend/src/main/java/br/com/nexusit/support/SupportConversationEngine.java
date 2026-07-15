@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -27,16 +28,22 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Slf4j
 public class SupportConversationEngine {
 
-    private static final String FIRST_CONTACT_TEXT = "Olá! 👋 Bem-vindo ao suporte TI do Armazém Galdino. Por favor, me informe seu nome completo.";
-    private static final String MENU_TEMPLATE = "Olá %s! Como posso te ajudar?\n" +
-            "1️⃣ Abrir chamado de suporte\n" +
+    private static final String FIRST_CONTACT_TEXT = "Olá! 👋 Sou o atendimento automático do TI Galdino.\n\nPara começar, me informe seu *nome completo*.";
+    private static final String MENU_TEMPLATE = "Olá, %s! Como posso te ajudar?\n\n" +
+            "1️⃣ Abrir chamado\n" +
             "2️⃣ Consultar meus chamados\n" +
             "3️⃣ Falar com um técnico\n" +
-            "0️⃣ Encerrar atendimento";
-    private static final String ASK_DESCRIPTION = "Por favor, descreva seu problema. Você pode enviar fotos, vídeos ou áudio 📷🎧";
-    private static final String WAIT_TECH = "Aguarde um momento, estou verificando a disponibilidade dos técnicos...";
-    private static final String CLOSED_TEXT = "Atendimento encerrado. Caso precise de mais ajuda, é só me chamar novamente. Obrigado! 😊";
-    private static final String EXPIRED_TEXT = "Seu atendimento anterior expirou por inatividade. Vamos começar novamente?";
+            "0️⃣ Encerrar\n\n" +
+            "Se preferir, pode escrever direto o problema. Ex.: _coletor desconectou_, _sistema travou_, _sem internet_, _impressora parada_.";
+    private static final String ASK_DESCRIPTION = "Certo. Me envie o que está acontecendo em uma mensagem só, se puder:\n\n" +
+            "• qual sistema/equipamento;\n" +
+            "• setor/local;\n" +
+            "• desde quando acontece;\n" +
+            "• se é só com você ou com mais pessoas.\n\n" +
+            "Pode mandar foto, vídeo ou áudio também. 📷🎧";
+    private static final String WAIT_TECH = "Certo, vou colocar seu atendimento na fila para um técnico assumir. Se for urgente, envie também o setor/local e o impacto.";
+    private static final String CLOSED_TEXT = "✅ Atendimento encerrado. Se precisar de mais alguma coisa, é só me chamar novamente.";
+    private static final String EXPIRED_TEXT = "Seu atendimento anterior expirou por inatividade. Vou iniciar um novo atendimento, tudo bem?";
     private static final Duration MENU_TIMEOUT = Duration.ofMinutes(60);
     private static final Duration DESCRIPTION_TIMEOUT = Duration.ofHours(2);
     private static final Duration HUMAN_ACTIVE_TIMEOUT = Duration.ofDays(7);
@@ -196,25 +203,64 @@ public class SupportConversationEngine {
             sendAndRecord(conversation, CLOSED_TEXT);
             return;
         }
-        sendAndRecord(conversation, "Não entendi sua opção.\n\n" + menuText(contact.getGlpiUserName()));
+        if (looksLikeSupportRequest(msg)) {
+            handleDirectSupportRequest(conversation, contact, msg, "");
+            return;
+        }
+        sendAndRecord(conversation, "Não consegui identificar a opção.\n\n" + menuText(contact.getGlpiUserName()));
+    }
+
+    private void handleDirectSupportRequest(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String transcription) {
+        String description = descriptionFrom(msg, transcription);
+        int priority = inferPriority(description);
+        int ticketId = glpiService.createTicket(
+                autoTitle(description),
+                structuredTicketDescription(contact, description, inferCategory(description), priority),
+                contact.getGlpiUserId(),
+                priority,
+                inferCategory(description)
+        );
+        conversation.setGlpiTicketId(ticketId);
+        conversation.setState(ConversationState.PENDING_TECH);
+        conversationRepo.save(conversation);
+        attachMediaIfAny(ticketId, msg);
+        notifyQueueOfNewTicket(conversation, contact, ticketId);
+        sendAndRecord(conversation, openedTicketText(ticketId, priority));
+    }
+
+    private boolean looksLikeSupportRequest(InboundWhatsappMessage msg) {
+        String text = normalize(msg.text());
+        if (msg.hasMedia()) return true;
+        if (text.length() < 8) return false;
+        if (text.matches("^[0-9]+$")) return false;
+        return text.contains("parou") || text.contains("nao funciona") || text.contains("não funciona")
+                || text.contains("travou") || text.contains("erro") || text.contains("falha")
+                || text.contains("sem ") || text.contains("lento") || text.contains("lenta")
+                || text.contains("impressora") || text.contains("coletor") || text.contains("winthor")
+                || text.contains("internet") || text.contains("wifi") || text.contains("wi-fi")
+                || text.contains("sistema") || text.contains("senha") || text.contains("login")
+                || text.contains("acesso") || text.contains("computador") || text.contains("notebook")
+                || text.contains("email") || text.contains("e-mail");
     }
 
     private void handleAwaitingDescription(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String transcription) {
         if (conversation.getGlpiTicketId() == null) {
             String description = descriptionFrom(msg, transcription);
+            int priority = inferPriority(description);
+            String category = inferCategory(description);
             int ticketId = glpiService.createTicket(
                     autoTitle(description),
-                    description,
+                    structuredTicketDescription(contact, description, category, priority),
                     contact.getGlpiUserId(),
-                    3,
-                    inferCategory(description)
+                    priority,
+                    category
             );
             conversation.setGlpiTicketId(ticketId);
             conversation.setState(ConversationState.PENDING_TECH);
             conversationRepo.save(conversation);
             attachMediaIfAny(ticketId, msg);
             notifyQueueOfNewTicket(conversation, contact, ticketId);
-            sendAndRecord(conversation, "✅ Chamado #" + ticketId + " aberto com sucesso! Um técnico irá atendê-lo em breve. Você será notificado aqui quando seu chamado for atendido.");
+            sendAndRecord(conversation, openedTicketText(ticketId, priority));
         } else {
             appendFollowupOnly(conversation, msg, transcription);
         }
@@ -359,14 +405,80 @@ public class SupportConversationEngine {
         String t = normalize(description);
         if (t.contains("impressora") || t.contains("toner") || t.contains("scanner")) return "Impressoras";
         if (t.contains("internet") || t.contains("wifi") || t.contains("wi-fi") || t.contains("rede")) return "Rede/Internet";
-        if (t.contains("winthor") || t.contains("sistema") || t.contains("erp")) return "Sistemas/WinThor";
+        if (t.contains("coletor") || t.contains("palm") || t.contains("android") || t.contains("celular")) return "Coletores/Mobile";
+        if (t.contains("winthor") || t.contains("sistema") || t.contains("erp") || t.contains("pdv") || t.contains("caixa")) return "Sistemas/WinThor";
         if (t.contains("email") || t.contains("e-mail")) return "E-mail";
         if (t.contains("senha") || t.contains("acesso") || t.contains("login")) return "Acessos";
+        if (t.contains("computador") || t.contains("notebook") || t.contains("monitor") || t.contains("teclado") || t.contains("mouse")) return "Computadores";
         return "Suporte TI";
     }
 
+    private int inferPriority(String description) {
+        String t = normalize(description);
+        if (t.contains("urgente") || t.contains("parado geral") || t.contains("todos parados")
+                || t.contains("loja parada") || t.contains("sem internet") || t.contains("internet caiu")
+                || t.contains("sistema fora") || t.contains("winthor fora") || t.contains("pdv parado")
+                || t.contains("caixa parado") || t.contains("nao vende") || t.contains("não vende")) {
+            return 4;
+        }
+        if (t.contains("parou") || t.contains("nao funciona") || t.contains("não funciona")
+                || t.contains("travou") || t.contains("erro") || t.contains("falha")
+                || t.contains("sem acesso") || t.contains("coletor desconect")) {
+            return 3;
+        }
+        return 3;
+    }
+
+    private String priorityLabel(int priority) {
+        return switch (priority) {
+            case 4 -> "Alta";
+            case 5 -> "Muito alta";
+            default -> "Média";
+        };
+    }
+
+    private String openedTicketText(int ticketId, int priority) {
+        return "✅ Chamado #" + ticketId + " aberto com sucesso.\n\n" +
+                "Prioridade inicial: *" + priorityLabel(priority) + "*.\n" +
+                "Um técnico irá assumir pelo NexusIT. Se lembrar de mais algum detalhe, pode enviar aqui que será anexado ao chamado.";
+    }
+
+    private String structuredTicketDescription(WhatsappContact contact, String description, String category, int priority) {
+        String requester = contact.getGlpiUserName() != null && !contact.getGlpiUserName().isBlank()
+                ? contact.getGlpiUserName() : contact.getDisplayName();
+        return "Origem: WhatsApp TI Galdino\n" +
+                "Solicitante: " + firstNonBlank(requester, contact.getPhoneNumber()) + "\n" +
+                "Telefone: " + contact.getPhoneNumber() + "\n" +
+                "Categoria sugerida: " + category + "\n" +
+                "Prioridade sugerida: " + priorityLabel(priority) + "\n\n" +
+                "Relato do usuário:\n" + description + "\n\n" +
+                "Checklist inicial sugerido:\n" + suggestedChecklist(category, description);
+    }
+
+    private String suggestedChecklist(String category, String description) {
+        String t = normalize(category + " " + description);
+        if (t.contains("rede") || t.contains("internet") || t.contains("wifi")) {
+            return "- confirmar setor/local afetado;\n- testar conectividade do equipamento;\n- verificar AP/switch/porta no NexusIT/Zabbix;\n- validar se há outros usuários afetados.";
+        }
+        if (t.contains("impressora")) {
+            return "- confirmar impressora/setor;\n- verificar fila de impressão e conexão;\n- checar papel/toner/erro no painel;\n- testar impressão de outro computador.";
+        }
+        if (t.contains("coletor") || t.contains("mobile")) {
+            return "- confirmar MAC/nome do coletor e setor;\n- verificar Wi-Fi/AP conectado no painel UniFi;\n- testar login/aplicativo;\n- diferenciar falha de rede x falha do sistema.";
+        }
+        if (t.contains("winthor") || t.contains("sistema") || t.contains("pdv")) {
+            return "- confirmar módulo/tela e mensagem de erro;\n- verificar se afeta um usuário ou todos;\n- testar conexão com servidor/sistema;\n- registrar evidência ou print.";
+        }
+        if (t.contains("acesso") || t.contains("senha") || t.contains("login")) {
+            return "- confirmar sistema afetado;\n- validar usuário/cadastro;\n- não solicitar senha pelo WhatsApp;\n- tratar redefinição conforme política interna.";
+        }
+        return "- confirmar setor/local;\n- identificar equipamento/sistema afetado;\n- verificar impacto e quantidade de usuários;\n- pedir evidência se necessário.";
+    }
+
     private String normalize(String s) {
-        return s == null ? "" : s.trim().toLowerCase(Locale.ROOT);
+        if (s == null) return "";
+        String lower = s.trim().toLowerCase(Locale.ROOT);
+        return Normalizer.normalize(lower, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
     }
 
     private String firstNonBlank(String a, String b) {
