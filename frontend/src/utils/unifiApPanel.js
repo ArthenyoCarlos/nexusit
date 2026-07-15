@@ -135,6 +135,86 @@ function matchValue(text, regex) {
   return match ? match[1] : null
 }
 
+export function normalizeMac(value = '') {
+  const raw = String(value ?? '').trim().toLowerCase().replace(/[^a-f0-9]/g, '')
+  if (raw.length !== 12) return ''
+  return raw.match(/.{1,2}/g).join(':')
+}
+
+export function macFromEvent(event = {}) {
+  return normalizeMac(matchValue(event.message ?? '', /User\[([^\]]+)\]/i))
+}
+
+export function formatRateKbps(value) {
+  if (value == null || Number.isNaN(Number(value))) return '—'
+  const kbps = Number(value)
+  if (kbps >= 1000) return `${(kbps / 1000).toFixed(1)} Mbps`
+  return `${kbps.toFixed(0)} Kbps`
+}
+
+export function explainSignal(signal) {
+  if (signal == null || Number.isNaN(Number(signal))) return { label: 'Sem sinal informado', tone: 'warning', description: 'A controladora não informou o nível de sinal desse cliente.' }
+  const value = Number(signal)
+  if (value >= -60) return { label: `${value} dBm · bom`, tone: 'healthy', description: 'Sinal bom. Se o sistema travou, a causa provavelmente não é cobertura Wi‑Fi fraca nesse momento.' }
+  if (value >= -70) return { label: `${value} dBm · médio`, tone: 'warning', description: 'Sinal utilizável, mas já pode oscilar dependendo de interferência, distância e movimentação.' }
+  return { label: `${value} dBm · fraco`, tone: 'down', description: 'Sinal fraco. Pode causar travamento, queda do coletor ou lentidão no sistema.' }
+}
+
+export function analyzeMonitoredClients(devices = [], clients = [], events = [], nowSeconds = Math.floor(Date.now() / 1000)) {
+  return devices.map(device => {
+    const mac = normalizeMac(device.mac)
+    const active = clients.find(client => normalizeMac(client.mac) === mac)
+    const relatedEvents = events
+      .filter(event => macFromEvent(event) === mac)
+      .sort((a, b) => Number(b.time ?? 0) - Number(a.time ?? 0))
+    const disconnects = relatedEvents.filter(event => /disconnect|disconnected|saiu/i.test(String(event.message ?? ''))).length
+    const roams = relatedEvents.filter(event => /\broams?\s+from\s+AP/i.test(String(event.message ?? ''))).length
+    const connects = relatedEvents.filter(event => /has connected to AP/i.test(String(event.message ?? ''))).length
+    const lastEvent = relatedEvents[0]
+    const lastSeen = active?.lastSeen ?? lastEvent?.time ?? null
+    const secondsSinceSeen = lastSeen ? Math.max(0, nowSeconds - Number(lastSeen)) : null
+    const signal = explainSignal(active?.signal)
+    let status = 'offline'
+    let title = 'Sem conexão ativa agora'
+    let summary = 'Não encontrei esse MAC na lista de clientes ativos da controladora.'
+    let tone = 'warning'
+    if (active) {
+      status = signal.tone === 'down' ? 'weak' : roams >= 5 || disconnects > 0 ? 'unstable' : 'online'
+      tone = signal.tone === 'down' ? 'down' : status === 'unstable' || signal.tone === 'warning' ? 'warning' : 'healthy'
+      title = status === 'online' ? 'Online agora' : status === 'weak' ? 'Online com sinal fraco' : 'Online, mas com oscilações recentes'
+      summary = `Conectado no AP ${active.apName || active.apMac || 'não identificado'}${active.ssid ? ` na rede ${active.ssid}` : ''}. Sinal: ${signal.label}.`
+    } else if (lastEvent) {
+      summary = `Último registro foi ${secondsSinceSeen == null ? 'há pouco tempo' : `há ${formatDuration(secondsSinceSeen)}`}: ${explainUnifiEvent(lastEvent).title}.`
+    }
+    return {
+      ...device,
+      mac,
+      active,
+      status,
+      tone,
+      title,
+      summary,
+      signal,
+      relatedEvents,
+      lastEvent,
+      lastSeen,
+      disconnects,
+      roams,
+      connects,
+      secondsSinceSeen,
+      action: active
+        ? signal.tone === 'down'
+          ? 'Testar o coletor próximo ao AP, verificar cobertura/interferência e avaliar ajuste de potência/canais.'
+          : roams >= 5
+            ? 'Roaming alto: verificar se o coletor está entre dois APs, potência dos APs e sobreposição de cobertura.'
+            : disconnects > 0
+              ? 'Houve desconexão recente: comparar horário com reclamação e verificar sinal/AP no momento.'
+              : 'Sem indício forte de rede agora. Se o sistema travou, investigar aplicação/servidor do sistema também.'
+        : 'Se o usuário relata travamento agora, confirmar se o coletor está ligado/no Wi‑Fi correto. Se estiver, verificar senha/rede ou reiniciar Wi‑Fi do coletor.',
+    }
+  })
+}
+
 export function explainUnifiEvent(event = {}) {
   const raw = String(event.message ?? '')
   const lower = raw.toLowerCase()

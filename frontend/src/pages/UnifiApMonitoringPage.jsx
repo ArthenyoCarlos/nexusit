@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
 import { getUnifiApPanel } from '../services/monitoring'
-import { buildApSummary, enrichAps, explainApLast24h, explainUnifiEvent, formatDuration, formatMs, statusLabel } from '../utils/unifiApPanel'
+import { analyzeMonitoredClients, buildApSummary, enrichAps, explainApLast24h, explainUnifiEvent, formatDuration, formatMs, formatRateKbps, normalizeMac, statusLabel } from '../utils/unifiApPanel'
 
 const statusStyle = {
   healthy: { color: 'var(--green)', bg: 'var(--green-bg)', border: 'rgba(34,197,94,.32)' },
@@ -115,6 +115,151 @@ function ApLast24hExplanation({ ap }) {
             <p className="label-caps" style={{ marginBottom: 4 }}>O que fazer</p>
             <p style={{ fontSize: 12, color: 'var(--text-secondary)', lineHeight: 1.4 }}>{info.action}</p>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ClientMonitorSection({ payload }) {
+  const storageKey = 'nexusit.unifi.monitoredClients.v1'
+  const [devices, setDevices] = useState(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) || '[]')
+      return Array.isArray(saved) ? saved : []
+    } catch {
+      return []
+    }
+  })
+  const [name, setName] = useState('')
+  const [mac, setMac] = useState('')
+  const [error, setError] = useState('')
+
+  const saveDevices = next => {
+    setDevices(next)
+    localStorage.setItem(storageKey, JSON.stringify(next))
+  }
+
+  const addDevice = event => {
+    event.preventDefault()
+    const normalized = normalizeMac(mac)
+    if (!normalized) {
+      setError('Informe um MAC válido, exemplo: 54:47:41:ee:fd:0d')
+      return
+    }
+    if (devices.some(device => normalizeMac(device.mac) === normalized)) {
+      setError('Esse MAC já está na lista.')
+      return
+    }
+    saveDevices([...devices, { id: `${normalized}-${Date.now()}`, name: name.trim() || `Dispositivo ${normalized.slice(-5)}`, mac: normalized }])
+    setName('')
+    setMac('')
+    setError('')
+  }
+
+  const removeDevice = id => saveDevices(devices.filter(device => device.id !== id))
+  const monitored = useMemo(
+    () => analyzeMonitoredClients(devices, payload?.wirelessClients ?? [], payload?.recentControllerEvents ?? []),
+    [devices, payload]
+  )
+
+  return (
+    <section className="card" style={{ padding: 16, marginBottom: 22 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+        <div>
+          <p className="label-caps">Dispositivos monitorados</p>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>Coletores, celulares ou notebooks por MAC</h2>
+          <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4, lineHeight: 1.45 }}>
+            Use quando alguém reclamar que o sistema travou: cadastre o MAC e veja se o equipamento está online, em qual AP, sinal, SSID, roaming e desconexões recentes.
+          </p>
+        </div>
+        <span className="badge" style={{ color: 'var(--accent-text)', border: '1px solid var(--border-muted)' }}>{payload?.wirelessClients?.length ?? 0} clientes ativos</span>
+      </div>
+
+      <form onSubmit={addDevice} style={{ display: 'grid', gridTemplateColumns: 'minmax(160px, 1fr) minmax(180px, 1fr) auto', gap: 10, alignItems: 'end', marginBottom: 12 }}>
+        <label style={{ display: 'grid', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
+          Nome/apelido
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="Coletor Rua 3" style={inputStyle} />
+        </label>
+        <label style={{ display: 'grid', gap: 5, fontSize: 12, color: 'var(--text-secondary)' }}>
+          MAC do dispositivo
+          <input value={mac} onChange={e => setMac(e.target.value)} placeholder="54:47:41:ee:fd:0d" style={inputStyle} />
+        </label>
+        <button type="submit" className="btn btn-primary" style={{ height: 38 }}>Monitorar</button>
+      </form>
+      {error && <p style={{ color: 'var(--red)', fontSize: 12, marginBottom: 10 }}>{error}</p>}
+
+      {monitored.length === 0 ? (
+        <div style={{ padding: 14, borderRadius: 12, background: 'var(--bg-subtle)', border: '1px dashed var(--border-muted)', color: 'var(--text-tertiary)', fontSize: 13 }}>
+          Nenhum dispositivo cadastrado ainda. Pegue o MAC do coletor/celular e adicione acima.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(330px, 1fr))', gap: 12 }}>
+          {monitored.map(device => <ClientDeviceCard key={device.id} device={device} onRemove={() => removeDevice(device.id)} />)}
+        </div>
+      )}
+    </section>
+  )
+}
+
+const inputStyle = {
+  height: 38,
+  borderRadius: 10,
+  border: '1px solid var(--border-muted)',
+  background: 'var(--bg-subtle)',
+  color: 'var(--text-primary)',
+  padding: '0 11px',
+  outline: 'none',
+}
+
+function ClientDeviceCard({ device, onRemove }) {
+  const [open, setOpen] = useState(false)
+  const s = statusStyle[device.tone] ?? statusStyle.healthy
+  const active = device.active
+  return (
+    <div style={{ border: `1px solid ${s.border}`, borderRadius: 14, background: 'var(--bg-subtle)', padding: 13 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ minWidth: 0 }}>
+          <p style={{ fontSize: 14, fontWeight: 800, color: 'var(--text-primary)' }}>{device.name}</p>
+          <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', fontFamily: 'var(--font-mono)' }}>{device.mac}</p>
+        </div>
+        <button type="button" onClick={onRemove} style={{ border: 'none', background: 'transparent', color: 'var(--text-tertiary)', cursor: 'pointer' }}>remover</button>
+      </div>
+      <div style={{ marginTop: 10, padding: 10, borderRadius: 11, border: `1px solid ${s.border}`, background: s.bg }}>
+        <p style={{ color: s.color, fontWeight: 800, fontSize: 13 }}>{device.title}</p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: 1.45, marginTop: 4 }}>{device.summary}</p>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8, marginTop: 10 }}>
+        <InfoLine label="AP atual" value={active?.apName || active?.apMac || 'offline'} warn={!active} />
+        <InfoLine label="Rede" value={active?.ssid || '—'} />
+        <InfoLine label="IP" value={active?.ip || '—'} />
+        <InfoLine label="Canal" value={active?.channel ?? '—'} />
+        <InfoLine label="Sinal" value={device.signal.label} warn={device.signal.tone !== 'healthy'} />
+        <InfoLine label="Conectado há" value={formatDuration(active?.uptimeSeconds)} />
+        <InfoLine label="Roaming" value={`${device.roams} evento(s)`} warn={device.roams >= 5} />
+        <InfoLine label="Desconexões" value={`${device.disconnects} evento(s)`} warn={device.disconnects > 0} />
+      </div>
+      <button type="button" onClick={() => setOpen(v => !v)} style={{ marginTop: 10, width: '100%', border: '1px solid var(--border-muted)', background: 'var(--bg-surface)', color: 'var(--text-secondary)', borderRadius: 10, padding: '8px 10px', cursor: 'pointer' }}>
+        {open ? 'fechar diagnóstico' : 'entender diagnóstico'}
+      </button>
+      {open && (
+        <div style={{ marginTop: 10, display: 'grid', gap: 9, fontSize: 12.5 }}>
+          <DetailText title="Leitura operacional" text={device.signal.description} />
+          <DetailText title="O que fazer" text={device.action} />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+            <InfoLine label="TX" value={formatRateKbps(active?.txRate)} />
+            <InfoLine label="RX" value={formatRateKbps(active?.rxRate)} />
+            <InfoLine label="Ruído" value={active?.noise != null ? `${active.noise} dBm` : '—'} />
+            <InfoLine label="Último visto" value={device.lastSeen ? formatClock(device.lastSeen) : '—'} />
+          </div>
+          {(device.relatedEvents ?? []).length > 0 && (
+            <div>
+              <p className="label-caps" style={{ marginBottom: 6 }}>Eventos desse dispositivo</p>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {device.relatedEvents.slice(0, 4).map((event, index) => <EventCard key={`${event.time}-${index}`} event={event} compact />)}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -249,10 +394,13 @@ export default function UnifiApMonitoringPage() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
             <InfoBlock title="Controladora" value={`${payload?.controller?.ip ?? '192.168.2.52'} · UniFi Network`} subtitle={payload?.controller?.url ?? 'https://192.168.2.52:8443'} />
             <InfoBlock title="Eventos" value={payload?.controller?.eventStatus === 'ok' ? 'Integrado' : 'Pendente'} subtitle={payload?.controller?.eventStatus === 'ok' ? 'Logs da controladora correlacionados por AP' : 'Verificar credencial da controladora'} warn={payload?.controller?.eventStatus !== 'ok'} />
+            <InfoBlock title="Clientes Wi‑Fi" value={payload?.controller?.clientStatus === 'ok' ? `${payload?.wirelessClients?.length ?? 0} ativos` : 'Pendente'} subtitle={payload?.controller?.clientStatus === 'ok' ? 'MAC, AP, SSID, sinal, TX/RX e roaming' : 'Verificar leitura /stat/sta da controladora'} warn={payload?.controller?.clientStatus !== 'ok'} />
             <InfoBlock title="Snapshot" value={generatedAt ? generatedAt.toLocaleString('pt-BR') : 'Sem snapshot'} subtitle={stale ? 'Atenção: coleta aparentemente atrasada' : 'Coletor Hermes ativo'} warn={stale} />
             <InfoBlock title="Fonte" value="Hermes + SNMP + ICMP + LLDP" subtitle="Histórico SQLite e JSON consumido pelo NexusIT" />
           </div>
         </section>
+
+        <ClientMonitorSection payload={payload} />
 
         {(payload?.recentControllerEvents ?? []).length > 0 && (
           <section className="card" style={{ padding: 16, marginBottom: 22 }}>

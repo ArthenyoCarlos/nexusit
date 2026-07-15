@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildApSummary, classifyAp, enrichAps, explainApLast24h, explainUnifiEvent, formatDuration, statusLabel } from './unifiApPanel.js'
+import { analyzeMonitoredClients, buildApSummary, classifyAp, enrichAps, explainApLast24h, explainUnifiEvent, formatDuration, normalizeMac, statusLabel } from './unifiApPanel.js'
 
 assert.equal(formatDuration(65), '1m')
 assert.equal(formatDuration(3660), '1h 1m')
@@ -60,5 +60,20 @@ assert.equal(last24h.tone, 'warning')
 assert.match(last24h.summary, /reiniciou 1 vez/)
 assert.ok(last24h.details.some(item => item.label === 'Eventos' && item.value === '19'))
 assert.match(last24h.action, /PoE|energia/)
+
+assert.equal(normalizeMac('54-47-41-EE-FD-0D'), '54:47:41:ee:fd:0d')
+const monitoredClients = analyzeMonitoredClients(
+  [{ name: 'Coletor Rua 3', mac: '54:47:41:ee:fd:0d' }],
+  [{ mac: '54:47:41:ee:fd:0d', ip: '192.168.2.168', ssid: 'COLETORES', apName: 'RUA 3 NOVO', signal: -56, channel: 1, txRate: 72200, rxRate: 65000, uptimeSeconds: 5415, lastSeen: 1000 }],
+  [
+    { time: 990, message: 'User[54:47:41:ee:fd:0d] has connected to AP[9c:05:d6:f2:57:97] with SSID "COLETORES" on "channel 1(ng)"', apName: 'RUA 3 NOVO' },
+    { time: 995, message: 'User[54:47:41:ee:fd:0d] roams from AP[9c:05:d6:f3:6a:f2] to AP[9c:05:d6:f2:57:97] from "channel 48(na)" to "channel 1(ng)" on "COLETORES"', fromApName: 'RUA 2 NOVO', toApName: 'RUA 3 NOVO' },
+  ],
+  1010
+)
+assert.equal(monitoredClients[0].status, 'online')
+assert.equal(monitoredClients[0].tone, 'healthy')
+assert.match(monitoredClients[0].summary, /RUA 3 NOVO.*COLETORES.*bom/)
+assert.equal(monitoredClients[0].roams, 1)
 
 console.log('unifiApPanel tests passed')
