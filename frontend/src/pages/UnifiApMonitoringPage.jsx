@@ -354,6 +354,97 @@ function ClientDeviceCard({ device, onRemove }) {
   )
 }
 
+function AuditEventsSection({ events = [] }) {
+  const [openId, setOpenId] = useState(null)
+  const recent = [...events].sort((a, b) => Number(b.time || 0) - Number(a.time || 0)).slice(0, 30)
+  const reboots = recent.filter(event => event.type === 'reboot').length
+  const offline = recent.filter(event => event.type === 'offline').length
+
+  if (recent.length === 0) {
+    return (
+      <section className="card" style={{ padding: 16, marginBottom: 22 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+          <div>
+            <p className="label-caps">Auditoria de reboots e quedas</p>
+            <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>Nenhum evento auditável nas últimas 24h</h2>
+            <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4 }}>Quando um AP reiniciar ou ficar sem resposta, o painel registrará horário, duração estimada, clientes antes/depois e evidências.</p>
+          </div>
+          <span className="badge" style={{ border: '1px solid var(--border-muted)' }}>0 evento</span>
+        </div>
+      </section>
+    )
+  }
+
+  return (
+    <section className="card" style={{ padding: 16, marginBottom: 22 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12 }}>
+        <div>
+          <p className="label-caps">Auditoria de reboots e quedas</p>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>Linha do tempo dos APs</h2>
+          <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4 }}>Registro persistente para descobrir se reinicia em horários específicos, quanto tempo ficou parado e impacto nos clientes.</p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <span className="badge badge-amber">{reboots} reboot(s)</span>
+          <span className="badge" style={{ color: 'var(--red)', border: '1px solid rgba(239,68,68,.35)' }}>{offline} queda(s)</span>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gap: 8 }}>
+        {recent.map(event => {
+          const open = openId === event.id
+          const tone = event.type === 'offline' ? statusStyle.down : statusStyle.warning
+          const before = event.clientCountBefore == null ? 'sem histórico' : `${event.clientCountBefore} cliente(s)`
+          const after = event.clientCountAfter == null ? 'sem histórico' : `${event.clientCountAfter} cliente(s)`
+          const controllerEvents = event.details?.controllerEvents ?? []
+          return (
+            <div key={event.id} style={{ border: `1px solid ${tone.border}`, borderRadius: 13, background: 'var(--bg-subtle)', overflow: 'hidden' }}>
+              <button type="button" onClick={() => setOpenId(open ? null : event.id)} style={{ width: '100%', border: 'none', background: 'transparent', color: 'inherit', textAlign: 'left', cursor: 'pointer', padding: '11px 12px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '120px 150px 1fr 120px auto', gap: 10, alignItems: 'baseline', fontSize: 12 }}>
+                  <span style={{ color: 'var(--text-tertiary)' }}>{formatClock(event.time)}</span>
+                  <strong style={{ color: 'var(--accent-text)' }}>{event.apName}</strong>
+                  <span><strong style={{ color: tone.color }}>{event.title}</strong></span>
+                  <span style={{ color: 'var(--text-secondary)' }}>{formatDuration(event.durationSeconds)}</span>
+                  <span style={{ color: 'var(--text-tertiary)', fontSize: 11 }}>{open ? 'fechar' : 'auditar'}</span>
+                </div>
+              </button>
+              {open && (
+                <div style={{ padding: '0 12px 12px', borderTop: '1px solid var(--border-muted)', display: 'grid', gap: 9, fontSize: 12.5 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8, marginTop: 10 }}>
+                    <InfoLine label="Duração estimada" value={formatDuration(event.durationSeconds)} warn={event.durationSeconds != null && event.durationSeconds >= 180} />
+                    <InfoLine label="Clientes antes" value={before} />
+                    <InfoLine label="Clientes depois" value={after} />
+                    <InfoLine label="IP do AP" value={event.details?.ip || '—'} />
+                    <InfoLine label="MAC do AP" value={event.details?.mac || '—'} />
+                    <InfoLine label="Amostras down" value={event.details?.samplesDown != null ? `${event.details.samplesDown}` : '—'} />
+                  </div>
+                  <DetailText title="Evidência" text={event.details?.evidence || 'Evento derivado do histórico ICMP/SNMP coletado pelo Hermes.'} />
+                  {event.type === 'reboot' && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                      <InfoLine label="Uptime antes" value={formatDuration(event.details?.uptimeBeforeSeconds)} />
+                      <InfoLine label="Uptime depois" value={formatDuration(event.details?.uptimeAfterSeconds)} />
+                      <InfoLine label="Janela início" value={formatClock(event.details?.downWindowStartTs)} />
+                      <InfoLine label="Janela fim" value={formatClock(event.details?.downWindowEndTs)} />
+                    </div>
+                  )}
+                  {controllerEvents.length > 0 ? (
+                    <div>
+                      <p className="label-caps" style={{ marginBottom: 6 }}>Eventos da controladora próximos</p>
+                      <div style={{ display: 'grid', gap: 6 }}>
+                        {controllerEvents.map((controllerEvent, index) => <EventCard key={`${controllerEvent.time}-${index}`} event={controllerEvent} compact />)}
+                      </div>
+                    </div>
+                  ) : (
+                    <DetailText title="Controladora" text="Nenhum evento da controladora foi correlacionado nos 10 minutos próximos. A evidência principal é ICMP/SNMP." />
+                  )}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}
+
 function ApCard({ ap }) {
   const s = statusStyle[ap.status] ?? statusStyle.healthy
   const portKnown = ap.switchPort && ap.switchPort !== 'unknown'
@@ -374,6 +465,8 @@ function ApCard({ ap }) {
         <MiniMetric label="Perda agora" value={`${Number(ap.lastLossPct ?? 0).toFixed(0)}%`} tone={(ap.lastLossPct ?? 0) > 0 ? 'warning' : 'healthy'} />
         <MiniMetric label="Latência média" value={formatMs(ap.avgRttMs)} tone={(ap.avgRttMs ?? 0) > 50 ? 'warning' : 'healthy'} />
         <MiniMetric label="Uptime" value={formatDuration(ap.uptimeSeconds)} tone={(ap.reboots24h ?? 0) > 0 ? 'warning' : 'healthy'} />
+        <MiniMetric label="Clientes" value={`${ap.currentClientCount ?? 0}`} tone="healthy" />
+        <MiniMetric label="Auditoria 24h" value={`${ap.auditEvents24h ?? 0}`} tone={(ap.auditEvents24h ?? 0) > 0 ? 'warning' : 'healthy'} />
       </div>
 
       <div style={{ marginTop: 14, paddingTop: 12, borderTop: '1px solid var(--border-muted)', display: 'grid', gap: 8 }}>
@@ -500,6 +593,8 @@ export default function UnifiApMonitoringPage() {
         </section>
 
         <ClientMonitorSection payload={payload} />
+
+        <AuditEventsSection events={payload?.auditEvents ?? []} />
 
         {(payload?.recentControllerEvents ?? []).length > 0 && (
           <section className="card" style={{ padding: 16, marginBottom: 22 }}>
