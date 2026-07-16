@@ -158,3 +158,63 @@ zabbix_export:
               priority: AVERAGE
               description: 'Memória saturada de forma persistente.'
               manual_close: 'YES'
+        - uuid: 237a3a9e6ea54c46a6e95e1cf5c514a0
+          name: 'Notebook: IPs e gateways ativos via WMI'
+          key: 'wmi.getall[root\cimv2,"select Description,IPAddress,IPSubnet,DefaultIPGateway,DHCPEnabled,DNSServerSearchOrder from Win32_NetworkAdapterConfiguration where IPEnabled=True"]'
+          delay: 5m
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          description: 'Mostra IP, gateway, DNS e DHCP das interfaces ativas.'
+        - uuid: 8a58ff109eb4434aa87e388b27ba8697
+          name: 'Notebook: adaptadores de rede físicos via WMI'
+          key: 'wmi.getall[root\cimv2,"select Description,NetConnectionID,MACAddress,NetConnectionStatus,Speed,NetEnabled from Win32_NetworkAdapter where PhysicalAdapter=True"]'
+          delay: 5m
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          description: 'Lista adaptadores físicos, nome da rede/interface, MAC, status e velocidade declarada. Ajuda a identificar se está no Wi-Fi ou cabo.'
+        - uuid: 3b4d4aa79e534f2f9f3a0b7f2e4200e2
+          name: 'Notebook: zonas térmicas ACPI via WMI'
+          key: 'wmi.getall[root\wmi,"SELECT CurrentTemperature,InstanceName FROM MSAcpi_ThermalZoneTemperature"]'
+          delay: 5m
+          history: 30d
+          value_type: TEXT
+          trends: '0'
+          description: 'Temperatura ACPI quando o Windows/BIOS expõe sensor térmico. Nem todo notebook disponibiliza esse dado sem ferramenta de sensor adicional.'
+      discovery_rules:
+        - uuid: 352ec9197e6843e1b1e36f004cd23546
+          name: 'Notebook: descoberta de interfaces de rede'
+          key: net.if.discovery
+          delay: 1h
+          description: 'Descobre interfaces para medir download/upload atual. Sem trigger de link down para evitar ruído em notebooks.'
+          item_prototypes:
+            - uuid: 86eda8161cf94241b7d5260ef2b8c417
+              name: 'Notebook: Interface {#IFNAME}: download atual'
+              key: 'net.if.in["{#IFGUID}"]'
+              history: 14d
+              trends: 90d
+              units: bps
+              description: 'Tráfego recebido pela interface; equivalente ao download atual nessa placa.'
+            - uuid: 937edf09a9cd47429e37547f365e0153
+              name: 'Notebook: Interface {#IFNAME}: upload atual'
+              key: 'net.if.out["{#IFGUID}"]'
+              history: 14d
+              trends: 90d
+              units: bps
+              description: 'Tráfego enviado pela interface; equivalente ao upload atual nessa placa.'
+            - uuid: 146a93d9a133461488693fe66cdfdc9e
+              name: 'Notebook: Interface {#IFNAME}: velocidade do link'
+              key: 'net.if.speed["{#IFGUID}"]'
+              delay: 5m
+              history: 14d
+              trends: 90d
+              units: bps
+              description: 'Velocidade negociada/declarada da interface.'
+            - uuid: 385f5d7fea5a47c6be4269e205820ed5
+              name: 'Notebook: Interface {#IFNAME}: status operacional'
+              key: 'net.if.status["{#IFGUID}"]'
+              delay: 5m
+              history: 14d
+              trends: '0'
+              description: 'Status operacional da interface. Sem trigger automática por ser notebook.'
