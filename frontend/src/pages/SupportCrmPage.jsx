@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { VoiceRecorder } from '@independo/capacitor-voice-recorder'
 import Layout from '../components/Layout'
@@ -170,6 +171,7 @@ function MediaAttachment({ message }) {
 
 export default function SupportCrmPage() {
   const { user } = useAuth()
+  const [searchParams] = useSearchParams()
   const toast = useToast()
 
   const [queue, setQueue] = useState([])
@@ -206,6 +208,11 @@ export default function SupportCrmPage() {
     const t = setInterval(loadLists, 4000)
     return () => clearInterval(t)
   }, [loadLists])
+
+  useEffect(() => {
+    const id = searchParams.get('conversation')
+    if (id) setSelectedId(id)
+  }, [searchParams])
 
   useEffect(() => {
     getUsers().then(setTechnicianOptions).catch(() => setTechnicianOptions([]))

@@ -35,6 +35,11 @@ public class SupportController {
         return service.getAll(days);
     }
 
+    @GetMapping("/dashboard")
+    public SupportDashboardResponse getDashboard(@RequestParam(defaultValue = "7") int days) {
+        return service.getDashboard(days);
+    }
+
     @GetMapping("/{id}")
     public SupportConversationDetail getDetail(@PathVariable UUID id) { return service.getDetail(id); }
 

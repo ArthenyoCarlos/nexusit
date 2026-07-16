@@ -28,6 +28,7 @@ import VaultPage from './pages/VaultPage'
 import SshConsolePage from './pages/SshConsolePage'
 import NexusDeskPage from './pages/NexusDeskPage'
 import SupportCrmPage from './pages/SupportCrmPage'
+import SupportBotDashboardPage from './pages/SupportBotDashboardPage'
 import TeamTrackingPage from './pages/TeamTrackingPage'
 import LicensesPage from './pages/LicensesPage'
 import OnboardingPage from './pages/OnboardingPage'
@@ -96,6 +97,7 @@ export default function App() {
                   <Route path="/ssh-console"     element={<SshConsolePage />} />
                   <Route path="/nexusdesk"       element={<NexusDeskPage />} />
                   <Route path="/support-crm"     element={<SupportCrmPage />} />
+                  <Route path="/support-bot"     element={<SupportBotDashboardPage />} />
                   <Route path="/team-tracking"   element={<TeamTrackingPage />} />
                   <Route path="/licenses"        element={<LicensesPage />} />
                   <Route path="/onboarding"           element={<OnboardingPage />} />

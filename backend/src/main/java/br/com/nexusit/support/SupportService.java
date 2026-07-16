@@ -17,10 +17,18 @@ import org.springframework.web.server.ResponseStatusException;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.text.Normalizer;
+import java.time.Duration;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -50,6 +58,73 @@ public class SupportService {
     public List<SupportConversationSummary> getAll(int days) {
         LocalDateTime since = LocalDateTime.now().minusDays(Math.max(1, days));
         return conversationRepo.findAllSince(since).stream().map(SupportConversationSummary::from).toList();
+    }
+
+    public SupportDashboardResponse getDashboard(int days) {
+        int windowDays = Math.max(1, Math.min(days, 90));
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime since = now.minusDays(windowDays);
+        LocalDate today = now.toLocalDate();
+
+        List<SupportConversation> conversations = conversationRepo.findAllSince(since);
+        Map<UUID, SupportMessage> lastMessages = conversations.stream()
+                .collect(Collectors.toMap(SupportConversation::getId,
+                        c -> messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null)));
+        List<SupportConversationSummary> summaries = conversations.stream()
+                .map(c -> SupportConversationSummary.from(c, List.of(), lastMessages.get(c.getId())))
+                .toList();
+
+        long total = conversations.size();
+        long queue = conversations.stream().filter(c -> c.getState() == ConversationState.PENDING_TECH).count();
+        long active = conversations.stream().filter(c -> c.getState() == ConversationState.HUMAN_ACTIVE).count();
+        long closed = conversations.stream().filter(c -> c.getState() == ConversationState.CLOSED).count();
+        long awaiting = conversations.stream().filter(c -> c.getState() == ConversationState.AWAITING_NAME
+                || c.getState() == ConversationState.MENU || c.getState() == ConversationState.AWAITING_DESCRIPTION).count();
+        long todayCount = conversations.stream().filter(c -> c.getCreatedAt() != null && c.getCreatedAt().toLocalDate().equals(today)).count();
+        long withTicket = conversations.stream().filter(c -> c.getGlpiTicketId() != null).count();
+        long messages24h = messageRepo.countByCreatedAtGreaterThanEqual(now.minusHours(24));
+        long avgWait = Math.round(conversations.stream()
+                .filter(c -> c.getClaimedAt() != null && c.getCreatedAt() != null)
+                .mapToLong(c -> Duration.between(c.getCreatedAt(), c.getClaimedAt()).toMinutes())
+                .average().orElse(0));
+        long oldestQueue = conversations.stream()
+                .filter(c -> c.getState() == ConversationState.PENDING_TECH && c.getCreatedAt() != null)
+                .mapToLong(c -> Duration.between(c.getCreatedAt(), now).toMinutes())
+                .max().orElse(0);
+
+        List<SupportDashboardResponse.CountItem> byState = List.of(
+                new SupportDashboardResponse.CountItem("PENDING_TECH", "Fila", queue, queue > 0 ? "warning" : "healthy"),
+                new SupportDashboardResponse.CountItem("HUMAN_ACTIVE", "Em atendimento", active, "info"),
+                new SupportDashboardResponse.CountItem("AWAITING", "No bot/aguardando usuário", awaiting, awaiting > 0 ? "warning" : "muted"),
+                new SupportDashboardResponse.CountItem("CLOSED", "Encerrados", closed, "healthy")
+        );
+
+        List<SupportDashboardResponse.CountItem> byCategory = groupCounts(summaries.stream()
+                .map(s -> inferSupportTopic(s.lastMessagePreview()))
+                .toList(), "muted");
+
+        List<SupportDashboardResponse.CountItem> byTechnician = groupCounts(conversations.stream()
+                .filter(c -> c.getClaimedBy() != null)
+                .map(c -> c.getClaimedBy().getName())
+                .toList(), "info");
+
+        List<SupportDashboardResponse.AttentionItem> attention = buildAttention(conversations, summaries, lastMessages, now);
+        List<SupportConversationSummary> recent = summaries.stream()
+                .sorted(Comparator.comparing((SupportConversationSummary s) ->
+                        s.lastMessageAt() != null ? s.lastMessageAt() : s.createdAt(), Comparator.nullsLast(Comparator.naturalOrder())).reversed())
+                .limit(12)
+                .toList();
+
+        return new SupportDashboardResponse(
+                now,
+                windowDays,
+                new SupportDashboardResponse.Metrics(total, todayCount, queue, active, closed, awaiting, withTicket, messages24h, avgWait, oldestQueue),
+                byState,
+                byCategory,
+                byTechnician,
+                attention,
+                recent
+        );
     }
 
     public SupportConversationDetail getDetail(UUID id) {
@@ -307,6 +382,87 @@ public class SupportService {
     private String supportTitle(User user) {
         if (user.getJobTitle() != null && !user.getJobTitle().isBlank()) return user.getJobTitle().trim();
         return user.getRole() == Role.ADMIN ? "Administrador(a)" : "Técnico(a)";
+    }
+
+    private List<SupportDashboardResponse.CountItem> groupCounts(List<String> values, String tone) {
+        Map<String, Long> counts = values.stream()
+                .filter(v -> v != null && !v.isBlank())
+                .collect(Collectors.groupingBy(v -> v, LinkedHashMap::new, Collectors.counting()));
+        return counts.entrySet().stream()
+                .sorted(Map.Entry.<String, Long>comparingByValue().reversed())
+                .limit(8)
+                .map(e -> new SupportDashboardResponse.CountItem(e.getKey(), e.getKey(), e.getValue(), tone))
+                .toList();
+    }
+
+    private List<SupportDashboardResponse.AttentionItem> buildAttention(List<SupportConversation> conversations,
+                                                                        List<SupportConversationSummary> summaries,
+                                                                        Map<UUID, SupportMessage> lastMessages,
+                                                                        LocalDateTime now) {
+        Map<UUID, SupportConversationSummary> summaryById = summaries.stream()
+                .collect(Collectors.toMap(SupportConversationSummary::id, s -> s));
+        List<SupportDashboardResponse.AttentionItem> items = new ArrayList<>();
+        for (SupportConversation c : conversations) {
+            SupportConversationSummary summary = summaryById.get(c.getId());
+            if (summary == null) continue;
+            if (c.getState() == ConversationState.PENDING_TECH && c.getCreatedAt() != null) {
+                long age = Duration.between(c.getCreatedAt(), now).toMinutes();
+                if (age >= 15) {
+                    items.add(new SupportDashboardResponse.AttentionItem(
+                            c.getId().toString(),
+                            age >= 60 ? "Fila parada há mais de 1h" : "Fila aguardando técnico",
+                            contactLabel(c) + " · " + (c.getGlpiTicketId() != null ? "Chamado #" + c.getGlpiTicketId() : "sem chamado"),
+                            age >= 60 ? "danger" : "warning",
+                            age,
+                            summary
+                    ));
+                }
+            }
+            SupportMessage last = lastMessages.get(c.getId());
+            if (c.getState() == ConversationState.HUMAN_ACTIVE && last != null && last.getAuthor() == MessageAuthor.EMPLOYEE) {
+                long age = Duration.between(last.getCreatedAt(), now).toMinutes();
+                if (age >= 10) {
+                    items.add(new SupportDashboardResponse.AttentionItem(
+                            c.getId().toString() + ":reply",
+                            "Cliente respondeu e aguarda retorno",
+                            contactLabel(c) + " · última mensagem há " + age + " min",
+                            age >= 30 ? "danger" : "warning",
+                            age,
+                            summary
+                    ));
+                }
+            }
+        }
+        return items.stream()
+                .sorted(Comparator.comparing(SupportDashboardResponse.AttentionItem::ageMinutes, Comparator.nullsLast(Comparator.reverseOrder())))
+                .limit(10)
+                .toList();
+    }
+
+    private String contactLabel(SupportConversation c) {
+        if (c.getContact() == null) return "Contato";
+        if (c.getContact().getGlpiUserName() != null && !c.getContact().getGlpiUserName().isBlank()) return c.getContact().getGlpiUserName();
+        if (c.getContact().getDisplayName() != null && !c.getContact().getDisplayName().isBlank()) return c.getContact().getDisplayName();
+        return c.getContact().getPhoneNumber();
+    }
+
+    private String inferSupportTopic(String text) {
+        String t = normalizeText(text);
+        if (t.contains("impressora") || t.contains("toner") || t.contains("scanner")) return "Impressoras";
+        if (t.contains("internet") || t.contains("wifi") || t.contains("wi-fi") || t.contains("rede")) return "Rede/Internet";
+        if (t.contains("coletor") || t.contains("palm") || t.contains("android") || t.contains("celular")) return "Coletores/Mobile";
+        if (t.contains("winthor") || t.contains("sistema") || t.contains("erp") || t.contains("pdv") || t.contains("caixa")) return "Sistemas/WinThor";
+        if (t.contains("email") || t.contains("e-mail")) return "E-mail";
+        if (t.contains("senha") || t.contains("acesso") || t.contains("login")) return "Acessos";
+        if (t.contains("computador") || t.contains("notebook") || t.contains("monitor")) return "Computadores";
+        if (t.isBlank()) return "Sem texto";
+        return "Suporte TI";
+    }
+
+    private String normalizeText(String s) {
+        if (s == null) return "";
+        String lower = s.trim().toLowerCase(Locale.ROOT);
+        return Normalizer.normalize(lower, Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
     }
 
     private String mediaKind(String mime) {
