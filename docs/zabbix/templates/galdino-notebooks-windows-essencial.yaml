@@ -1,0 +1,160 @@
+zabbix_export:
+  version: '7.0'
+  template_groups:
+    - uuid: 846977d1dfed4968bc5f8bdb363285bc
+      name: 'Templates/Operating systems'
+  templates:
+    - uuid: 4848c42f42b4434b9909877242e67a5a
+      template: 'Galdino - Notebooks Windows Essencial'
+      name: 'Galdino - Notebooks Windows Essencial'
+      description: 'Template enxuto para notebooks Windows: métricas essenciais e triggers importantes, evitando ruído de serviços comuns e interfaces desligadas.'
+      groups:
+        - name: 'Templates/Operating systems'
+      items:
+        - uuid: 9b0fb4a0451844cfa443f81064496ee3
+          name: 'Notebook: Zabbix agent ping'
+          key: agent.ping
+          history: 7d
+          trends: '0'
+          description: 'Retorno do Zabbix Agent. Usado para saber se o notebook está comunicando com o Zabbix.'
+          triggers:
+            - uuid: 55c2a16c0e38487eab7742f7600779bc
+              expression: 'nodata(/Galdino - Notebooks Windows Essencial/agent.ping,24h)=1'
+              name: 'Notebook: Zabbix Agent sem comunicação por mais de 24h'
+              priority: AVERAGE
+              description: 'Alerta somente após 24h sem coleta para evitar ruído quando notebook é desligado fora do expediente/noite.'
+              manual_close: 'YES'
+        - uuid: 4fbef24fa54745eba5e74618676187d3
+          name: 'Notebook: Serviço Firewall Windows'
+          key: 'service.info["mpssvc",state]'
+          delay: 5m
+          history: 14d
+          trends: '0'
+          description: 'Estado do serviço Windows Defender Firewall. 0 normalmente significa em execução.'
+          triggers:
+            - uuid: 1dbcba7053854bdbad5069fd11df2170
+              expression: 'min(/Galdino - Notebooks Windows Essencial/service.info["mpssvc",state],30m)<>0'
+              name: 'Notebook: Firewall do Windows parado'
+              priority: AVERAGE
+              description: 'Firewall do Windows não está em execução por 30min.'
+              manual_close: 'YES'
+        - uuid: 0afa18b7bf1745d4a941b92574be081c
+          name: 'Notebook: Serviço Microsoft Defender'
+          key: 'service.info["WinDefend",state]'
+          delay: 5m
+          history: 14d
+          trends: '0'
+          description: 'Estado do serviço Microsoft Defender Antivírus. 0 normalmente significa em execução.'
+          triggers:
+            - uuid: d0dbcc7e79934005a6f2b4ac7736c516
+              expression: 'min(/Galdino - Notebooks Windows Essencial/service.info["WinDefend",state],30m)<>0'
+              name: 'Notebook: Microsoft Defender parado'
+              priority: HIGH
+              description: 'Antivírus do Windows não está em execução por 30min.'
+              manual_close: 'YES'
+        - uuid: 3a8be45f02d346feaff77d9ff22e5660
+          name: 'Notebook: Uso de CPU'
+          key: system.cpu.util
+          history: 14d
+          value_type: FLOAT
+          trends: 90d
+          units: '%'
+          description: 'Uso total de CPU.'
+          triggers:
+            - uuid: 1a232c1cc15144bca6ae0ceb86280afa
+              expression: 'min(/Galdino - Notebooks Windows Essencial/system.cpu.util,30m)>95'
+              name: 'Notebook: CPU acima de 95% por 30min'
+              priority: AVERAGE
+              description: 'CPU saturada de forma persistente. Evita alerta por pico curto.'
+              manual_close: 'YES'
+        - uuid: fe11586f15f44a40b225c3a1ad09d50f
+          name: 'Notebook: Horário local'
+          key: system.localtime
+          delay: 5m
+          history: 7d
+          trends: '0'
+          units: unixtime
+          description: 'Horário local do Windows para detectar relógio fora de sincronia.'
+          triggers:
+            - uuid: c329c2db12684dae823446a776d5b58e
+              expression: 'fuzzytime(/Galdino - Notebooks Windows Essencial/system.localtime,5m)=0'
+              name: 'Notebook: relógio do Windows fora de sincronia'
+              priority: AVERAGE
+              description: 'Relógio errado pode afetar login, certificados, sistemas e emissão/consulta.'
+              manual_close: 'YES'
+        - uuid: 617049031a7c4ec1939e048b1f7b0acd
+          name: 'Notebook: Uptime do Windows'
+          key: system.uptime
+          delay: 5m
+          history: 30d
+          trends: 90d
+          units: uptime
+          description: 'Tempo desde o último boot do Windows.'
+          triggers:
+            - uuid: 5ebc78d959df4d75a3c9a7ac83aeb02b
+              expression: 'last(/Galdino - Notebooks Windows Essencial/system.uptime)<600 and last(/Galdino - Notebooks Windows Essencial/system.uptime,#2)>600'
+              name: 'Notebook: reiniciou recentemente'
+              priority: WARNING
+              description: 'Registra reboot recente. Severidade baixa para auditoria, não como pane crítica.'
+              manual_close: 'YES'
+        - uuid: e8f4e6920b8f49dfb6b32d9d1833f2f4
+          name: 'Notebook: Disco C: livre'
+          key: 'vfs.fs.size[C:,free]'
+          delay: 5m
+          history: 30d
+          trends: 180d
+          units: B
+          description: 'Espaço livre no disco C:.'
+        - uuid: b1ea3fc33bed4dbaad3859580ff5966e
+          name: 'Notebook: Disco C: usado'
+          key: 'vfs.fs.size[C:,pused]'
+          delay: 5m
+          history: 30d
+          value_type: FLOAT
+          trends: 180d
+          units: '%'
+          description: 'Percentual usado do disco C:.'
+          triggers:
+            - uuid: 69bf9da441d8445cb67a26475c2dd3bd
+              expression: 'min(/Galdino - Notebooks Windows Essencial/vfs.fs.size[C:,pused],1h)>90'
+              name: 'Notebook: disco C: acima de 90% por 1h'
+              priority: AVERAGE
+              description: 'Espaço em disco chegando ao limite. Verificar limpeza antes de travar sistema/atualizações.'
+              manual_close: 'YES'
+            - uuid: f396a36dcfa44f27a191672ad27cb422
+              expression: 'min(/Galdino - Notebooks Windows Essencial/vfs.fs.size[C:,pused],30m)>95'
+              name: 'Notebook: disco C: acima de 95% por 30min'
+              priority: HIGH
+              description: 'Disco quase cheio. Pode travar Windows, updates, navegador e aplicações.'
+              manual_close: 'YES'
+        - uuid: e6c62c316bf14dc8afdc44303857d718
+          name: 'Notebook: Memória total'
+          key: 'vm.memory.size[total]'
+          delay: 1h
+          history: 7d
+          trends: 90d
+          units: B
+          description: 'Memória RAM total.'
+        - uuid: fd94e7734a4449e39f8c9f2983f0904b
+          name: 'Notebook: Memória usada'
+          key: 'vm.memory.size[used]'
+          delay: 5m
+          history: 14d
+          trends: 90d
+          units: B
+          description: 'Memória RAM usada.'
+        - uuid: 3117a3720e1e49e0bdeda455d9c5e736
+          name: 'Notebook: Uso de memória'
+          key: vm.memory.util
+          history: 14d
+          value_type: FLOAT
+          trends: 90d
+          units: '%'
+          description: 'Percentual de memória RAM em uso.'
+          triggers:
+            - uuid: 119ffeaa0dbe49c9aad3e412472ef24f
+              expression: 'min(/Galdino - Notebooks Windows Essencial/vm.memory.util,30m)>95'
+              name: 'Notebook: memória acima de 95% por 30min'
+              priority: AVERAGE
+              description: 'Memória saturada de forma persistente.'
+              manual_close: 'YES'
