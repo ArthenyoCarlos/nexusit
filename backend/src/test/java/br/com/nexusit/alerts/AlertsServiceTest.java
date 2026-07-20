@@ -86,8 +86,8 @@ class AlertsServiceTest {
     @Test
     void flagsCriticalZabbixProblems() {
         when(zabbixService.getProblems()).thenReturn(List.of(
-                new ZabbixProblem("1", "Disco cheio", 5, "Desastre", "srv-arquivos", 0L),
-                new ZabbixProblem("2", "CPU alta", 2, "Aviso", "srv-web", 0L)
+                new ZabbixProblem("1", "Disco cheio", 5, "Desastre", "srv-arquivos", 0L, "100"),
+                new ZabbixProblem("2", "CPU alta", 2, "Aviso", "srv-web", 0L, "101")
         ));
 
         AlertsSummary summary = service.getSummary();

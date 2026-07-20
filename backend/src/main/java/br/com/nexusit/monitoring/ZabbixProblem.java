@@ -6,5 +6,6 @@ public record ZabbixProblem(
         int severity,
         String severityLabel,
         String hostName,
-        long clock
+        long clock,
+        String hostId
 ) {}

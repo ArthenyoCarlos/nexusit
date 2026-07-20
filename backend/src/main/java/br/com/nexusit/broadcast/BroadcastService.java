@@ -30,6 +30,7 @@ public class BroadcastService {
     private final NotificationGroupRepository groupRepository;
     private final EvolutionApiClient evolutionApiClient;
     private final AuditService auditService;
+    private final TargetResolver targetResolver;
 
     public List<BroadcastContact> listContacts() {
         return contactRepository.findAll().stream()
@@ -70,29 +71,15 @@ public class BroadcastService {
     // write (inside AuditService's own transaction) to survive after this method throws —
     // wrapping this method in a transaction would roll that write back along with it.
     public void send(BroadcastSendRequest req, User actor) {
-        String target;
-        String targetLabel;
-        if (req.targetType() == BroadcastSendRequest.TargetType.CONTACT) {
-            WhatsappContact contact = contactRepository.findById(req.targetId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Contato não encontrado"));
-            target = contact.getPhoneNumber();
-            targetLabel = safeName(contact);
-        } else {
-            NotificationGroup group = groupRepository.findById(req.targetId())
-                    .filter(NotificationGroup::isActive)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Grupo não encontrado"));
-            target = group.getGroupJid();
-            targetLabel = group.getName();
-        }
-
+        TargetResolver.Resolved resolved = targetResolver.resolve(req.targetType(), req.targetId());
         try {
-            evolutionApiClient.sendTextOrThrow(target, req.message());
+            evolutionApiClient.sendTextOrThrow(resolved.whatsappTarget(), req.message());
             auditService.log(AuditModule.BROADCAST, "SEND", actor,
-                    req.targetType().name(), req.targetId(), targetLabel, req.message());
+                    req.targetType().name(), req.targetId(), resolved.label(), req.message());
         } catch (Exception e) {
-            log.warn("Falha ao enviar disparo manual para {} ({}): {}", targetLabel, target, e.toString());
+            log.warn("Falha ao enviar disparo manual para {} ({}): {}", resolved.label(), resolved.whatsappTarget(), e.toString());
             auditService.log(AuditModule.BROADCAST, "SEND_FAILED", actor,
-                    req.targetType().name(), req.targetId(), targetLabel, req.message() + "\n\nErro: " + e.getMessage());
+                    req.targetType().name(), req.targetId(), resolved.label(), req.message() + "\n\nErro: " + e.getMessage());
             throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Falha ao enviar mensagem pelo WhatsApp: " + e.getMessage());
         }
     }

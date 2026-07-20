@@ -9,6 +9,4 @@ public record BroadcastSendRequest(
         @NotNull TargetType targetType,
         @NotNull UUID targetId,
         @NotBlank String message
-) {
-    public enum TargetType { CONTACT, GROUP }
-}
+) {}

@@ -136,14 +136,17 @@ public class ZabbixService {
                 .map(p -> {
                     int sev = intVal(p, "severity");
                     String triggerId = str(p, "objectid");
-                    String hostName = hostNameFromTrigger(triggerMap.get(triggerId));
+                    Map<String, Object> trigger = triggerMap.get(triggerId);
+                    String hostName = hostNameFromTrigger(trigger);
+                    String hostId = hostIdFromTrigger(trigger);
                     return new ZabbixProblem(
                             str(p, "eventid"),
                             str(p, "name"),
                             sev,
                             SEVERITY_LABELS.getOrDefault(sev, "?"),
                             hostName,
-                            longVal(p, "clock")
+                            longVal(p, "clock"),
+                            hostId
                     );
                 }).toList();
     }, List.of());
@@ -308,6 +311,14 @@ public class ZabbixService {
         }
         String name = str(hosts.get(0), "name");
         return name.isBlank() ? "Desconhecido" : name;
+    }
+
+    @SuppressWarnings("unchecked")
+    private String hostIdFromTrigger(Map<String, Object> trigger) {
+        if (trigger == null) return "";
+        List<Map<String, Object>> hosts = (List<Map<String, Object>>) trigger.get("hosts");
+        if (hosts == null || hosts.isEmpty()) return "";
+        return str(hosts.get(0), "hostid");
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
