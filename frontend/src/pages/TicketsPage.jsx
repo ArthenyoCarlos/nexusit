@@ -61,8 +61,19 @@ const ORIGIN_OPTIONS = [
   { value: '', label: 'Todas as origens' },
   { value: 'ZABBIX', label: 'Zabbix' },
   { value: 'WHATSAPP', label: 'WhatsApp (CRM)' },
-  { value: 'MANUAL', label: 'Manual/GLPI' },
+  { value: 'MANUAL', label: 'Manual GLPI' },
 ]
+
+const splitLockedTitlePrefix = (title = '', origin = 'MANUAL') => {
+  const match = String(title || '').trim().match(/^\[(Zabbix|WhatsApp|Whatsapp|GLPI)]\s*(.*)$/i)
+  if (match) {
+    const raw = match[1].toLowerCase()
+    const prefix = raw === 'zabbix' ? '[Zabbix]' : raw === 'glpi' ? '[GLPI]' : '[Whatsapp]'
+    return { prefix, body: match[2] || '' }
+  }
+  const prefix = origin === 'ZABBIX' ? '[Zabbix]' : origin === 'WHATSAPP' ? '[Whatsapp]' : '[GLPI]'
+  return { prefix, body: String(title || '').trim() }
+}
 
 function OriginBadge({ origin }) {
   const o = ORIGIN[origin] ?? ORIGIN.MANUAL
@@ -158,6 +169,7 @@ export default function TicketsPage() {
   const [assetPickerId, setAssetPickerId] = useState('')
   const [assetLinking, setAssetLinking] = useState(false)
   const [categories, setCategories] = useState([])
+  const [editTitlePrefix, setEditTitlePrefix] = useState('[GLPI]')
   const [editTitle, setEditTitle] = useState('')
   const [titleLoading, setTitleLoading] = useState(false)
   const [editCategory, setEditCategory] = useState('')
@@ -179,7 +191,9 @@ export default function TicketsPage() {
 
   useEffect(() => {
     if (!detail) return
-    setEditTitle(detail.ticket.title || '')
+    const { prefix, body } = splitLockedTitlePrefix(detail.ticket.title, detail.ticket.origin)
+    setEditTitlePrefix(prefix)
+    setEditTitle(body)
     setEditPriority(String(detail.ticket.priority || ''))
     setEditUrgency(String(detail.ticket.urgency || ''))
     setEditImpact(String(detail.ticket.impact || ''))
@@ -298,11 +312,12 @@ export default function TicketsPage() {
   }
 
   const handleUpdateTitle = async () => {
-    if (!selected || !editTitle.trim()) return
+    const cleanTitle = editTitle.replace(/^\s*\[(Zabbix|WhatsApp|Whatsapp|GLPI)]\s*/i, '').trim()
+    if (!selected || !cleanTitle) return
     setTitleLoading(true)
     try {
-      await updateTicketFields(selected.id, { name: editTitle.trim() })
-      setActionMsg({ type: 'success', text: 'Assunto do chamado atualizado.' })
+      await updateTicketFields(selected.id, { name: `${editTitlePrefix} ${cleanTitle}` })
+      setActionMsg({ type: 'success', text: 'Assunto do chamado atualizado sem alterar a tag de origem.' })
       await fetchTickets(); const res = await getTicket(selected.id); setDetail(res.data); setSelected(res.data.ticket)
     } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao atualizar assunto.') }) }
     finally { setTitleLoading(false) }
@@ -643,11 +658,22 @@ export default function TicketsPage() {
               <div className="ticket-detail-header-top">
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <label className="input-label">Assunto do chamado</label>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input value={editTitle} onChange={e => setEditTitle(e.target.value)} className="input" placeholder="Assunto do chamado" />
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                    <span className="badge badge-default" title="Tag de origem bloqueada — não pode ser alterada pelo assunto">
+                      {editTitlePrefix}
+                    </span>
+                    <input
+                      value={editTitle}
+                      onChange={e => setEditTitle(e.target.value.replace(/^\s*\[(Zabbix|WhatsApp|Whatsapp|GLPI)]\s*/i, ''))}
+                      className="input"
+                      placeholder="Digite só o assunto do chamado"
+                    />
                     <button onClick={handleUpdateTitle} disabled={titleLoading || !editTitle.trim()} className="btn btn-primary text-xs">
                       {titleLoading ? 'Salvando...' : 'Salvar assunto'}
                     </button>
+                  </div>
+                  <div className="text-xs text-[var(--text-secondary)]" style={{ marginTop: 4 }}>
+                    A tag {editTitlePrefix} é protegida; altere apenas o assunto para facilitar a Wiki.
                   </div>
                 </div>
                 <div className="ticket-detail-header-badges">
