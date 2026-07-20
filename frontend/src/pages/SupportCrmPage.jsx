@@ -189,6 +189,7 @@ export default function SupportCrmPage() {
   const [addTechId, setAddTechId] = useState('')
   const [transferTechId, setTransferTechId] = useState('')
   const [savingTech, setSavingTech] = useState(false)
+  const [selectedFilePreview, setSelectedFilePreview] = useState(null)
   const threadEndRef = useRef(null)
   const threadBodyRef = useRef(null)
   const isNearBottomRef = useRef(true)
@@ -254,6 +255,33 @@ export default function SupportCrmPage() {
   useEffect(() => {
     if (isNearBottomRef.current) threadEndRef.current?.scrollIntoView({ block: 'nearest' })
   }, [detail])
+
+  useEffect(() => {
+    if (!selectedFile || !selectedFile.type.startsWith('image/')) { setSelectedFilePreview(null); return undefined }
+    const url = URL.createObjectURL(selectedFile)
+    setSelectedFilePreview(url)
+    return () => URL.revokeObjectURL(url)
+  }, [selectedFile])
+
+  useEffect(() => {
+    if (!isMine) return undefined
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      const fileItem = Array.from(items).find(i => i.kind === 'file')
+      if (!fileItem) return
+      const file = fileItem.getAsFile()
+      if (!file) return
+      e.preventDefault()
+      const isGenericName = !file.name || /^(image|blob|clipboard)\.[a-z0-9]+$/i.test(file.name)
+      const ext = (file.type.split('/')[1] || 'png').split('+')[0]
+      const named = isGenericName ? new File([file], `print-${Date.now()}.${ext}`, { type: file.type }) : file
+      setSelectedFile(named)
+      toast.add('Imagem colada anexada — clique em Enviar.', 'success')
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [isMine, toast])
 
   const handleClaim = async (id) => {
     setClaimingId(id)
@@ -539,6 +567,7 @@ export default function SupportCrmPage() {
                 <form onSubmit={handleSend} className="support-reply-form">
                   {selectedFile && (
                     <div className="support-selected-file">
+                      {selectedFilePreview && <img src={selectedFilePreview} alt="" className="support-selected-file-thumb" />}
                       <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>📎 {selectedFile.name} · {formatBytes(selectedFile.size)}</span>
                       <button type="button" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="btn btn-default btn-sm">Remover</button>
                     </div>
@@ -548,7 +577,7 @@ export default function SupportCrmPage() {
                       value={message}
                       onChange={e => setMessage(e.target.value)}
                       disabled={!isMine}
-                      placeholder={isMine ? 'Escreva uma resposta ou anexe algo...' : conversation.state === 'HUMAN_ACTIVE' ? 'Atendido por outro técnico' : 'Atendimento não está ativo'}
+                      placeholder={isMine ? 'Escreva uma resposta, anexe ou cole (Ctrl+V) um print...' : conversation.state === 'HUMAN_ACTIVE' ? 'Atendido por outro técnico' : 'Atendimento não está ativo'}
                       className="input support-composer-input"
                     />
                     <input

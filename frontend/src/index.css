@@ -863,6 +863,13 @@ select.input {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.support-selected-file-thumb {
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
 .support-composer-row {
   display: flex;
   gap: 8px;
