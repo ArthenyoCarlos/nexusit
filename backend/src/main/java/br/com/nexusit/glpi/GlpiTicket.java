@@ -21,5 +21,6 @@ public record GlpiTicket(
         String slaTtrName,
         String timeToOwn,
         String timeToResolve,
-        int slaWaitingDuration
+        int slaWaitingDuration,
+        String origin
 ) {}

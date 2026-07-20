@@ -421,6 +421,24 @@ body {
   .ticket-section-head { padding: 12px 14px; }
 }
 
+/* ── Ticket list origin KPI strip ─────────────────────────────── */
+.ticket-origin-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.ticket-origin-kpi { padding: 16px 18px; display: flex; align-items: center; gap: 12px; }
+.ticket-origin-kpi .stat-value { margin-top: 0; font-size: 22px; }
+.ticket-origin-kpi .stat-label { margin-top: 2px; }
+.ticket-origin-kpi-btn {
+  appearance: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
 /* ════════════════════════════════════════════════════════════
    CARDS
    ════════════════════════════════════════════════════════════ */

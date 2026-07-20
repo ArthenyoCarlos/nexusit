@@ -132,7 +132,7 @@ class SupportConversationEngineTest {
         when(contactRepo.findByPhoneNumber("5511999999999")).thenReturn(Optional.of(contact));
         when(conversationRepo.findLatestOpenByContact(contact.getId())).thenReturn(Optional.of(conversation));
         when(glpiService.getOpenTicketsForRequester(42)).thenReturn(List.of(
-                new GlpiTicket(777, "Impressora parada", 1, "Novo", 3, "Média", 3, "Média", 3, "Médio", "", "Maria Silva", "", "", "", 1, "", "", "", "", 0)
+                new GlpiTicket(777, "Impressora parada", 1, "Novo", 3, "Média", 3, "Média", 3, "Médio", "", "Maria Silva", "", "", "", 1, "", "", "", "", 0, "MANUAL")
         ));
 
         engine.onInboundMessage(textMessage("5511999999999", "2"));

@@ -50,6 +50,22 @@ const STATUS_COLOR = {
   5: 'bg-[var(--green-bg)] text-[var(--green)]',
   6: 'bg-[var(--bg-muted)] text-[var(--text-tertiary)]',
 }
+const ORIGIN = {
+  ZABBIX:   { label: 'Zabbix',        icon: '🖥️', badge: 'badge-orange', color: 'var(--orange)', bg: 'var(--orange-bg)' },
+  WHATSAPP: { label: 'WhatsApp (CRM)', icon: '💬', badge: 'badge-green',  color: 'var(--green)',  bg: 'var(--green-bg)'  },
+  MANUAL:   { label: 'Manual/GLPI',   icon: '📋', badge: 'badge-gray',   color: 'var(--text-secondary)', bg: 'var(--bg-muted)' },
+}
+const ORIGIN_OPTIONS = [
+  { value: '', label: 'Todas as origens' },
+  { value: 'ZABBIX', label: 'Zabbix' },
+  { value: 'WHATSAPP', label: 'WhatsApp (CRM)' },
+  { value: 'MANUAL', label: 'Manual/GLPI' },
+]
+
+function OriginBadge({ origin }) {
+  const o = ORIGIN[origin] ?? ORIGIN.MANUAL
+  return <span className={`badge ${o.badge}`}>{o.icon} {o.label}</span>
+}
 
 function PriorityBadge({ priority }) {
   const p = PRIORITY[priority] ?? PRIORITY[3]
@@ -114,6 +130,7 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true)
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
+  const [originFilter, setOriginFilter] = useState('')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -416,6 +433,7 @@ export default function TicketsPage() {
 
   const filtered = tickets.filter(t => {
     if (priorityFilter && t.priority !== parseInt(priorityFilter)) return false
+    if (originFilter && (t.origin || 'MANUAL') !== originFilter) return false
     if (search) {
       const q = search.toLowerCase()
       return t.title?.toLowerCase().includes(q) || t.requester?.toLowerCase().includes(q) || t.assignedTo?.toLowerCase().includes(q)
@@ -426,6 +444,12 @@ export default function TicketsPage() {
   const duplicateGroups = detectDuplicateTicketGroups(tickets)
   const duplicateCountsById = new Map(duplicateGroups.flatMap(group => group.tickets.map(ticket => [ticket.id, group.count])))
   const selectedDuplicates = selected ? findDuplicateTicketsFor(selected, tickets) : []
+
+  const originCounts = tickets.reduce((acc, t) => {
+    const key = t.origin || 'MANUAL'
+    acc[key] = (acc[key] || 0) + 1
+    return acc
+  }, {})
 
   return (
     <Layout>
@@ -445,6 +469,44 @@ export default function TicketsPage() {
           </button>
         </div>
 
+        {/* Origin KPIs */}
+        <div className="ticket-origin-kpis">
+          <div className="stat-card ticket-origin-kpi">
+            <div className="stat-icon" style={{ background: 'var(--bg-muted)', color: 'var(--text-secondary)' }}>📊</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="stat-value">{loading ? '—' : tickets.length}</div>
+              <div className="stat-label">Total carregado</div>
+            </div>
+          </div>
+          <button type="button" className="stat-card ticket-origin-kpi ticket-origin-kpi-btn"
+            onClick={() => setOriginFilter(originFilter === 'ZABBIX' ? '' : 'ZABBIX')}
+            style={{ borderColor: originFilter === 'ZABBIX' ? 'var(--orange)' : undefined }}>
+            <div className="stat-icon" style={{ background: ORIGIN.ZABBIX.bg, color: ORIGIN.ZABBIX.color }}>{ORIGIN.ZABBIX.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="stat-value">{loading ? '—' : originCounts.ZABBIX || 0}</div>
+              <div className="stat-label">Zabbix (monitoramento)</div>
+            </div>
+          </button>
+          <button type="button" className="stat-card ticket-origin-kpi ticket-origin-kpi-btn"
+            onClick={() => setOriginFilter(originFilter === 'WHATSAPP' ? '' : 'WHATSAPP')}
+            style={{ borderColor: originFilter === 'WHATSAPP' ? 'var(--green)' : undefined }}>
+            <div className="stat-icon" style={{ background: ORIGIN.WHATSAPP.bg, color: ORIGIN.WHATSAPP.color }}>{ORIGIN.WHATSAPP.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="stat-value">{loading ? '—' : originCounts.WHATSAPP || 0}</div>
+              <div className="stat-label">WhatsApp (CRM/Hermes)</div>
+            </div>
+          </button>
+          <button type="button" className="stat-card ticket-origin-kpi ticket-origin-kpi-btn"
+            onClick={() => setOriginFilter(originFilter === 'MANUAL' ? '' : 'MANUAL')}
+            style={{ borderColor: originFilter === 'MANUAL' ? 'var(--border-strong)' : undefined }}>
+            <div className="stat-icon" style={{ background: ORIGIN.MANUAL.bg, color: ORIGIN.MANUAL.color }}>{ORIGIN.MANUAL.icon}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div className="stat-value">{loading ? '—' : originCounts.MANUAL || 0}</div>
+              <div className="stat-label">Manual / GLPI</div>
+            </div>
+          </button>
+        </div>
+
         {/* Filters */}
         <div className="filter-bar">
           <input type="text" placeholder="Buscar título, solicitante..." value={search}
@@ -455,6 +517,9 @@ export default function TicketsPage() {
           <select value={priorityFilter} onChange={e => setPriorityFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
             {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+          <select value={originFilter} onChange={e => setOriginFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+            {ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
         </div>
 
         {/* Table */}
@@ -463,7 +528,7 @@ export default function TicketsPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th><th>Título</th><th>Prioridade</th><th>Status</th>
+                  <th>#</th><th>Título</th><th>Origem</th><th>Prioridade</th><th>Status</th>
                   <th>Solicitante</th><th>Atribuído</th><th>Abertura</th>
                 </tr>
               </thead>
@@ -471,14 +536,14 @@ export default function TicketsPage() {
                 {loading ? (
                   [...Array(5)].map((_, i) => (
                     <tr key={i}>
-                      {[...Array(7)].map((_, j) => (
+                      {[...Array(8)].map((_, j) => (
                         <td key={j}><div className="skeleton" style={{ height: 14, borderRadius: 4 }} /></td>
                       ))}
                     </tr>
                   ))
                 ) : filtered.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-tertiary)' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '48px 0', color: 'var(--text-tertiary)' }}>
                       {tickets.length === 0
                         ? 'Nenhum chamado. Verifique a integração com o GLPI.'
                         : 'Nenhum chamado corresponde aos filtros.'}
@@ -493,6 +558,7 @@ export default function TicketsPage() {
                         {duplicateCountsById.has(t.id) && <span className="badge bg-[var(--amber-bg)] text-[var(--amber)]">duplicado x{duplicateCountsById.get(t.id)}</span>}
                       </div>
                     </td>
+                    <td><OriginBadge origin={t.origin} /></td>
                     <td><PriorityBadge priority={t.priority} /></td>
                     <td><StatusBadge status={t.status} label={t.statusLabel} /></td>
                     <td className="muted">{t.requester || '—'}</td>
@@ -525,6 +591,10 @@ export default function TicketsPage() {
                 </div>
               </div>
               <div className="ticket-detail-meta-row">
+                <div className="ticket-detail-meta-item">
+                  <span className="ticket-detail-meta-label">Origem</span>
+                  <span className="ticket-detail-meta-value"><OriginBadge origin={detail.ticket.origin} /></span>
+                </div>
                 <div className="ticket-detail-meta-item">
                   <span className="ticket-detail-meta-label">Solicitante</span>
                   <span className="ticket-detail-meta-value">{detail.ticket.requester || '—'}</span>

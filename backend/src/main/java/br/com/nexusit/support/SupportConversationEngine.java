@@ -184,7 +184,7 @@ public class SupportConversationEngine {
         if (text.equals("3") || text.contains("tecnico") || text.contains("técnico") || text.contains("atendente")) {
             sendAndRecord(conversation, WAIT_TECH);
             int ticketId = glpiService.createTicket(
-                    "Atendimento direto com técnico via WhatsApp",
+                    "[WhatsApp] Atendimento direto com técnico via WhatsApp",
                     "Funcionário solicitou falar diretamente com um técnico pelo WhatsApp corporativo do TI Galdino.",
                     contact.getGlpiUserId(),
                     4,
@@ -388,6 +388,10 @@ public class SupportConversationEngine {
     }
 
     private String autoTitle(String description) {
+        return "[WhatsApp] " + autoTitleText(description);
+    }
+
+    private String autoTitleText(String description) {
         String oneLine = description.replaceAll("\\s+", " ").trim();
         if (oneLine.isBlank()) return "Chamado via WhatsApp";
         String[] words = oneLine.split(" ");

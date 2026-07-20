@@ -159,7 +159,7 @@ public class GlpiService {
         return new GlpiTicket(t.id(), t.title(), t.status(), t.statusLabel(), t.priority(), t.priorityLabel(),
                 t.urgency(), t.urgencyLabel(), t.impact(), t.impactLabel(), t.category(), requester,
                 assignedTo, t.openedAt(), t.solvedAt(), t.ticketType(), t.slaTtoName(), t.slaTtrName(),
-                t.timeToOwn(), t.timeToResolve(), t.slaWaitingDuration());
+                t.timeToOwn(), t.timeToResolve(), t.slaWaitingDuration(), t.origin());
     }
 
     private GlpiTicket withResolvedAssignee(GlpiTicket t) {
@@ -169,7 +169,7 @@ public class GlpiService {
         return new GlpiTicket(t.id(), t.title(), t.status(), t.statusLabel(), t.priority(), t.priorityLabel(),
                 t.urgency(), t.urgencyLabel(), t.impact(), t.impactLabel(), t.category(), t.requester(),
                 resolved, t.openedAt(), t.solvedAt(), t.ticketType(), t.slaTtoName(), t.slaTtrName(),
-                t.timeToOwn(), t.timeToResolve(), t.slaWaitingDuration());
+                t.timeToOwn(), t.timeToResolve(), t.slaWaitingDuration(), t.origin());
     }
 
     private String resolveAssignedTechnician(int ticketId) {
@@ -429,10 +429,11 @@ public class GlpiService {
         String assignedTo = firstNonEmpty(t, "_users_id_assign", "users_id_assign_1", "users_id_assign");
         // itilcategories_id also arrives expanded to its display name (or "0"/blank when uncategorized)
         String category = nonZeroStr(t, "itilcategories_id");
+        String title = str(t, "name");
 
         return new GlpiTicket(
                 intVal(t, "id"),
-                str(t, "name"),
+                title,
                 status, STATUS_LABELS.getOrDefault(status, "?"),
                 priority, PRIORITY_LABELS.getOrDefault(priority, "?"),
                 urgency, URGENCY_IMPACT_LABELS.getOrDefault(urgency, "?"),
@@ -447,8 +448,19 @@ public class GlpiService {
                 nonZeroStr(t, "slas_id_ttr"),
                 str(t, "time_to_own"),
                 str(t, "time_to_resolve"),
-                intVal(t, "sla_waiting_duration")
+                intVal(t, "sla_waiting_duration"),
+                inferOrigin(title)
         );
+    }
+
+    // Chamados do Zabbix sao abertos pelo plugin nativo do GLPI (fora deste backend) com titulo
+    // "[Zabbix] ...". Chamados do Hermes/WhatsApp sao prefixados em SupportConversationEngine.
+    // Sem um campo estruturado de origem no GLPI, o prefixo do titulo e o unico sinal confiavel.
+    private String inferOrigin(String title) {
+        String t = title == null ? "" : title.trim();
+        if (t.regionMatches(true, 0, "[Zabbix]", 0, 8)) return "ZABBIX";
+        if (t.regionMatches(true, 0, "[WhatsApp]", 0, 10)) return "WHATSAPP";
+        return "MANUAL";
     }
 
     // ── Utils ─────────────────────────────────────────────────────────────

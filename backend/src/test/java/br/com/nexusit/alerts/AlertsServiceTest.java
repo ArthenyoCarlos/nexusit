@@ -100,7 +100,7 @@ class AlertsServiceTest {
 
     private GlpiTicket ticket(int id, int priority, String assignedTo) {
         return new GlpiTicket(id, "Chamado " + id, 1, "Novo", priority, "?", 1, "?", 1, "?",
-                "", "Solicitante", assignedTo, "2026-01-01 10:00:00", "", 1, "", "", "", "", 0);
+                "", "Solicitante", assignedTo, "2026-01-01 10:00:00", "", 1, "", "", "", "", 0, "MANUAL");
     }
 
     private HermesController.HermesSummary emptyHermesSummary() {
