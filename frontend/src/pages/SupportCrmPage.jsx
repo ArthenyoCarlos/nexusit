@@ -263,26 +263,6 @@ export default function SupportCrmPage() {
     return () => URL.revokeObjectURL(url)
   }, [selectedFile])
 
-  useEffect(() => {
-    if (!isMine) return undefined
-    const handlePaste = (e) => {
-      const items = e.clipboardData?.items
-      if (!items) return
-      const fileItem = Array.from(items).find(i => i.kind === 'file')
-      if (!fileItem) return
-      const file = fileItem.getAsFile()
-      if (!file) return
-      e.preventDefault()
-      const isGenericName = !file.name || /^(image|blob|clipboard)\.[a-z0-9]+$/i.test(file.name)
-      const ext = (file.type.split('/')[1] || 'png').split('+')[0]
-      const named = isGenericName ? new File([file], `print-${Date.now()}.${ext}`, { type: file.type }) : file
-      setSelectedFile(named)
-      toast.add('Imagem colada anexada — clique em Enviar.', 'success')
-    }
-    document.addEventListener('paste', handlePaste)
-    return () => document.removeEventListener('paste', handlePaste)
-  }, [isMine, toast])
-
   const handleClaim = async (id) => {
     setClaimingId(id)
     try {
@@ -428,6 +408,26 @@ export default function SupportCrmPage() {
   const assignedIds = new Set([conversation?.claimedById, ...(conversation?.technicians?.map(t => t.id) ?? [])].filter(Boolean))
   const availableToAdd = technicianOptions.filter(t => t.active && !assignedIds.has(t.id))
   const availableToTransfer = technicianOptions.filter(t => t.active && t.id !== conversation?.claimedById)
+
+  useEffect(() => {
+    if (!isMine) return undefined
+    const handlePaste = (e) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      const fileItem = Array.from(items).find(i => i.kind === 'file')
+      if (!fileItem) return
+      const file = fileItem.getAsFile()
+      if (!file) return
+      e.preventDefault()
+      const isGenericName = !file.name || /^(image|blob|clipboard)\.[a-z0-9]+$/i.test(file.name)
+      const ext = (file.type.split('/')[1] || 'png').split('+')[0]
+      const named = isGenericName ? new File([file], `print-${Date.now()}.${ext}`, { type: file.type }) : file
+      setSelectedFile(named)
+      toast.add('Imagem colada anexada — clique em Enviar.', 'success')
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+  }, [isMine, toast])
 
   return (
     <Layout>
