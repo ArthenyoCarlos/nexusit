@@ -1,5 +1,6 @@
 package br.com.nexusit.glpi;
 
+import br.com.nexusit.support.SupportConversationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class GlpiService {
 
     private final GlpiClient client;
     private final ObjectMapper objectMapper;
+    private final SupportConversationRepository conversationRepository;
 
     // Status: 1=Novo, 2=Em andamento (atribuído), 3=Em andamento (planejado),
     //         4=Aguardando, 5=Resolvido, 6=Fechado
@@ -69,14 +71,11 @@ public class GlpiService {
             if (raw == null) return List.of();
 
             ActorMaps actors = fetchActorMaps();
+            Set<Integer> crmTicketIds = fetchCrmTicketIds();
 
             return raw.stream()
-                    .filter(t -> {
-                        int s = intVal(t, "status");
-                        if (status != null) return s == status;
-                        return s <= 4; // open: 1,2,3,4
-                    })
-                    .map(t -> withActors(toTicket(t), actors))
+                    .filter(t -> status == null || intVal(t, "status") == status)
+                    .map(t -> withActors(toTicket(t, crmTicketIds), actors))
                     .toList();
         }, List.of());
     }
@@ -88,7 +87,7 @@ public class GlpiService {
                     "get_hateoas", "false"
             );
             Map<String, Object> raw = client.getOne("/Ticket/" + id, params);
-            GlpiTicket ticket = withResolvedAssignee(toTicket(raw));
+            GlpiTicket ticket = withResolvedAssignee(toTicket(raw, fetchCrmTicketIds()));
             String content = str(raw, "content");
 
             // Followups
@@ -204,7 +203,13 @@ public class GlpiService {
     }
 
     public void updateTicket(int ticketId, Map<String, Object> fields) {
-        client.put("/Ticket/" + ticketId, Map.of("input", fields));
+        Map<String, Object> normalized = new LinkedHashMap<>(fields);
+        Object name = normalized.get("name");
+        if (name != null && !String.valueOf(name).isBlank()) {
+            String origin = inferOriginForTicket(ticketId, String.valueOf(name));
+            normalized.put("name", ensureOriginPrefix(String.valueOf(name), origin));
+        }
+        client.put("/Ticket/" + ticketId, Map.of("input", normalized));
     }
 
     public Integer assignTicket(int ticketId, int glpiUserId) {
@@ -274,6 +279,16 @@ public class GlpiService {
                     .sorted(Comparator.comparing(m -> String.valueOf(m.get("name")).toLowerCase()))
                     .toList();
         }, List.of());
+    }
+
+    public Map<String, Object> createCategory(String name) {
+        String clean = name == null ? "" : name.trim();
+        if (clean.isBlank()) throw new IllegalArgumentException("Nome do setor é obrigatório");
+        Map<String, Object> resp = client.post("/ITILCategory", Map.of("input", Map.of("name", clean)));
+        Map<String, Object> m = new LinkedHashMap<>();
+        m.put("id", intVal(resp, "id"));
+        m.put("name", clean);
+        return m;
     }
 
     private String technicianDisplayName(Map<String, Object> u) {
@@ -348,7 +363,7 @@ public class GlpiService {
                     .filter(t -> intVal(t, "users_id_recipient") == requesterGlpiUserId
                             || intVal(t, "users_id_requester") == requesterGlpiUserId
                             || intVal(t, "_users_id_requester") == requesterGlpiUserId)
-                    .map(this::toTicket)
+                    .map(t -> toTicket(t, fetchCrmTicketIds()))
                     .toList();
         }, List.of());
     }
@@ -359,7 +374,7 @@ public class GlpiService {
 
     public int createTicket(String title, String content, int requesterGlpiUserId, int priority, String category) {
         Map<String, Object> input = new LinkedHashMap<>();
-        input.put("name", title);
+        input.put("name", ensureOriginPrefix(title, "WHATSAPP"));
         input.put("content", "[Categoria sugerida: " + (category == null || category.isBlank() ? "Suporte TI" : category) + "]\n\n" + content);
         input.put("_users_id_requester", requesterGlpiUserId);
         input.put("priority", priority);
@@ -416,24 +431,28 @@ public class GlpiService {
 
     // ── Parsing ───────────────────────────────────────────────────────────
 
-    private GlpiTicket toTicket(Map<String, Object> t) {
+    private GlpiTicket toTicket(Map<String, Object> t, Set<Integer> crmTicketIds) {
         int status = intVal(t, "status");
         int priority = intVal(t, "priority");
         int urgency = intVal(t, "urgency");
         int impact = intVal(t, "impact");
         int type = intVal(t, "type");
+        int id = intVal(t, "id");
 
         // GLPI with expand_dropdowns=true returns user names in _users_id_requester / _users_id_assign
         // For the list endpoint these may be absent; fall back to empty string
         String requester = firstNonEmpty(t, "_users_id_requester", "users_id_requester_1", "users_id_requester");
         String assignedTo = firstNonEmpty(t, "_users_id_assign", "users_id_assign_1", "users_id_assign");
+
         // itilcategories_id also arrives expanded to its display name (or "0"/blank when uncategorized)
         String category = nonZeroStr(t, "itilcategories_id");
-        String title = str(t, "name");
+        String rawTitle = str(t, "name");
+        String origin = inferOrigin(id, rawTitle, crmTicketIds);
+        String displayTitle = ensureOriginPrefix(rawTitle, origin);
 
         return new GlpiTicket(
-                intVal(t, "id"),
-                title,
+                id,
+                displayTitle,
                 status, STATUS_LABELS.getOrDefault(status, "?"),
                 priority, PRIORITY_LABELS.getOrDefault(priority, "?"),
                 urgency, URGENCY_IMPACT_LABELS.getOrDefault(urgency, "?"),
@@ -449,18 +468,37 @@ public class GlpiService {
                 str(t, "time_to_own"),
                 str(t, "time_to_resolve"),
                 intVal(t, "sla_waiting_duration"),
-                inferOrigin(title)
+                origin
         );
     }
 
-    // Chamados do Zabbix sao abertos pelo plugin nativo do GLPI (fora deste backend) com titulo
-    // "[Zabbix] ...". Chamados do Hermes/WhatsApp sao prefixados em SupportConversationEngine.
-    // Sem um campo estruturado de origem no GLPI, o prefixo do titulo e o unico sinal confiavel.
-    private String inferOrigin(String title) {
+    // Origem oficial na tela: Zabbix pelo prefixo nativo; CRM/WhatsApp pelo vínculo local
+    // support_conversations.glpi_ticket_id; o restante é chamado manual do GLPI.
+    private String inferOrigin(int ticketId, String title, Set<Integer> crmTicketIds) {
         String t = title == null ? "" : title.trim();
         if (t.regionMatches(true, 0, "[Zabbix]", 0, 8)) return "ZABBIX";
-        if (t.regionMatches(true, 0, "[WhatsApp]", 0, 10)) return "WHATSAPP";
+        if (crmTicketIds != null && crmTicketIds.contains(ticketId)) return "WHATSAPP";
+        if (t.regionMatches(true, 0, "[WhatsApp]", 0, 10) || t.regionMatches(true, 0, "[Whatsapp]", 0, 10)) return "WHATSAPP";
         return "MANUAL";
+    }
+
+    private String inferOriginForTicket(int ticketId, String title) {
+        return inferOrigin(ticketId, title, fetchCrmTicketIds());
+    }
+
+    private String ensureOriginPrefix(String title, String origin) {
+        String clean = title == null ? "" : title.trim();
+        clean = clean.replaceFirst("(?i)^\\[(Zabbix|WhatsApp|Whatsapp|GLPI)]\\s*", "").trim();
+        String prefix = switch (origin) {
+            case "ZABBIX" -> "[Zabbix]";
+            case "WHATSAPP" -> "[Whatsapp]";
+            default -> "[GLPI]";
+        };
+        return (prefix + " " + clean).trim();
+    }
+
+    private Set<Integer> fetchCrmTicketIds() {
+        return safeCall(conversationRepository::findGlpiTicketIds, Set.of());
     }
 
     // ── Utils ─────────────────────────────────────────────────────────────

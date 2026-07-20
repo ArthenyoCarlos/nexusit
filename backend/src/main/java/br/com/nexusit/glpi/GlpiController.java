@@ -40,6 +40,18 @@ public class GlpiController {
         return service.getCategories();
     }
 
+    @PostMapping("/categories")
+    public ResponseEntity<Map<String, Object>> createCategory(@RequestBody Map<String, String> body) {
+        try {
+            return ResponseEntity.ok(service.createCategory(body.getOrDefault("name", "")));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            log.warn("Failed to create GLPI category: {}", describeGlpiError(e));
+            return ResponseEntity.status(HttpStatus.BAD_GATEWAY).body(Map.of("error", describeGlpiError(e)));
+        }
+    }
+
     @PutMapping("/tickets/{id}/fields")
     public ResponseEntity<Map<String, String>> updateTicketFields(
             @PathVariable int id,

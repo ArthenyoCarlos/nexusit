@@ -1,5 +1,6 @@
 package br.com.nexusit.glpi;
 
+import br.com.nexusit.support.SupportConversationRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -8,10 +9,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.when;
 
 /**
@@ -25,11 +28,15 @@ class GlpiServiceTest {
     @Mock
     GlpiClient client;
 
+    @Mock
+    SupportConversationRepository conversationRepository;
+
     GlpiService service;
 
     @org.junit.jupiter.api.BeforeEach
     void setUp() {
-        service = new GlpiService(client, new ObjectMapper());
+        service = new GlpiService(client, new ObjectMapper(), conversationRepository);
+        lenient().when(conversationRepository.findGlpiTicketIds()).thenReturn(Set.of());
     }
 
     @Test
@@ -83,5 +90,39 @@ class GlpiServiceTest {
         List<GlpiTicket> result = service.getTickets(null);
 
         assertThat(result.get(0).assignedTo()).isBlank();
+    }
+
+    @Test
+    void classifiesCrmTicketFromSupportConversationEvenWithoutWhatsappPrefix() {
+        Map<String, Object> ticket = Map.of(
+                "id", 10, "name", "Concerto", "status", 2, "priority", 3,
+                "urgency", 3, "impact", 3, "type", 1
+        );
+        when(client.getList(eq("/Ticket"), any())).thenReturn(List.of(ticket));
+        when(client.getList(eq("/Ticket_User"), any())).thenReturn(List.of());
+        when(conversationRepository.findGlpiTicketIds()).thenReturn(Set.of(10));
+
+        List<GlpiTicket> result = service.getTickets(null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).origin()).isEqualTo("WHATSAPP");
+        assertThat(result.get(0).title()).isEqualTo("[Whatsapp] Concerto");
+    }
+
+    @Test
+    void includesClosedTicketsWhenNoStatusFilterIsProvided() {
+        Map<String, Object> closedTicket = Map.of(
+                "id", 11, "name", "Chamado fechado", "status", 6, "priority", 3,
+                "urgency", 3, "impact", 3, "type", 1
+        );
+        when(client.getList(eq("/Ticket"), any())).thenReturn(List.of(closedTicket));
+        when(client.getList(eq("/Ticket_User"), any())).thenReturn(List.of());
+
+        List<GlpiTicket> result = service.getTickets(null);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).status()).isEqualTo(6);
+        assertThat(result.get(0).origin()).isEqualTo("MANUAL");
+        assertThat(result.get(0).title()).isEqualTo("[GLPI] Chamado fechado");
     }
 }

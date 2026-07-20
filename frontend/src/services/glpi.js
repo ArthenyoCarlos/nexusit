@@ -21,5 +21,8 @@ export const getTechnicians = () =>
 export const getCategories = () =>
   api.get('/glpi/categories')
 
+export const createCategory = (name) =>
+  api.post('/glpi/categories', { name })
+
 export const updateTicketFields = (id, fields) =>
   api.put(`/glpi/tickets/${id}/fields`, fields)

@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 public interface SupportConversationRepository extends JpaRepository<SupportConversation, UUID> {
@@ -45,4 +46,7 @@ public interface SupportConversationRepository extends JpaRepository<SupportConv
     @Query("UPDATE SupportConversation c SET c.claimedBy = :user, c.state = 'HUMAN_ACTIVE', c.claimedAt = :now " +
             "WHERE c.id = :id AND c.claimedBy IS NULL AND c.state = 'PENDING_TECH'")
     int claim(@Param("id") UUID id, @Param("user") User user, @Param("now") LocalDateTime now);
+
+    @Query("SELECT c.glpiTicketId FROM SupportConversation c WHERE c.glpiTicketId IS NOT NULL")
+    Set<Integer> findGlpiTicketIds();
 }

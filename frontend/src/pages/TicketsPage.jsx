@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { getTickets, getTicket, addFollowup, closeTicket, assignTicket, getTechnicians, getCategories, updateTicketFields } from '../services/glpi'
+import { getTickets, getTicket, addFollowup, closeTicket, assignTicket, getTechnicians, getCategories, createCategory, updateTicketFields } from '../services/glpi'
 import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
 import { getTicketAssetLinks, createTicketAssetLink, deleteTicketAssetLink } from '../services/ticketAssetLinks'
@@ -20,6 +20,8 @@ const PRIORITY = {
 }
 const STATUS_OPTIONS = [
   { value: '',  label: 'Todos os status' },
+  { value: 'OPEN', label: 'Abertos' },
+  { value: 'CLOSED', label: 'Fechados/Resolvidos' },
   { value: '1', label: 'Novo' },
   { value: '2', label: 'Em andamento' },
   { value: '4', label: 'Aguardando' },
@@ -131,6 +133,9 @@ export default function TicketsPage() {
   const [statusFilter, setStatusFilter] = useState('')
   const [priorityFilter, setPriorityFilter] = useState('')
   const [originFilter, setOriginFilter] = useState('')
+  const [requesterFilter, setRequesterFilter] = useState('')
+  const [technicianFilter, setTechnicianFilter] = useState('')
+  const [sectorFilter, setSectorFilter] = useState('')
   const [search, setSearch] = useState('')
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
@@ -153,7 +158,11 @@ export default function TicketsPage() {
   const [assetPickerId, setAssetPickerId] = useState('')
   const [assetLinking, setAssetLinking] = useState(false)
   const [categories, setCategories] = useState([])
+  const [editTitle, setEditTitle] = useState('')
+  const [titleLoading, setTitleLoading] = useState(false)
   const [editCategory, setEditCategory] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryCreating, setCategoryCreating] = useState(false)
   const [editPriority, setEditPriority] = useState('')
   const [editUrgency, setEditUrgency] = useState('')
   const [editImpact, setEditImpact] = useState('')
@@ -170,6 +179,7 @@ export default function TicketsPage() {
 
   useEffect(() => {
     if (!detail) return
+    setEditTitle(detail.ticket.title || '')
     setEditPriority(String(detail.ticket.priority || ''))
     setEditUrgency(String(detail.ticket.urgency || ''))
     setEditImpact(String(detail.ticket.impact || ''))
@@ -185,12 +195,11 @@ export default function TicketsPage() {
   const fetchTickets = useCallback(async () => {
     setLoading(true)
     try {
-      const status = statusFilter ? parseInt(statusFilter) : null
-      const res = await getTickets(status)
+      const res = await getTickets()
       setTickets(res.data)
     } catch { setTickets([]) }
     finally { setLoading(false) }
-  }, [statusFilter])
+  }, [])
 
   useEffect(() => { fetchTickets() }, [fetchTickets])
 
@@ -286,6 +295,32 @@ export default function TicketsPage() {
       setAssignUserId(''); const res = await getTicket(selected.id); setDetail(res.data)
     } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao atribuir técnico.') }) }
     finally { setActionLoading(false) }
+  }
+
+  const handleUpdateTitle = async () => {
+    if (!selected || !editTitle.trim()) return
+    setTitleLoading(true)
+    try {
+      await updateTicketFields(selected.id, { name: editTitle.trim() })
+      setActionMsg({ type: 'success', text: 'Assunto do chamado atualizado.' })
+      await fetchTickets(); const res = await getTicket(selected.id); setDetail(res.data); setSelected(res.data.ticket)
+    } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao atualizar assunto.') }) }
+    finally { setTitleLoading(false) }
+  }
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return
+    setCategoryCreating(true)
+    try {
+      const res = await createCategory(newCategoryName.trim())
+      const created = res.data
+      const updated = await getCategories().then(r => r.data).catch(() => [...categories, created])
+      setCategories(updated)
+      setEditCategory(String(created.id))
+      setNewCategoryName('')
+      setActionMsg({ type: 'success', text: 'Setor criado. Clique em Salvar classificação para aplicar ao chamado.' })
+    } catch (err) { setActionMsg({ type: 'error', text: describeGlpiError(err, 'Erro ao criar setor.') }) }
+    finally { setCategoryCreating(false) }
   }
 
   const handleUpdateClassification = async () => {
@@ -432,14 +467,24 @@ export default function TicketsPage() {
   }
 
   const filtered = tickets.filter(t => {
+    if (statusFilter === 'OPEN' && ![1, 2, 3, 4].includes(t.status)) return false
+    if (statusFilter === 'CLOSED' && ![5, 6].includes(t.status)) return false
+    if (statusFilter && !['OPEN', 'CLOSED'].includes(statusFilter) && t.status !== parseInt(statusFilter)) return false
     if (priorityFilter && t.priority !== parseInt(priorityFilter)) return false
     if (originFilter && (t.origin || 'MANUAL') !== originFilter) return false
+    if (requesterFilter && (t.requester || '') !== requesterFilter) return false
+    if (technicianFilter && (t.assignedTo || '') !== technicianFilter) return false
+    if (sectorFilter && (t.category || '') !== sectorFilter) return false
     if (search) {
       const q = search.toLowerCase()
-      return t.title?.toLowerCase().includes(q) || t.requester?.toLowerCase().includes(q) || t.assignedTo?.toLowerCase().includes(q)
+      return t.title?.toLowerCase().includes(q) || t.requester?.toLowerCase().includes(q) || t.assignedTo?.toLowerCase().includes(q) || t.category?.toLowerCase().includes(q)
     }
     return true
   })
+
+  const requesterOptions = Array.from(new Set(tickets.map(t => t.requester).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const technicianOptions = Array.from(new Set(tickets.map(t => t.assignedTo).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const sectorOptions = Array.from(new Set(tickets.map(t => t.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
 
   const duplicateGroups = detectDuplicateTicketGroups(tickets)
   const duplicateCountsById = new Map(duplicateGroups.flatMap(group => group.tickets.map(ticket => [ticket.id, group.count])))
@@ -520,6 +565,18 @@ export default function TicketsPage() {
           <select value={originFilter} onChange={e => setOriginFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
             {ORIGIN_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
+          <select value={requesterFilter} onChange={e => setRequesterFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+            <option value="">Todos os usuários</option>
+            {requesterOptions.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+          <select value={technicianFilter} onChange={e => setTechnicianFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+            <option value="">Todos os técnicos</option>
+            {technicianOptions.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
+          <select value={sectorFilter} onChange={e => setSectorFilter(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+            <option value="">Todos os setores</option>
+            {sectorOptions.map(name => <option key={name} value={name}>{name}</option>)}
+          </select>
         </div>
 
         {/* Table */}
@@ -584,7 +641,15 @@ export default function TicketsPage() {
           <div className="ticket-detail-body">
             <div>
               <div className="ticket-detail-header-top">
-                <h3>{detail.ticket.title}</h3>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <label className="input-label">Assunto do chamado</label>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={editTitle} onChange={e => setEditTitle(e.target.value)} className="input" placeholder="Assunto do chamado" />
+                    <button onClick={handleUpdateTitle} disabled={titleLoading || !editTitle.trim()} className="btn btn-primary text-xs">
+                      {titleLoading ? 'Salvando...' : 'Salvar assunto'}
+                    </button>
+                  </div>
+                </div>
                 <div className="ticket-detail-header-badges">
                   <PriorityBadge priority={detail.ticket.priority} />
                   <StatusBadge status={detail.ticket.status} label={detail.ticket.statusLabel} />
@@ -623,7 +688,7 @@ export default function TicketsPage() {
             )}
 
             {/* Classification: category / priority / urgency / impact */}
-            <TicketSection icon="🏷️" title="Classificação" tone="neutral"
+            <TicketSection icon="🏷️" title="Setor e classificação" tone="neutral"
               right={
                 <button onClick={handleUpdateClassification} disabled={classifyLoading} className="btn btn-primary text-xs">
                   {classifyLoading ? 'Salvando...' : 'Salvar classificação'}
@@ -631,9 +696,9 @@ export default function TicketsPage() {
               }>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
                 <div>
-                  <label className="input-label">Categoria</label>
+                  <label className="input-label">Setor</label>
                   <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="input text-xs">
-                    <option value="">Sem categoria</option>
+                    <option value="">Sem setor</option>
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                   </select>
                 </div>
@@ -655,6 +720,15 @@ export default function TicketsPage() {
                     {URGENCY_IMPACT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </select>
                 </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 12, alignItems: 'end', flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 240, flex: 1 }}>
+                  <label className="input-label">Criar novo setor</label>
+                  <input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} className="input text-xs" placeholder="Ex.: Financeiro, Comercial, Logística" />
+                </div>
+                <button onClick={handleCreateCategory} disabled={categoryCreating || !newCategoryName.trim()} className="btn btn-default text-xs">
+                  {categoryCreating ? 'Criando...' : 'Criar setor'}
+                </button>
               </div>
             </TicketSection>
 
