@@ -58,6 +58,24 @@ public class EvolutionApiClient {
         }
     }
 
+    /**
+     * Same as {@link #sendText}, but rethrows on failure instead of swallowing it. For
+     * user-triggered sends (e.g. the Broadcast page) where the operator needs to know
+     * whether the message actually went out — unlike Hermes's fire-and-forget replies.
+     */
+    public void sendTextOrThrow(String target, String text) {
+        if (!props.isConfigured()) {
+            throw new IllegalStateException("Evolution API não configurada (defina application.whatsapp.*)");
+        }
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("apikey", props.getApiKey());
+        Map<String, Object> body = Map.of("number", target, "text", text);
+        restTemplate.exchange(
+                props.getBaseUrl() + "/message/sendText/" + props.getInstanceName(),
+                HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+    }
+
     /** Best-effort media send through Evolution API v2 sendMedia endpoint. */
     public void sendMedia(String phoneNumber, byte[] bytes, String filename, String mime, String caption) {
         if (!props.isConfigured()) {
@@ -109,6 +127,39 @@ public class EvolutionApiClient {
                     HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
         } catch (Exception e) {
             log.warn("Falha ao enviar áudio WhatsApp para {}: {}", phoneNumber, e.toString());
+        }
+    }
+
+    /**
+     * Lists WhatsApp groups the connected instance participates in, so the UI can offer a
+     * picker instead of making the user hunt down a raw group JID. Returns raw maps (shape
+     * not fully verified against a live Evolution API instance — parse defensively).
+     */
+    public java.util.List<Map<String, Object>> fetchGroups() {
+        if (!props.isConfigured()) {
+            log.warn("Evolution API não configurada — não é possível listar grupos");
+            return java.util.List.of();
+        }
+        try {
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("apikey", props.getApiKey());
+            var resp = restTemplate.exchange(
+                    props.getBaseUrl() + "/group/fetchAllGroups/" + props.getInstanceName() + "?getParticipants=false",
+                    HttpMethod.GET, new HttpEntity<>(headers), java.util.List.class);
+            java.util.List<?> body = resp.getBody();
+            if (body == null) return java.util.List.of();
+            java.util.List<Map<String, Object>> result = new java.util.ArrayList<>();
+            for (Object o : body) {
+                if (o instanceof Map<?, ?> m) {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> casted = (Map<String, Object>) m;
+                    result.add(casted);
+                }
+            }
+            return result;
+        } catch (Exception e) {
+            log.warn("Falha ao buscar grupos do WhatsApp: {}", e.toString());
+            return java.util.List.of();
         }
     }
 

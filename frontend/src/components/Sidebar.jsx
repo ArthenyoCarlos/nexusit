@@ -33,6 +33,7 @@ const NAV = [
       { label: 'Chamados',      path: '/tickets',     Icon: IconTicket     },
       { label: 'CRM Suporte',   path: '/support-crm', Icon: IconCrm        },
       { label: 'Painel Bot TI', path: '/support-bot', Icon: IconBot        },
+      { label: 'Disparo WhatsApp', path: '/broadcast', Icon: IconBroadcast },
       { label: 'Anotações',     path: '/notes',       Icon: IconNotes      },
       { label: 'Reuniões',      path: '/meetings',    Icon: IconMeetings   },
       { label: 'Planejamento',  path: '/planning',    Icon: IconPlanning   },
@@ -164,6 +165,7 @@ function IconNetwork()    { return <svg {...i}><circle cx="12" cy="5" r="2"/><ci
 function IconTicket()     { return <svg {...i}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
 function IconCrm()        { return <svg {...i}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> }
 function IconBot()        { return <svg {...i}><rect x="5" y="8" width="14" height="10" rx="3"/><path d="M12 4v4M9 4h6M8 13h.01M16 13h.01M10 17h4"/></svg> }
+function IconBroadcast()  { return <svg {...i}><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 010 8.49M7.76 16.24a6 6 0 010-8.49M19.07 4.93a10 10 0 010 14.14M4.93 19.07a10 10 0 010-14.14"/></svg> }
 function IconNotes()      { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16l4-2 4 2 4-2 4 2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/></svg> }
 function IconMeetings()   { return <svg {...i}><path d="M8 2v4m8-4v4M3 10h18M5 4h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2z"/></svg> }
 function IconAudit()      { return <svg {...i}><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> }
