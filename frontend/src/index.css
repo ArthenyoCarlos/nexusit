@@ -313,6 +313,115 @@ body {
 .sidebar-nav:hover::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); }
 
 /* ════════════════════════════════════════════════════════════
+   TICKET DETAIL MODAL
+   ════════════════════════════════════════════════════════════ */
+.ticket-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+.ticket-detail-header-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.ticket-detail-header-top h3 {
+  font-size: 17.5px;
+  font-weight: 650;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.4;
+}
+.ticket-detail-header-badges { display: flex; gap: 6px; flex-shrink: 0; flex-wrap: wrap; }
+.ticket-detail-meta-row {
+  display: flex;
+  flex-wrap: wrap;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--r-lg);
+  overflow: hidden;
+  background: var(--bg-subtle);
+}
+.ticket-detail-meta-item {
+  flex: 1 1 140px;
+  padding: 11px 14px;
+  border-right: 1px solid var(--border-muted);
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ticket-detail-meta-item:last-child { border-right: 0; }
+.ticket-detail-meta-label {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+  color: var(--text-tertiary);
+}
+.ticket-detail-meta-value {
+  font-size: 13px;
+  color: var(--text-secondary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ticket-section {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--r-xl);
+  box-shadow: var(--shadow-xs);
+  overflow: hidden;
+}
+.ticket-section-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 13px 18px;
+  border-bottom: 1px solid var(--border-muted);
+  background: var(--bg-subtle);
+}
+.ticket-section-head-left { display: flex; gap: 11px; align-items: flex-start; min-width: 0; }
+.ticket-section-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+.ticket-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-primary);
+  margin: 0;
+}
+.ticket-section-subtitle {
+  font-size: 12.5px;
+  color: var(--text-tertiary);
+  margin: 3px 0 0;
+  line-height: 1.4;
+}
+.ticket-section-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.ticket-section-body { padding: 17px 18px; }
+
+@media (max-width: 620px) {
+  .ticket-detail-meta-item { flex-basis: 50%; border-right: 0; border-bottom: 1px solid var(--border-muted); }
+  .ticket-section-body { padding: 14px; }
+  .ticket-section-head { padding: 12px 14px; }
+}
+
+/* ════════════════════════════════════════════════════════════
    CARDS
    ════════════════════════════════════════════════════════════ */
 .card {

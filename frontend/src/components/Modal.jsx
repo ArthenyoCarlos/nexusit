@@ -1,7 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-const SIZE_MAP = { sm: 400, md: 520, lg: 740, xl: 920 }
+const SIZE_MAP = { sm: 400, md: 520, lg: 740, xl: 960 }
 
 export default function Modal({ open, onClose, title, children, size = 'md' }) {
   useEffect(() => {
@@ -61,7 +61,7 @@ export default function Modal({ open, onClose, title, children, size = 'md' }) {
         </div>
 
         {/* Body */}
-        <div style={{ padding: '20px' }}>
+        <div style={{ padding: 'clamp(16px, 3vw, 26px)' }}>
           {children}
         </div>
       </div>

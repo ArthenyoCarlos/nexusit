@@ -75,6 +75,37 @@ function formatDate(s) {
   return new Date(s).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
+const SECTION_TONE = {
+  neutral: { bg: 'var(--bg-muted)', color: 'var(--text-secondary)' },
+  accent:  { bg: 'var(--accent-light)', color: 'var(--accent-text)' },
+  amber:   { bg: 'var(--amber-bg)', color: 'var(--amber)' },
+}
+
+function TicketSection({ icon, title, subtitle, tone = 'neutral', right, children }) {
+  const t = SECTION_TONE[tone] ?? SECTION_TONE.neutral
+  return (
+    <section className="ticket-section">
+      <div className="ticket-section-head">
+        <div className="ticket-section-head-left">
+          <span className="ticket-section-icon" style={{ background: t.bg, color: t.color }}>{icon}</span>
+          <div style={{ minWidth: 0 }}>
+            <p className="ticket-section-title">{title}</p>
+            {subtitle && <p className="ticket-section-subtitle">{subtitle}</p>}
+          </div>
+        </div>
+        {right && <div className="ticket-section-right">{right}</div>}
+      </div>
+      <div className="ticket-section-body">{children}</div>
+    </section>
+  )
+}
+
+function initials(name) {
+  if (!name) return '?'
+  const parts = name.trim().split(/\s+/)
+  return ((parts[0]?.[0] || '') + (parts[1]?.[0] || '')).toUpperCase() || '?'
+}
+
 export default function TicketsPage() {
   const { user } = useAuth()
   const isAdmin = user?.role === 'ADMIN'
@@ -484,32 +515,51 @@ export default function TicketsPage() {
           </div>
         )}
         {detail && (
-          <div className="space-y-6">
+          <div className="ticket-detail-body">
             <div>
-              <h3 className="font-semibold text-[var(--text-primary)] mb-2">{detail.ticket.title}</h3>
-              <div className="flex flex-wrap gap-2 mb-3">
-                <PriorityBadge priority={detail.ticket.priority} />
-                <StatusBadge status={detail.ticket.status} label={detail.ticket.statusLabel} />
+              <div className="ticket-detail-header-top">
+                <h3>{detail.ticket.title}</h3>
+                <div className="ticket-detail-header-badges">
+                  <PriorityBadge priority={detail.ticket.priority} />
+                  <StatusBadge status={detail.ticket.status} label={detail.ticket.statusLabel} />
+                </div>
               </div>
-              <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-sm text-[var(--text-secondary)]">
-                <div><span className="text-[var(--text-tertiary)] text-xs block">Solicitante</span>{detail.ticket.requester || '—'}</div>
-                <div><span className="text-[var(--text-tertiary)] text-xs block">Atribuído</span>{detail.ticket.assignedTo || '—'}</div>
-                <div><span className="text-[var(--text-tertiary)] text-xs block">Abertura</span>{formatDate(detail.ticket.openedAt)}</div>
+              <div className="ticket-detail-meta-row">
+                <div className="ticket-detail-meta-item">
+                  <span className="ticket-detail-meta-label">Solicitante</span>
+                  <span className="ticket-detail-meta-value">{detail.ticket.requester || '—'}</span>
+                </div>
+                <div className="ticket-detail-meta-item">
+                  <span className="ticket-detail-meta-label">Atribuído</span>
+                  <span className="ticket-detail-meta-value">{detail.ticket.assignedTo || '—'}</span>
+                </div>
+                <div className="ticket-detail-meta-item">
+                  <span className="ticket-detail-meta-label">Abertura</span>
+                  <span className="ticket-detail-meta-value">{formatDate(detail.ticket.openedAt)}</span>
+                </div>
                 {detail.ticket.solvedAt && (
-                  <div><span className="text-[var(--text-tertiary)] text-xs block">Resolução</span>{formatDate(detail.ticket.solvedAt)}</div>
+                  <div className="ticket-detail-meta-item">
+                    <span className="ticket-detail-meta-label">Resolução</span>
+                    <span className="ticket-detail-meta-value">{formatDate(detail.ticket.solvedAt)}</span>
+                  </div>
                 )}
               </div>
             </div>
 
+            {detail.content && (
+              <TicketSection icon="📝" title="Descrição" tone="neutral">
+                <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap" style={{ margin: 0, lineHeight: 1.6 }}>{detail.content}</p>
+              </TicketSection>
+            )}
+
             {/* Classification: category / priority / urgency / impact */}
-            <div className="card" style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
-                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider" style={{ margin: 0 }}>Classificação</p>
+            <TicketSection icon="🏷️" title="Classificação" tone="neutral"
+              right={
                 <button onClick={handleUpdateClassification} disabled={classifyLoading} className="btn btn-primary text-xs">
                   {classifyLoading ? 'Salvando...' : 'Salvar classificação'}
                 </button>
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 10 }}>
+              }>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 12 }}>
                 <div>
                   <label className="input-label">Categoria</label>
                   <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="input text-xs">
@@ -536,27 +586,16 @@ export default function TicketsPage() {
                   </select>
                 </div>
               </div>
-            </div>
-
-            {detail.content && (
-              <div className="bg-[var(--bg-subtle)] rounded-xl p-4 text-sm text-[var(--text-secondary)] whitespace-pre-wrap border border-[var(--border)]" style={{ boxShadow: 'var(--shadow-xs)' }}>
-                {detail.content}
-              </div>
-            )}
+            </TicketSection>
 
             {selectedDuplicates.length > 0 && (
-              <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <div>
-                    <p className="text-xs font-semibold text-[var(--amber)] uppercase tracking-wider">Possíveis chamados duplicados</p>
-                    <p className="text-sm text-[var(--amber)]">Encontramos chamados abertos com mesmo assunto e solicitante. Revise antes de documentar ou fechar individualmente.</p>
-                  </div>
-                  <span className="badge bg-[var(--amber-bg)] text-[var(--amber)]">{selectedDuplicates.length + 1} similares</span>
-                </div>
+              <TicketSection icon="⚠️" title="Possíveis chamados duplicados" tone="amber"
+                subtitle="Encontramos chamados abertos com mesmo assunto e solicitante. Revise antes de documentar ou fechar individualmente."
+                right={<span className="badge badge-amber">{selectedDuplicates.length + 1} similares</span>}>
                 <div className="space-y-2">
                   {selectedDuplicates.map(ticket => (
                     <button key={ticket.id} onClick={() => openDetail(ticket)}
-                      className="w-full text-left rounded-xl border border-[var(--amber-border)] bg-[var(--bg-surface)] p-3 hover:bg-[var(--amber-bg)] transition">
+                      className="w-full text-left rounded-xl border border-[var(--amber-border)] bg-[var(--bg-subtle)] p-3 hover:bg-[var(--amber-bg)] transition">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <p className="text-sm font-semibold text-[var(--text-primary)]">#{ticket.id} · {ticket.title || '(sem título)'}</p>
@@ -567,18 +606,13 @@ export default function TicketsPage() {
                     </button>
                   ))}
                 </div>
-              </div>
+              </TicketSection>
             )}
 
             {/* Hermes Actions */}
-            <div className="rounded-2xl border border-[var(--accent-ring)] bg-[var(--accent-light)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
-              <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-                <div>
-                  <p className="text-xs font-semibold text-[var(--accent-text)] uppercase tracking-wider">Hermes no chamado</p>
-                  <p className="text-sm text-[var(--text-secondary)]">Gere resumo, resolução base ou artigo da Wiki a partir do histórico do GLPI.</p>
-                </div>
-                <span className="badge badge-blue">NexusAI</span>
-              </div>
+            <TicketSection icon="✨" title="Hermes no chamado" tone="accent"
+              subtitle="Gere resumo, resolução base ou artigo da Wiki a partir do histórico do GLPI."
+              right={<span className="badge badge-blue">NexusAI</span>}>
               <div className="flex flex-wrap" style={{ gap: 10 }}>
                 <button onClick={handleSmartSummary} disabled={actionLoading || wikiCreating}
                   className="btn btn-default text-xs">
@@ -600,7 +634,7 @@ export default function TicketsPage() {
                 )}
               </div>
               {assistantDraft && (
-                <div className="mt-4 rounded-xl bg-[var(--bg-surface)] border border-[var(--accent-ring)] p-3">
+                <div className="mt-4 rounded-xl bg-[var(--bg-subtle)] border border-[var(--accent-ring)] p-3">
                   <div className="flex items-center justify-between gap-2 mb-2">
                     <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">{assistantDraft.title}</p>
                     <div className="flex gap-2">
@@ -611,24 +645,19 @@ export default function TicketsPage() {
                   <pre className="whitespace-pre-wrap text-sm text-[var(--text-secondary)] font-sans leading-relaxed">{assistantDraft.text}</pre>
                 </div>
               )}
-            </div>
+            </TicketSection>
 
             {/* Wiki Suggestions */}
-            <div className="rounded-2xl border border-[var(--amber-border)] bg-[var(--amber-bg)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <div>
-                  <p className="text-xs font-semibold text-[var(--amber)] uppercase tracking-wider">Sugestões da Wiki</p>
-                  <p className="text-sm text-[var(--text-secondary)]">Artigos parecidos encontrados automaticamente antes de documentar.</p>
-                </div>
-                <span className="badge bg-[var(--amber-bg)] text-[var(--amber)]">{wikiSuggestionsLoading ? 'buscando' : wikiSuggestions.length}</span>
-              </div>
+            <TicketSection icon="📚" title="Sugestões da Wiki" tone="amber"
+              subtitle="Artigos parecidos encontrados automaticamente antes de documentar."
+              right={<span className="badge badge-amber">{wikiSuggestionsLoading ? 'buscando' : wikiSuggestions.length}</span>}>
               {wikiSuggestionQueries.length > 0 && (
                 <div className="flex flex-wrap gap-1 mb-3">
-                  {wikiSuggestionQueries.map(q => <span key={q} className="badge bg-[var(--bg-surface)] text-[var(--text-tertiary)] border border-[var(--amber-border)]">{q}</span>)}
+                  {wikiSuggestionQueries.map(q => <span key={q} className="badge bg-[var(--bg-subtle)] text-[var(--text-tertiary)] border border-[var(--border-muted)]">{q}</span>)}
                 </div>
               )}
               {!wikiSuggestionsLoading && wikiSuggestions.length > 0 && (
-                <div className="mb-3 rounded-xl border border-[var(--amber-border)] bg-[var(--amber-bg)] px-3 py-2 text-sm text-[var(--amber)]">
+                <div className="alert alert-amber mb-3">
                   Possível duplicidade: revise as sugestões ou vincule um artigo existente antes de criar nova documentação.
                 </div>
               )}
@@ -639,14 +668,14 @@ export default function TicketsPage() {
               ) : (
                 <div className="space-y-2">
                   {wikiSuggestions.map(article => (
-                    <div key={article.id} className="rounded-xl border border-[var(--amber-border)] bg-[var(--bg-surface)] p-3">
+                    <div key={article.id} className="rounded-xl border border-[var(--border-muted)] bg-[var(--bg-subtle)] p-3">
                       <div className="flex flex-wrap items-start justify-between gap-3">
                         <div className="min-w-0">
                           <p className="text-sm font-semibold text-[var(--text-primary)]">{article.title}</p>
                           <p className="text-xs text-[var(--text-tertiary)]">{article.category || 'Wiki'} · score {article.score || 0} · {article.matchCount} ocorrência(s) nas buscas</p>
                           {article.scoreReasons?.length > 0 && (
                             <div className="flex flex-wrap gap-1 mt-1">
-                              {article.scoreReasons.map(reason => <span key={reason} className="badge bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber-border)]">{reason}</span>)}
+                              {article.scoreReasons.map(reason => <span key={reason} className="badge badge-amber">{reason}</span>)}
                             </div>
                           )}
                         </div>
@@ -660,14 +689,11 @@ export default function TicketsPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </TicketSection>
 
             {/* Linked Wiki Articles */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Artigos relacionados na Wiki</p>
-                <span className="badge bg-[var(--bg-muted)] text-[var(--text-secondary)]">{wikiLinks.length}</span>
-              </div>
+            <TicketSection icon="🔗" title="Artigos relacionados na Wiki" tone="neutral"
+              right={<span className="badge badge-gray">{wikiLinks.length}</span>}>
               {wikiLinks.length === 0 ? (
                 <p className="text-sm text-[var(--text-tertiary)] italic">Nenhum artigo vinculado a este chamado ainda.</p>
               ) : (
@@ -686,14 +712,11 @@ export default function TicketsPage() {
                   ))}
                 </div>
               )}
-            </div>
+            </TicketSection>
 
             {/* Linked Systems/Assets */}
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-surface)] p-5" style={{ boxShadow: 'var(--shadow-xs)' }}>
-              <div className="flex items-center justify-between gap-2 mb-3">
-                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Sistemas e ativos relacionados</p>
-                <span className="badge bg-[var(--bg-muted)] text-[var(--text-secondary)]">{assetLinks.length}</span>
-              </div>
+            <TicketSection icon="🖥️" title="Sistemas e ativos relacionados" tone="neutral"
+              right={<span className="badge badge-gray">{assetLinks.length}</span>}>
               {assetLinks.length === 0 ? (
                 <p className="text-sm text-[var(--text-tertiary)] italic mb-3">Nenhum sistema ou ativo vinculado a este chamado ainda.</p>
               ) : (
@@ -726,37 +749,40 @@ export default function TicketsPage() {
                   {assetLinking ? 'Vinculando...' : 'Vincular'}
                 </button>
               </div>
-            </div>
+            </TicketSection>
 
             {/* Followups */}
-            <div>
-              <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-                Histórico ({detail.followups.length})
-              </p>
+            <TicketSection icon="🕓" title={`Histórico (${detail.followups.length})`} tone="neutral">
               {detail.followups.length === 0 ? (
                 <p className="text-[var(--text-tertiary)] text-sm italic">Nenhum acompanhamento ainda.</p>
               ) : (
                 <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                   {detail.followups.map(f => (
-                    <div key={f.id} className="bg-[var(--bg-surface)] border border-[var(--border)] rounded-lg p-3">
-                      <div className="flex justify-between text-xs text-[var(--text-tertiary)] mb-1">
-                        <span className="font-medium text-[var(--text-secondary)]">{f.author || 'Sistema'}</span>
-                        <span>{formatDate(f.date)}</span>
+                    <div key={f.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                      <span style={{
+                        width: 26, height: 26, borderRadius: '50%', flexShrink: 0, marginTop: 2,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        fontSize: 10.5, fontWeight: 700, background: 'var(--bg-muted)', color: 'var(--text-secondary)',
+                      }}>{initials(f.author)}</span>
+                      <div className="bg-[var(--bg-subtle)] border border-[var(--border-muted)] rounded-lg p-3" style={{ flex: 1, minWidth: 0 }}>
+                        <div className="flex justify-between text-xs text-[var(--text-tertiary)] mb-1">
+                          <span className="font-medium text-[var(--text-secondary)]">{f.author || 'Sistema'}</span>
+                          <span>{formatDate(f.date)}</span>
+                        </div>
+                        <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{f.content}</p>
                       </div>
-                      <p className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap">{f.content}</p>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
+            </TicketSection>
 
             {actionMsg && (
               <div className={`alert ${actionMsg.type === 'success' ? 'alert-green' : 'alert-red'}`}>{actionMsg.text}</div>
             )}
 
             {/* Add Followup */}
-            <div className="card" style={{ padding: 16 }}>
-              <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider" style={{ marginBottom: 10 }}>Adicionar resposta</p>
+            <TicketSection icon="💬" title="Adicionar resposta" tone="neutral">
               <textarea value={followupText} onChange={e => setFollowupText(e.target.value)}
                 placeholder="Digite sua resposta..." rows={3}
                 className="input resize-none" />
@@ -766,32 +792,32 @@ export default function TicketsPage() {
                   Enviar resposta
                 </button>
               </div>
-            </div>
+            </TicketSection>
 
             {isAdmin && (
-              <div className="card" style={{ padding: 16, display: 'flex', flexDirection: 'column', gap: 14 }}>
-                <p className="text-xs font-semibold text-[var(--text-tertiary)] uppercase tracking-wider">Ações de Admin</p>
+              <TicketSection icon="🛡️" title="Ações de Admin" tone="neutral">
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Encerrar este chamado</span>
+                    <button onClick={handleClose} disabled={actionLoading || detail.ticket.status === 6}
+                      className="btn btn-default text-xs">
+                      Fechar chamado
+                    </button>
+                  </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>Encerrar este chamado</span>
-                  <button onClick={handleClose} disabled={actionLoading || detail.ticket.status === 6}
-                    className="btn btn-default text-xs">
-                    Fechar chamado
-                  </button>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <select value={assignUserId} onChange={e => setAssignUserId(e.target.value)}
+                      className="input text-xs" style={{ flex: '1 1 220px' }}>
+                      <option value="">Selecione um técnico...</option>
+                      {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    <button onClick={handleAssign} disabled={!assignUserId || actionLoading}
+                      className="btn btn-primary text-xs" style={{ flexShrink: 0 }}>
+                      Atribuir técnico
+                    </button>
+                  </div>
                 </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-                  <select value={assignUserId} onChange={e => setAssignUserId(e.target.value)}
-                    className="input text-xs" style={{ flex: '1 1 220px' }}>
-                    <option value="">Selecione um técnico...</option>
-                    {technicians.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
-                  <button onClick={handleAssign} disabled={!assignUserId || actionLoading}
-                    className="btn btn-primary text-xs" style={{ flexShrink: 0 }}>
-                    Atribuir técnico
-                  </button>
-                </div>
-              </div>
+              </TicketSection>
             )}
           </div>
         )}
