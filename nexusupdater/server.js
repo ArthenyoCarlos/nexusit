@@ -136,8 +136,13 @@ async function runUpdate() {
   // um merge local antigo que nunca foi enviado de volta pro origin).
   await execAsync('git fetch origin main --quiet', opts)
   await execAsync('git reset --hard origin/main', opts)
-  await execAsync(`${compose} build`, opts)
-  await execAsync(`${compose} up -d`, opts)
+  await execAsync(`${compose} build nexusit-backend nexusit-frontend`, opts)
+  // Nao recriar o proprio nexusupdater no meio da execucao: quando o Compose
+  // substitui este container, o processo Node que esta coordenando o update
+  // morre e a pilha pode ficar parada em "Created". Atualizacoes do updater
+  // entram no proximo ciclo/reinicio planejado; backend e frontend sao o alvo
+  // seguro do fluxo disparado pela tela.
+  await execAsync(`${compose} up -d nexusit-backend nexusit-frontend`, opts)
 
   const healthy = await waitForBackendHealthy()
   if (!healthy) {
