@@ -541,6 +541,7 @@ export default function UnifiApMonitoringPage() {
   const [selectedApName, setSelectedApName] = useState(null)
   const [apMetrics, setApMetrics] = useState([])
   const [apMetricsHours, setApMetricsHours] = useState(24)
+  const [apSearch, setApSearch] = useState('')
 
   const fetchData = useCallback(async () => {
     try {
@@ -577,6 +578,11 @@ export default function UnifiApMonitoringPage() {
   }
 
   const aps = useMemo(() => enrichAps(payload?.aps ?? []), [payload])
+  const filteredAps = useMemo(() => {
+    const q = apSearch.trim().toLowerCase()
+    if (!q) return aps
+    return aps.filter(ap => ap.name?.toLowerCase().includes(q) || ap.ip?.toLowerCase().includes(q) || ap.mac?.toLowerCase().includes(q))
+  }, [aps, apSearch])
   const summary = useMemo(() => buildApSummary(aps), [aps])
   const kpiDetails = useMemo(() => ({
     total: explainKpiSummary('total', aps, summary),
@@ -694,13 +700,21 @@ export default function UnifiApMonitoringPage() {
           </section>
         )}
 
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+          <p className="label-caps" style={{ margin: 0 }}>APs {!loading && <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>({filteredAps.length}{apSearch.trim() ? ` de ${aps.length}` : ''})</span>}</p>
+          <input type="text" value={apSearch} onChange={e => setApSearch(e.target.value)}
+            placeholder="Buscar AP por nome, IP ou MAC..." className="input" style={{ width: 240, height: 32 }} />
+        </div>
+
         {loading && aps.length === 0 ? (
           <div className="card empty-state"><h3>Carregando APs...</h3></div>
         ) : aps.length === 0 ? (
           <div className="card empty-state"><h3>Nenhum AP no snapshot</h3><p>Verifique o job Hermes UniFi AP loss/latency/uptime watchdog.</p></div>
+        ) : filteredAps.length === 0 ? (
+          <div className="card empty-state"><h3>Nenhum AP corresponde à busca</h3><p>Tente outro nome, IP ou MAC.</p></div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
-            {aps.map(ap => <ApCard key={ap.name} ap={ap} selected={ap.name === selectedApName} onSelect={() => selectAp(ap.name)} />)}
+            {filteredAps.map(ap => <ApCard key={ap.name} ap={ap} selected={ap.name === selectedApName} onSelect={() => selectAp(ap.name)} />)}
           </div>
         )}
       </div>

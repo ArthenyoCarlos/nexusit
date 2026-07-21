@@ -37,6 +37,7 @@ export default function MonitoringPage() {
   const [metricsHours, setMetricsHours] = useState(2)
   const [loading, setLoading]       = useState(true)
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [hostSearch, setHostSearch] = useState('')
 
   const fetchData = useCallback(async () => {
     try {
@@ -71,6 +72,12 @@ export default function MonitoringPage() {
 
   const online = hosts.filter(h => h.available).length
   const offline = hosts.length - online
+  const filteredHosts = hostSearch.trim()
+    ? hosts.filter(h => {
+        const q = hostSearch.trim().toLowerCase()
+        return h.name?.toLowerCase().includes(q) || h.ip?.toLowerCase().includes(q)
+      })
+    : hosts
   const cpuData = (metrics?.cpuHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), cpu: +p.value.toFixed(1) }))
   const memData = (metrics?.memoryHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), mem: +p.value.toFixed(1) }))
   const diskData = (metrics?.diskHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), disk: +p.value.toFixed(1) }))
@@ -125,7 +132,11 @@ export default function MonitoringPage() {
 
         {/* Hosts grid */}
         <section style={{ marginBottom: 24 }}>
-          <p className="label-caps" style={{ marginBottom: 12 }}>Hosts</p>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+            <p className="label-caps" style={{ margin: 0 }}>Hosts {!loading && <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>({filteredHosts.length}{hostSearch.trim() ? ` de ${hosts.length}` : ''})</span>}</p>
+            <input type="text" value={hostSearch} onChange={e => setHostSearch(e.target.value)}
+              placeholder="Buscar host por nome ou IP..." className="input" style={{ width: 240, height: 32 }} />
+          </div>
           {loading && hosts.length === 0 ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px,1fr))', gap: 10 }}>
               {[...Array(8)].map((_, i) => (
@@ -137,9 +148,14 @@ export default function MonitoringPage() {
               <h3>Nenhum host encontrado</h3>
               <p>Verifique a configuração do Zabbix.</p>
             </div>
+          ) : filteredHosts.length === 0 ? (
+            <div className="card empty-state">
+              <h3>Nenhum host corresponde à busca</h3>
+              <p>Tente outro nome ou IP.</p>
+            </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px,1fr))', gap: 10 }}>
-              {hosts.map(host => (
+              {filteredHosts.map(host => (
                 <button key={host.id} onClick={async () => {
                   setChartHostId(host.id)
                   const res = await getHostMetrics(host.id, metricsHours)
