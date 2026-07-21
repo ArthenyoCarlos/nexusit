@@ -218,7 +218,7 @@ export default function MonitoringPage() {
                 valueLabel={metrics.memoryUsedPercent != null ? `${metrics.memoryUsedPercent.toFixed(1)}%` : null}
                 data={memData} series={[{ dataKey: 'mem', color: 'var(--purple)', label: 'Memória' }]}
                 yDomain={[0, 100]} yFormatter={v => `${v}%`} />
-              <MetricChartCard title="Disco (C:)" color="var(--cyan)"
+              <MetricChartCard title="Disco principal" color="var(--cyan)"
                 valueLabel={metrics.diskUsedPercent != null ? `${metrics.diskUsedPercent.toFixed(1)}%` : null}
                 data={diskData} series={[{ dataKey: 'disk', color: 'var(--cyan)', label: 'Disco' }]}
                 yDomain={[0, 100]} yFormatter={v => `${v}%`} />

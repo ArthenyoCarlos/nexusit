@@ -171,20 +171,22 @@ public class ZabbixService {
             Long uptimeSeconds = null;
 
             Map<String, Object> itemParams = new LinkedHashMap<>();
-            itemParams.put("output", List.of("itemid", "key_", "lastvalue"));
+            itemParams.put("output", List.of("itemid", "key_", "lastvalue", "value_type"));
             itemParams.put("hostids", List.of(hostId));
             itemParams.put("monitored", true);
             itemParams.put("filter", Map.of("key_", List.of(
                     "system.cpu.util", "system.cpu.util[,idle]",
-                    "vm.memory.size[pavailable]", "vm.memory.size[pused]",
-                    "system.uptime", "vfs.fs.size[C:,pused]"
+                    "vm.memory.size[pavailable]", "vm.memory.size[pused]", "vm.memory.util",
+                    "system.uptime"
             )));
 
-            List<Map<String, Object>> items = client.call("item.get", itemParams);
+            List<Map<String, Object>> items = new ArrayList<>(client.call("item.get", itemParams));
+            items.addAll(findFilesystemPercentItems(hostId));
 
             String cpuItemId = null;
             String memItemId = null;
             String diskItemId = null;
+            Map<String, Object> bestDiskItem = null;
             for (Map<String, Object> item : items) {
                 String key = str(item, "key_");
                 String val = str(item, "lastvalue");
@@ -200,15 +202,19 @@ public class ZabbixService {
                 } else if (key.equals("vm.memory.size[pavailable]")) {
                     memPercent = 100.0 - dval;
                     memItemId = str(item, "itemid");
-                } else if (key.equals("vm.memory.size[pused]")) {
+                } else if (key.equals("vm.memory.size[pused]") || key.equals("vm.memory.util")) {
                     memPercent = dval;
                     memItemId = str(item, "itemid");
                 } else if (key.equals("system.uptime")) {
                     uptimeSeconds = (long) dval;
-                } else if (key.equals("vfs.fs.size[C:,pused]")) {
-                    diskPercent = dval;
-                    diskItemId = str(item, "itemid");
+                } else if (isFilesystemUsedPercentKey(key) && preferDiskItem(item, bestDiskItem)) {
+                    bestDiskItem = item;
                 }
+            }
+
+            if (bestDiskItem != null) {
+                diskPercent = parseDouble(str(bestDiskItem, "lastvalue"));
+                diskItemId = str(bestDiskItem, "itemid");
             }
 
             NetworkItems net = findNetworkItems(hostId);
@@ -226,6 +232,59 @@ public class ZabbixService {
                     cpuHistory, memoryHistory, diskHistory, netInHistory, netOutHistory,
                     temp.currentCelsius(), temperatureHistory);
         }, new ZabbixMetrics(hostId, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), null, List.of()));
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> findFilesystemPercentItems(String hostId) {
+        try {
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("output", List.of("itemid", "key_", "lastvalue", "value_type"));
+            params.put("hostids", List.of(hostId));
+            params.put("monitored", true);
+            // Zabbix wildcard matching does not reliably match patterns with brackets
+            // such as "*[,pused]". Search broadly and filter exact filesystem used-%
+            // keys in Java so both vfs.fs.size[...] and vfs.fs.dependent.size[...]
+            // are accepted.
+            params.put("search", Map.of("key_", "vfs.fs."));
+            List<Map<String, Object>> items = client.call("item.get", params);
+            return items.stream()
+                    .filter(item -> isFilesystemUsedPercentKey(str(item, "key_")))
+                    .toList();
+        } catch (Exception e) {
+            log.debug("Falha ao localizar itens de disco do host {}: {}", hostId, e.getMessage());
+            return List.of();
+        }
+    }
+
+    private boolean isFilesystemUsedPercentKey(String key) {
+        return (key.startsWith("vfs.fs.size[") || key.startsWith("vfs.fs.dependent.size["))
+                && key.endsWith(",pused]");
+    }
+
+    private boolean preferDiskItem(Map<String, Object> candidate, Map<String, Object> current) {
+        if (current == null) return true;
+        String candFs = filesystemFromKey(str(candidate, "key_"));
+        String currFs = filesystemFromKey(str(current, "key_"));
+        int candScore = filesystemPriority(candFs);
+        int currScore = filesystemPriority(currFs);
+        if (candScore != currScore) return candScore > currScore;
+        return parseDouble(str(candidate, "lastvalue")) > parseDouble(str(current, "lastvalue"));
+    }
+
+    private int filesystemPriority(String fs) {
+        if (fs == null) return 0;
+        if (fs.equalsIgnoreCase("C:")) return 100;
+        if (fs.equals("/")) return 90;
+        if (fs.equalsIgnoreCase("D:")) return 80;
+        if (fs.equals("/boot")) return 10;
+        return 50;
+    }
+
+    private String filesystemFromKey(String key) {
+        int start = key.indexOf('[');
+        int comma = key.lastIndexOf(",pused]");
+        if (start < 0 || comma <= start) return null;
+        return key.substring(start + 1, comma);
     }
 
     private record NetworkItems(String inItemId, String outItemId, int valueType) {
