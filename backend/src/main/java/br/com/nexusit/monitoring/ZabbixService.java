@@ -159,6 +159,7 @@ public class ZabbixService {
         return safeCall(() -> {
             Double cpuPercent = null;
             Double memPercent = null;
+            Double diskPercent = null;
             Long uptimeSeconds = null;
 
             Map<String, Object> itemParams = new LinkedHashMap<>();
@@ -168,13 +169,14 @@ public class ZabbixService {
             itemParams.put("filter", Map.of("key_", List.of(
                     "system.cpu.util", "system.cpu.util[,idle]",
                     "vm.memory.size[pavailable]", "vm.memory.size[pused]",
-                    "system.uptime"
+                    "system.uptime", "vfs.fs.size[C:,pused]"
             )));
 
             List<Map<String, Object>> items = client.call("item.get", itemParams);
 
             String cpuItemId = null;
             String memItemId = null;
+            String diskItemId = null;
             for (Map<String, Object> item : items) {
                 String key = str(item, "key_");
                 String val = str(item, "lastvalue");
@@ -195,31 +197,102 @@ public class ZabbixService {
                     memItemId = str(item, "itemid");
                 } else if (key.equals("system.uptime")) {
                     uptimeSeconds = (long) dval;
+                } else if (key.equals("vfs.fs.size[C:,pused]")) {
+                    diskPercent = dval;
+                    diskItemId = str(item, "itemid");
                 }
             }
 
-            long timeFrom = System.currentTimeMillis() / 1000 - (long) hours * 3600;
-            List<ZabbixMetrics.CpuDataPoint> cpuHistory = cpuItemId != null ? fetchItemHistory(cpuItemId, timeFrom) : List.of();
-            List<ZabbixMetrics.CpuDataPoint> memoryHistory = memItemId != null ? fetchItemHistory(memItemId, timeFrom) : List.of();
+            NetworkItems net = findNetworkItems(hostId);
 
-            return new ZabbixMetrics(hostId, cpuPercent, memPercent, uptimeSeconds, cpuHistory, memoryHistory);
-        }, new ZabbixMetrics(hostId, null, null, null, List.of(), List.of()));
+            long timeFrom = System.currentTimeMillis() / 1000 - (long) hours * 3600;
+            List<ZabbixMetrics.MetricPoint> cpuHistory = cpuItemId != null ? fetchItemHistory(cpuItemId, 0, timeFrom) : List.of();
+            List<ZabbixMetrics.MetricPoint> memoryHistory = memItemId != null ? fetchItemHistory(memItemId, 0, timeFrom) : List.of();
+            List<ZabbixMetrics.MetricPoint> diskHistory = diskItemId != null ? fetchItemHistory(diskItemId, 0, timeFrom) : List.of();
+            List<ZabbixMetrics.MetricPoint> netInHistory = net.inItemId() != null ? fetchItemHistory(net.inItemId(), net.valueType(), timeFrom) : List.of();
+            List<ZabbixMetrics.MetricPoint> netOutHistory = net.outItemId() != null ? fetchItemHistory(net.outItemId(), net.valueType(), timeFrom) : List.of();
+
+            return new ZabbixMetrics(hostId, cpuPercent, memPercent, uptimeSeconds, diskPercent,
+                    cpuHistory, memoryHistory, diskHistory, netInHistory, netOutHistory);
+        }, new ZabbixMetrics(hostId, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of()));
+    }
+
+    private record NetworkItems(String inItemId, String outItemId, int valueType) {
+        static final NetworkItems NONE = new NetworkItems(null, null, 3);
+    }
+
+    /**
+     * Os itens de interface de rede sao criados por descoberta (LLD) do Zabbix, entao a
+     * key exata varia por host/interface (ex. net.if.in["{GUID-DA-INTERFACE}"]) — nao dá
+     * pra filtrar por key exata como os outros itens. Busca por prefixo, agrupa in/out pelo
+     * trecho entre colchetes (mesma interface) e usa a interface com maior tráfego total
+     * combinado, assumindo que é o link físico ativo (não verificado contra Zabbix real —
+     * também não confirmado se o item já reporta bytes/s ou um contador bruto acumulado).
+     */
+    @SuppressWarnings("unchecked")
+    private NetworkItems findNetworkItems(String hostId) {
+        try {
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("output", List.of("itemid", "key_", "lastvalue", "value_type"));
+            params.put("hostids", List.of(hostId));
+            params.put("monitored", true);
+            params.put("search", Map.of("key_", "net.if."));
+            params.put("searchWildcardsEnabled", true);
+
+            List<Map<String, Object>> items = client.call("item.get", params);
+            Map<String, Map<String, Object>> inByInterface = new HashMap<>();
+            Map<String, Map<String, Object>> outByInterface = new HashMap<>();
+            for (Map<String, Object> item : items) {
+                String key = str(item, "key_");
+                String iface = interfaceFromKey(key);
+                if (iface == null) continue;
+                if (key.startsWith("net.if.in[")) inByInterface.put(iface, item);
+                else if (key.startsWith("net.if.out[")) outByInterface.put(iface, item);
+            }
+
+            String bestInterface = null;
+            double bestTotal = -1;
+            for (Map.Entry<String, Map<String, Object>> entry : inByInterface.entrySet()) {
+                Map<String, Object> outItem = outByInterface.get(entry.getKey());
+                if (outItem == null) continue;
+                double total = parseDouble(str(entry.getValue(), "lastvalue")) + parseDouble(str(outItem, "lastvalue"));
+                if (total > bestTotal) {
+                    bestTotal = total;
+                    bestInterface = entry.getKey();
+                }
+            }
+            if (bestInterface == null) return NetworkItems.NONE;
+
+            Map<String, Object> inItem = inByInterface.get(bestInterface);
+            Map<String, Object> outItem = outByInterface.get(bestInterface);
+            return new NetworkItems(str(inItem, "itemid"), str(outItem, "itemid"), intVal(inItem, "value_type"));
+        } catch (Exception e) {
+            log.debug("Falha ao localizar itens de rede do host {}: {}", hostId, e.getMessage());
+            return NetworkItems.NONE;
+        }
+    }
+
+    private String interfaceFromKey(String key) {
+        int start = key.indexOf('[');
+        int end = key.lastIndexOf(']');
+        if (start < 0 || end < 0 || end <= start) return null;
+        return key.substring(start + 1, end);
     }
 
     @SuppressWarnings("unchecked")
-    private List<ZabbixMetrics.CpuDataPoint> fetchItemHistory(String itemId, long timeFrom) {
+    private List<ZabbixMetrics.MetricPoint> fetchItemHistory(String itemId, int historyType, long timeFrom) {
         try {
             Map<String, Object> histParams = new LinkedHashMap<>();
             histParams.put("itemids", List.of(itemId));
-            histParams.put("history", 0); // float
+            histParams.put("history", historyType);
             histParams.put("time_from", timeFrom);
             histParams.put("sortfield", "clock");
             histParams.put("sortorder", "DESC");
             histParams.put("limit", 1000);
 
             List<Map<String, Object>> hist = client.call("history.get", histParams);
-            List<ZabbixMetrics.CpuDataPoint> points = hist.stream()
-                    .map(h -> new ZabbixMetrics.CpuDataPoint(longVal(h, "clock"), parseDouble(str(h, "value"))))
+            List<ZabbixMetrics.MetricPoint> points = hist.stream()
+                    .map(h -> new ZabbixMetrics.MetricPoint(longVal(h, "clock"), parseDouble(str(h, "value"))))
                     .toList();
             return points.reversed();
         } catch (Exception e) {

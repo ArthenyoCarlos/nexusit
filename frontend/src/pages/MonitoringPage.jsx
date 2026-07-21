@@ -14,6 +14,13 @@ function formatTime(ts, hours) {
     ? new Date(ts * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
     : new Date(ts * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
+function formatBytes(v) {
+  if (v == null) return '—'
+  if (v >= 1e9) return (v / 1e9).toFixed(1) + ' GB'
+  if (v >= 1e6) return (v / 1e6).toFixed(1) + ' MB'
+  if (v >= 1e3) return (v / 1e3).toFixed(1) + ' KB'
+  return Math.round(v) + ' B'
+}
 
 const PERIODS = [
   { label: '2h', hours: 2 },
@@ -65,6 +72,15 @@ export default function MonitoringPage() {
   const offline = hosts.length - online
   const cpuData = (metrics?.cpuHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), cpu: +p.value.toFixed(1) }))
   const memData = (metrics?.memoryHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), mem: +p.value.toFixed(1) }))
+  const diskData = (metrics?.diskHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), disk: +p.value.toFixed(1) }))
+  const netByTime = new Map()
+  ;(metrics?.networkInHistory ?? []).forEach(p => {
+    netByTime.set(p.timestamp, { ...(netByTime.get(p.timestamp) || {}), ts: p.timestamp, time: formatTime(p.timestamp, metricsHours), in: p.value })
+  })
+  ;(metrics?.networkOutHistory ?? []).forEach(p => {
+    netByTime.set(p.timestamp, { ...(netByTime.get(p.timestamp) || {}), ts: p.timestamp, time: formatTime(p.timestamp, metricsHours), out: p.value })
+  })
+  const netData = Array.from(netByTime.values()).sort((a, b) => a.ts - b.ts)
   const periodLabel = metricsHours <= 2 ? 'Últimas 2 horas' : metricsHours <= 24 ? 'Últimas 24 horas' : 'Últimos 7 dias'
 
   return (
@@ -184,6 +200,12 @@ export default function MonitoringPage() {
                     <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Memória</p>
                   </div>
                 )}
+                {metrics.diskUsedPercent != null && (
+                  <div style={{ textAlign: 'center' }}>
+                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>{metrics.diskUsedPercent.toFixed(1)}%</p>
+                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Disco</p>
+                  </div>
+                )}
                 {metrics.uptimeSeconds != null && (
                   <div style={{ textAlign: 'center' }}>
                     <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>{formatUptime(metrics.uptimeSeconds)}</p>
@@ -222,6 +244,46 @@ export default function MonitoringPage() {
                     formatter={v => [`${v}%`, 'Memória']}
                   />
                   <Line type="monotone" dataKey="mem" stroke="var(--purple)" dot={false} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
+            )}
+
+            <p className="label-caps" style={{ margin: '20px 0 8px' }}>Disco (C:)</p>
+            {diskData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={diskData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
+                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} unit="%" />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
+                    formatter={v => [`${v}%`, 'Disco']}
+                  />
+                  <Line type="monotone" dataKey="disk" stroke="var(--cyan)" dot={false} strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
+            )}
+
+            <p className="label-caps" style={{ margin: '20px 0 4px' }}>Rede</p>
+            <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8 }}>
+              Valor bruto reportado pelo Zabbix — pode ser taxa (bytes/s) ou contador acumulado, dependendo da configuração do item nesse host.
+            </p>
+            {netData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={netData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
+                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
+                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} tickFormatter={formatBytes} width={56} />
+                  <Tooltip
+                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
+                    formatter={(v, name) => [formatBytes(v), name === 'in' ? 'Download' : 'Upload']}
+                  />
+                  <Line type="monotone" dataKey="in" stroke="var(--green)" dot={false} strokeWidth={2} name="in" connectNulls />
+                  <Line type="monotone" dataKey="out" stroke="var(--orange)" dot={false} strokeWidth={2} name="out" connectNulls />
                 </LineChart>
               </ResponsiveContainer>
             ) : (
