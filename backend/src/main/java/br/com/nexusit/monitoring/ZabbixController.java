@@ -19,6 +19,7 @@ public class ZabbixController {
             System.getenv().getOrDefault("UNIFI_AP_SNAPSHOT_PATH", "/home/galdino/.hermes/state/unifi_ap_monitor_snapshot.json"));
 
     private final ZabbixService service;
+    private final UnifiApHistoryService unifiApHistoryService;
     private final ObjectMapper objectMapper;
 
     @GetMapping("/hosts")
@@ -56,5 +57,10 @@ public class ZabbixController {
             return root;
         }
         return objectMapper.readTree(UNIFI_AP_SNAPSHOT.toFile());
+    }
+
+    @GetMapping("/unifi-aps/history")
+    public List<UnifiApMetricPoint> getUnifiApHistory(@RequestParam String apName, @RequestParam(defaultValue = "24") int hours) {
+        return unifiApHistoryService.getHistory(apName, hours);
     }
 }

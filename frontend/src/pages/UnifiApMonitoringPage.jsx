@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
-import { getUnifiApPanel } from '../services/monitoring'
+import MetricChartCard from '../components/MetricChartCard'
+import { getUnifiApPanel, getUnifiApHistory } from '../services/monitoring'
 import { analyzeMonitoredClients, buildApSummary, enrichAps, explainApLast24h, explainKpiSummary, explainUnifiEvent, formatDuration, formatMs, formatRateKbps, normalizeMac, statusLabel } from '../utils/unifiApPanel'
 
 const statusStyle = {
@@ -9,9 +10,21 @@ const statusStyle = {
   down: { color: 'var(--red)', bg: 'var(--red-bg)', border: 'rgba(239,68,68,.35)' },
 }
 
+const AP_METRIC_PERIODS = [
+  { label: '2h', hours: 2 },
+  { label: '24h', hours: 24 },
+  { label: '7d', hours: 168 },
+]
+
 function formatClock(ts) {
   if (!ts) return '—'
   return new Date(ts * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+function formatChartTime(ts, hours) {
+  return hours > 2
+    ? new Date(ts * 1000).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
+    : new Date(ts * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
 }
 
 function Kpi({ label, value, tone = 'healthy', hint, detail }) {
@@ -445,11 +458,11 @@ function AuditEventsSection({ events = [] }) {
   )
 }
 
-function ApCard({ ap }) {
+function ApCard({ ap, selected, onSelect }) {
   const s = statusStyle[ap.status] ?? statusStyle.healthy
   const portKnown = ap.switchPort && ap.switchPort !== 'unknown'
   return (
-    <div className="card" style={{ padding: 16, border: `1px solid ${s.border}`, boxShadow: ap.status === 'down' ? '0 0 0 1px rgba(239,68,68,.15)' : undefined }}>
+    <div className="card" style={{ padding: 16, border: selected ? '2px solid var(--accent)' : `1px solid ${s.border}`, boxShadow: ap.status === 'down' ? '0 0 0 1px rgba(239,68,68,.15)' : undefined }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
@@ -458,7 +471,14 @@ function ApCard({ ap }) {
           </div>
           <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>{ap.ip} · {ap.mac || 'MAC pendente'}</p>
         </div>
-        <span className="badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}`, flexShrink: 0 }}>{statusLabel(ap.status)}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
+          <span className="badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>{statusLabel(ap.status)}</span>
+          {onSelect && (
+            <button type="button" onClick={onSelect} className="btn btn-default btn-sm" style={{ fontSize: 11 }}>
+              {selected ? '✓ Histórico' : '📊 Histórico'}
+            </button>
+          )}
+        </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 10, marginTop: 16 }}>
@@ -518,6 +538,9 @@ export default function UnifiApMonitoringPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState(null)
+  const [selectedApName, setSelectedApName] = useState(null)
+  const [apMetrics, setApMetrics] = useState([])
+  const [apMetricsHours, setApMetricsHours] = useState(24)
 
   const fetchData = useCallback(async () => {
     try {
@@ -538,6 +561,21 @@ export default function UnifiApMonitoringPage() {
     return () => clearInterval(timer)
   }, [fetchData])
 
+  const selectAp = useCallback(async (apName, hours = apMetricsHours) => {
+    setSelectedApName(apName)
+    try {
+      const res = await getUnifiApHistory(apName, hours)
+      setApMetrics(res.data)
+    } catch {
+      setApMetrics([])
+    }
+  }, [apMetricsHours])
+
+  const handleApPeriod = (hours) => {
+    setApMetricsHours(hours)
+    if (selectedApName) selectAp(selectedApName, hours)
+  }
+
   const aps = useMemo(() => enrichAps(payload?.aps ?? []), [payload])
   const summary = useMemo(() => buildApSummary(aps), [aps])
   const kpiDetails = useMemo(() => ({
@@ -553,6 +591,11 @@ export default function UnifiApMonitoringPage() {
   }), [aps, summary])
   const generatedAt = payload?.generatedAt ? new Date(payload.generatedAt * 1000) : null
   const stale = generatedAt ? Date.now() - generatedAt.getTime() > 5 * 60_000 : false
+  const selectedAp = aps.find(ap => ap.name === selectedApName)
+  const lossData = apMetrics.filter(p => p.lossPct != null).map(p => ({ time: formatChartTime(p.timestamp, apMetricsHours), loss: +p.lossPct.toFixed(1) }))
+  const rttData = apMetrics.filter(p => p.rttMs != null).map(p => ({ time: formatChartTime(p.timestamp, apMetricsHours), rtt: +p.rttMs.toFixed(1) }))
+  const clientData = apMetrics.filter(p => p.clientCount != null).map(p => ({ time: formatChartTime(p.timestamp, apMetricsHours), clients: p.clientCount }))
+  const apPeriodLabel = apMetricsHours <= 2 ? 'Últimas 2 horas' : apMetricsHours <= 24 ? 'Últimas 24 horas' : 'Últimos 7 dias'
 
   return (
     <Layout>
@@ -613,13 +656,51 @@ export default function UnifiApMonitoringPage() {
           </section>
         )}
 
+        {selectedApName && (
+          <section style={{ marginBottom: 22 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
+              <div>
+                <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Métricas — {selectedAp?.name ?? selectedApName}</h2>
+                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>{apPeriodLabel} · histórico coletado pelo NexusIT a cada 5 minutos</p>
+              </div>
+              <div style={{ display: 'flex', gap: 4, background: 'var(--bg-muted)', padding: 3, borderRadius: 'var(--r-md)' }}>
+                {AP_METRIC_PERIODS.map(p => (
+                  <button key={p.hours} onClick={() => handleApPeriod(p.hours)}
+                    style={{
+                      padding: '4px 12px', fontSize: 12, fontWeight: 600, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                      background: apMetricsHours === p.hours ? 'var(--bg-surface)' : 'transparent',
+                      color: apMetricsHours === p.hours ? 'var(--accent-text)' : 'var(--text-tertiary)',
+                      boxShadow: apMetricsHours === p.hours ? 'var(--shadow-sm)' : 'none',
+                    }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
+              <MetricChartCard title="Perda de pacotes" color="var(--amber)"
+                valueLabel={selectedAp?.lastLossPct != null ? `${Number(selectedAp.lastLossPct).toFixed(0)}%` : null}
+                data={lossData} series={[{ dataKey: 'loss', color: 'var(--amber)', label: 'Perda' }]}
+                yDomain={[0, 100]} yFormatter={v => `${v}%`} />
+              <MetricChartCard title="Latência" color="var(--accent-text)"
+                valueLabel={selectedAp?.avgRttMs != null ? formatMs(selectedAp.avgRttMs) : null}
+                data={rttData} series={[{ dataKey: 'rtt', color: 'var(--accent)', label: 'Latência' }]}
+                yFormatter={v => `${v}ms`} />
+              <MetricChartCard title="Clientes conectados" color="var(--cyan)"
+                valueLabel={selectedAp?.currentClientCount != null ? `${selectedAp.currentClientCount}` : null}
+                data={clientData} series={[{ dataKey: 'clients', color: 'var(--cyan)', label: 'Clientes' }]}
+                yFormatter={v => `${v}`} />
+            </div>
+          </section>
+        )}
+
         {loading && aps.length === 0 ? (
           <div className="card empty-state"><h3>Carregando APs...</h3></div>
         ) : aps.length === 0 ? (
           <div className="card empty-state"><h3>Nenhum AP no snapshot</h3><p>Verifique o job Hermes UniFi AP loss/latency/uptime watchdog.</p></div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(360px, 1fr))', gap: 14 }}>
-            {aps.map(ap => <ApCard key={ap.name} ap={ap} />)}
+            {aps.map(ap => <ApCard key={ap.name} ap={ap} selected={ap.name === selectedApName} onSelect={() => selectAp(ap.name)} />)}
           </div>
         )}
       </div>
