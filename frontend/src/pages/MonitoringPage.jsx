@@ -28,6 +28,36 @@ const PERIODS = [
   { label: '7d', hours: 168 },
 ]
 
+function MetricChartCard({ title, valueLabel, color, data, series, yDomain, yFormatter, note }) {
+  return (
+    <div className="card" style={{ padding: 14 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: note ? 2 : 6 }}>
+        <p className="label-caps" style={{ margin: 0 }}>{title}</p>
+        {valueLabel && <span style={{ fontSize: 15, fontWeight: 700, fontFamily: 'var(--font-mono)', color }}>{valueLabel}</span>}
+      </div>
+      {note && <p style={{ fontSize: 10, color: 'var(--text-tertiary)', margin: '0 0 6px' }}>{note}</p>}
+      {data.length > 0 ? (
+        <ResponsiveContainer width="100%" height={100}>
+          <LineChart data={data} margin={{ top: 2, right: 2, left: -24, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
+            <XAxis dataKey="time" tick={{ fontSize: 9, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" minTickGap={24} />
+            <YAxis domain={yDomain} tick={{ fontSize: 9, fill: 'var(--text-tertiary)' }} tickFormatter={yFormatter} width={30} />
+            <Tooltip
+              contentStyle={{ fontSize: 11, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
+              formatter={(v, name) => [yFormatter ? yFormatter(v) : v, series.find(s => s.dataKey === name)?.label ?? name]}
+            />
+            {series.map(s => (
+              <Line key={s.dataKey} type="monotone" dataKey={s.dataKey} stroke={s.color} dot={false} strokeWidth={1.6} connectNulls />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      ) : (
+        <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', textAlign: 'center', padding: '24px 0' }}>Sem dados de histórico.</p>
+      )}
+    </div>
+  )
+}
+
 export default function MonitoringPage() {
   const [hosts, setHosts]           = useState([])
   const [problems, setProblems]     = useState([])
@@ -164,15 +194,17 @@ export default function MonitoringPage() {
           )}
         </section>
 
-        {/* CPU + Memória */}
+        {/* Métricas do host selecionado */}
         {metrics && (
-          <section className="card" style={{ padding: 20, marginBottom: 24 }}>
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
+          <section style={{ marginBottom: 24 }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
               <div>
                 <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>
                   {hosts.find(h => h.id === chartHostId)?.name ?? '—'}
                 </h2>
-                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>{periodLabel}</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>
+                  {periodLabel}{metrics.uptimeSeconds != null ? ` · ↑ ${formatUptime(metrics.uptimeSeconds)}` : ''}
+                </p>
               </div>
               <div style={{ display: 'flex', gap: 4, background: 'var(--bg-muted)', padding: 3, borderRadius: 'var(--r-md)' }}>
                 {PERIODS.map(p => (
@@ -187,108 +219,27 @@ export default function MonitoringPage() {
                   </button>
                 ))}
               </div>
-              <div style={{ display: 'flex', gap: 16, fontSize: 13 }}>
-                {metrics.cpuPercent != null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--accent-text)', fontFamily: 'var(--font-mono)' }}>{metrics.cpuPercent.toFixed(1)}%</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>CPU</p>
-                  </div>
-                )}
-                {metrics.memoryUsedPercent != null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--purple)', fontFamily: 'var(--font-mono)' }}>{metrics.memoryUsedPercent.toFixed(1)}%</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Memória</p>
-                  </div>
-                )}
-                {metrics.diskUsedPercent != null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--cyan)', fontFamily: 'var(--font-mono)' }}>{metrics.diskUsedPercent.toFixed(1)}%</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Disco</p>
-                  </div>
-                )}
-                {metrics.uptimeSeconds != null && (
-                  <div style={{ textAlign: 'center' }}>
-                    <p style={{ fontSize: 19, fontWeight: 700, color: 'var(--green)', fontFamily: 'var(--font-mono)' }}>{formatUptime(metrics.uptimeSeconds)}</p>
-                    <p style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>Uptime</p>
-                  </div>
-                )}
-              </div>
             </div>
-            <p className="label-caps" style={{ marginBottom: 8 }}>CPU</p>
-            {cpuData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={cpuData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
-                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} unit="%" />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
-                    formatter={v => [`${v}%`, 'CPU']}
-                  />
-                  <Line type="monotone" dataKey="cpu" stroke="var(--accent)" dot={false} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
-            )}
 
-            <p className="label-caps" style={{ margin: '20px 0 8px' }}>Memória</p>
-            {memData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={memData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
-                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} unit="%" />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
-                    formatter={v => [`${v}%`, 'Memória']}
-                  />
-                  <Line type="monotone" dataKey="mem" stroke="var(--purple)" dot={false} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
-            )}
-
-            <p className="label-caps" style={{ margin: '20px 0 8px' }}>Disco (C:)</p>
-            {diskData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={diskData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
-                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
-                  <YAxis domain={[0, 100]} tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} unit="%" />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
-                    formatter={v => [`${v}%`, 'Disco']}
-                  />
-                  <Line type="monotone" dataKey="disk" stroke="var(--cyan)" dot={false} strokeWidth={2} />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
-            )}
-
-            <p className="label-caps" style={{ margin: '20px 0 4px' }}>Rede</p>
-            <p style={{ fontSize: 11, color: 'var(--text-tertiary)', marginBottom: 8 }}>
-              Valor bruto reportado pelo Zabbix — pode ser taxa (bytes/s) ou contador acumulado, dependendo da configuração do item nesse host.
-            </p>
-            {netData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={200}>
-                <LineChart data={netData} margin={{ top: 5, right: 10, left: -20, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-muted)" />
-                  <XAxis dataKey="time" tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} interval="preserveStartEnd" />
-                  <YAxis tick={{ fontSize: 10, fill: 'var(--text-tertiary)' }} tickFormatter={formatBytes} width={56} />
-                  <Tooltip
-                    contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg-surface)', boxShadow: 'var(--shadow-md)', color: 'var(--text-primary)' }}
-                    formatter={(v, name) => [formatBytes(v), name === 'in' ? 'Download' : 'Upload']}
-                  />
-                  <Line type="monotone" dataKey="in" stroke="var(--green)" dot={false} strokeWidth={2} name="in" connectNulls />
-                  <Line type="monotone" dataKey="out" stroke="var(--orange)" dot={false} strokeWidth={2} name="out" connectNulls />
-                </LineChart>
-              </ResponsiveContainer>
-            ) : (
-              <p style={{ color: 'var(--text-tertiary)', fontSize: 13, textAlign: 'center', padding: '32px 0' }}>Sem dados de histórico disponíveis.</p>
-            )}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
+              <MetricChartCard title="CPU" color="var(--accent-text)"
+                valueLabel={metrics.cpuPercent != null ? `${metrics.cpuPercent.toFixed(1)}%` : null}
+                data={cpuData} series={[{ dataKey: 'cpu', color: 'var(--accent)', label: 'CPU' }]}
+                yDomain={[0, 100]} yFormatter={v => `${v}%`} />
+              <MetricChartCard title="Memória" color="var(--purple)"
+                valueLabel={metrics.memoryUsedPercent != null ? `${metrics.memoryUsedPercent.toFixed(1)}%` : null}
+                data={memData} series={[{ dataKey: 'mem', color: 'var(--purple)', label: 'Memória' }]}
+                yDomain={[0, 100]} yFormatter={v => `${v}%`} />
+              <MetricChartCard title="Disco (C:)" color="var(--cyan)"
+                valueLabel={metrics.diskUsedPercent != null ? `${metrics.diskUsedPercent.toFixed(1)}%` : null}
+                data={diskData} series={[{ dataKey: 'disk', color: 'var(--cyan)', label: 'Disco' }]}
+                yDomain={[0, 100]} yFormatter={v => `${v}%`} />
+              <MetricChartCard title="Rede (download/upload)"
+                note="Valor bruto do Zabbix — pode ser taxa ou contador acumulado."
+                data={netData}
+                series={[{ dataKey: 'in', color: 'var(--green)', label: 'Download' }, { dataKey: 'out', color: 'var(--orange)', label: 'Upload' }]}
+                yFormatter={formatBytes} />
+            </div>
           </section>
         )}
 
