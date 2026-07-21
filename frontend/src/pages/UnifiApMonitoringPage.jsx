@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Layout from '../components/Layout'
 import MetricChartCard from '../components/MetricChartCard'
 import { getUnifiApPanel, getUnifiApHistory } from '../services/monitoring'
@@ -542,6 +542,14 @@ export default function UnifiApMonitoringPage() {
   const [apMetrics, setApMetrics] = useState([])
   const [apMetricsHours, setApMetricsHours] = useState(24)
   const [apSearch, setApSearch] = useState('')
+  const metricsSectionRef = useRef(null)
+  const apListSectionRef = useRef(null)
+
+  const scrollToRef = useCallback(ref => {
+    window.setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 80)
+  }, [])
 
   const fetchData = useCallback(async () => {
     try {
@@ -562,19 +570,20 @@ export default function UnifiApMonitoringPage() {
     return () => clearInterval(timer)
   }, [fetchData])
 
-  const selectAp = useCallback(async (apName, hours = apMetricsHours) => {
+  const selectAp = useCallback(async (apName, hours = apMetricsHours, scrollToHistory = true) => {
     setSelectedApName(apName)
+    if (scrollToHistory) scrollToRef(metricsSectionRef)
     try {
       const res = await getUnifiApHistory(apName, hours)
       setApMetrics(res.data)
     } catch {
       setApMetrics([])
     }
-  }, [apMetricsHours])
+  }, [apMetricsHours, scrollToRef])
 
   const handleApPeriod = (hours) => {
     setApMetricsHours(hours)
-    if (selectedApName) selectAp(selectedApName, hours)
+    if (selectedApName) selectAp(selectedApName, hours, false)
   }
 
   const aps = useMemo(() => enrichAps(payload?.aps ?? []), [payload])
@@ -601,6 +610,12 @@ export default function UnifiApMonitoringPage() {
   const lossData = apMetrics.filter(p => p.lossPct != null).map(p => ({ time: formatChartTime(p.timestamp, apMetricsHours), loss: +p.lossPct.toFixed(1) }))
   const rttData = apMetrics.filter(p => p.rttMs != null).map(p => ({ time: formatChartTime(p.timestamp, apMetricsHours), rtt: +p.rttMs.toFixed(1) }))
   const clientData = apMetrics.filter(p => p.clientCount != null).map(p => ({ time: formatChartTime(p.timestamp, apMetricsHours), clients: p.clientCount }))
+  const avgClientCount = clientData.length > 0
+    ? clientData.reduce((sum, point) => sum + Number(point.clients ?? 0), 0) / clientData.length
+    : null
+  const clientChartData = avgClientCount == null
+    ? clientData
+    : clientData.map(point => ({ ...point, avgClients: Number(avgClientCount.toFixed(2)) }))
   const apPeriodLabel = apMetricsHours <= 2 ? 'Últimas 2 horas' : apMetricsHours <= 24 ? 'Últimas 24 horas' : 'Últimos 7 dias'
 
   return (
@@ -663,24 +678,29 @@ export default function UnifiApMonitoringPage() {
         )}
 
         {selectedApName && (
-          <section style={{ marginBottom: 22 }}>
+          <section ref={metricsSectionRef} style={{ marginBottom: 22, scrollMarginTop: 16 }}>
             <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12 }}>
               <div>
                 <h2 style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-primary)' }}>Métricas — {selectedAp?.name ?? selectedApName}</h2>
                 <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>{apPeriodLabel} · histórico coletado pelo NexusIT a cada 5 minutos</p>
               </div>
-              <div style={{ display: 'flex', gap: 4, background: 'var(--bg-muted)', padding: 3, borderRadius: 'var(--r-md)' }}>
-                {AP_METRIC_PERIODS.map(p => (
-                  <button key={p.hours} onClick={() => handleApPeriod(p.hours)}
-                    style={{
-                      padding: '4px 12px', fontSize: 12, fontWeight: 600, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
-                      background: apMetricsHours === p.hours ? 'var(--bg-surface)' : 'transparent',
-                      color: apMetricsHours === p.hours ? 'var(--accent-text)' : 'var(--text-tertiary)',
-                      boxShadow: apMetricsHours === p.hours ? 'var(--shadow-sm)' : 'none',
-                    }}>
-                    {p.label}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                <button type="button" onClick={() => scrollToRef(apListSectionRef)} className="btn btn-default btn-sm">
+                  ↓ Voltar para APs
+                </button>
+                <div style={{ display: 'flex', gap: 4, background: 'var(--bg-muted)', padding: 3, borderRadius: 'var(--r-md)' }}>
+                  {AP_METRIC_PERIODS.map(p => (
+                    <button key={p.hours} onClick={() => handleApPeriod(p.hours)}
+                      style={{
+                        padding: '4px 12px', fontSize: 12, fontWeight: 600, borderRadius: 'var(--r-sm)', border: 'none', cursor: 'pointer',
+                        background: apMetricsHours === p.hours ? 'var(--bg-surface)' : 'transparent',
+                        color: apMetricsHours === p.hours ? 'var(--accent-text)' : 'var(--text-tertiary)',
+                        boxShadow: apMetricsHours === p.hours ? 'var(--shadow-sm)' : 'none',
+                      }}>
+                      {p.label}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12 }}>
@@ -694,13 +714,18 @@ export default function UnifiApMonitoringPage() {
                 yFormatter={v => `${v}ms`} />
               <MetricChartCard title="Clientes conectados" color="var(--cyan)"
                 valueLabel={selectedAp?.currentClientCount != null ? `${selectedAp.currentClientCount}` : null}
-                data={clientData} series={[{ dataKey: 'clients', color: 'var(--cyan)', label: 'Clientes' }]}
+                note={avgClientCount != null ? `Média do período: ${avgClientCount.toFixed(1)} cliente(s)` : undefined}
+                data={clientChartData}
+                series={[
+                  { dataKey: 'clients', color: 'var(--cyan)', label: 'Clientes' },
+                  { dataKey: 'avgClients', color: 'var(--orange)', label: 'Média', strokeDasharray: '5 5', strokeWidth: 1.3 },
+                ]}
                 yFormatter={v => `${v}`} />
             </div>
           </section>
         )}
 
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap' }}>
+        <div ref={apListSectionRef} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 12, flexWrap: 'wrap', scrollMarginTop: 16 }}>
           <p className="label-caps" style={{ margin: 0 }}>APs {!loading && <span style={{ color: 'var(--text-tertiary)', fontWeight: 400 }}>({filteredAps.length}{apSearch.trim() ? ` de ${aps.length}` : ''})</span>}</p>
           <input type="text" value={apSearch} onChange={e => setApSearch(e.target.value)}
             placeholder="Buscar AP por nome, IP ou MAC..." className="input" style={{ width: 240, height: 32 }} />

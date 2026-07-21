@@ -19,7 +19,7 @@ export default function MetricChartCard({ title, valueLabel, color, data, series
               formatter={(v, name) => [yFormatter ? yFormatter(v) : v, series.find(s => s.dataKey === name)?.label ?? name]}
             />
             {series.map(s => (
-              <Line key={s.dataKey} type="monotone" dataKey={s.dataKey} stroke={s.color} dot={false} strokeWidth={1.6} connectNulls />
+              <Line key={s.dataKey} type="monotone" dataKey={s.dataKey} stroke={s.color} strokeDasharray={s.strokeDasharray} dot={false} strokeWidth={s.strokeWidth ?? 1.6} connectNulls />
             ))}
           </LineChart>
         </ResponsiveContainer>
