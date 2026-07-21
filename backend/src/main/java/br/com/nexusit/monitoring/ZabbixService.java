@@ -167,7 +167,14 @@ public class ZabbixService {
         return safeCall(() -> {
             Double cpuPercent = null;
             Double memPercent = null;
+            Long memoryTotalBytes = null;
+            Long memoryUsedBytes = null;
+            Long memoryAvailableBytes = null;
             Double diskPercent = null;
+            Long diskTotalBytes = null;
+            Long diskUsedBytes = null;
+            Long diskFreeBytes = null;
+            String diskFilesystem = null;
             Long uptimeSeconds = null;
 
             Map<String, Object> itemParams = new LinkedHashMap<>();
@@ -177,6 +184,7 @@ public class ZabbixService {
             itemParams.put("filter", Map.of("key_", List.of(
                     "system.cpu.util", "system.cpu.util[,idle]",
                     "vm.memory.size[pavailable]", "vm.memory.size[pused]", "vm.memory.util",
+                    "vm.memory.size[total]", "vm.memory.size[used]", "vm.memory.size[available]",
                     "system.uptime"
             )));
 
@@ -205,6 +213,12 @@ public class ZabbixService {
                 } else if (key.equals("vm.memory.size[pused]") || key.equals("vm.memory.util")) {
                     memPercent = dval;
                     memItemId = str(item, "itemid");
+                } else if (key.equals("vm.memory.size[total]")) {
+                    memoryTotalBytes = parseLongBytes(val);
+                } else if (key.equals("vm.memory.size[used]")) {
+                    memoryUsedBytes = parseLongBytes(val);
+                } else if (key.equals("vm.memory.size[available]")) {
+                    memoryAvailableBytes = parseLongBytes(val);
                 } else if (key.equals("system.uptime")) {
                     uptimeSeconds = (long) dval;
                 } else if (isFilesystemUsedPercentKey(key) && preferDiskItem(item, bestDiskItem)) {
@@ -215,6 +229,24 @@ public class ZabbixService {
             if (bestDiskItem != null) {
                 diskPercent = parseDouble(str(bestDiskItem, "lastvalue"));
                 diskItemId = str(bestDiskItem, "itemid");
+                diskFilesystem = filesystemFromKey(str(bestDiskItem, "key_"));
+                DiskSize diskSize = fetchDiskSize(hostId, str(bestDiskItem, "key_"), diskPercent);
+                diskTotalBytes = diskSize.totalBytes();
+                diskFreeBytes = diskSize.freeBytes();
+                diskUsedBytes = diskSize.usedBytes();
+            }
+
+            if (memoryTotalBytes != null) {
+                if (memoryUsedBytes == null && memoryAvailableBytes != null) {
+                    memoryUsedBytes = Math.max(0, memoryTotalBytes - memoryAvailableBytes);
+                }
+                if (memoryAvailableBytes == null && memoryUsedBytes != null) {
+                    memoryAvailableBytes = Math.max(0, memoryTotalBytes - memoryUsedBytes);
+                }
+                if (memoryUsedBytes == null && memPercent != null) {
+                    memoryUsedBytes = Math.round(memoryTotalBytes * (memPercent / 100.0));
+                    memoryAvailableBytes = Math.max(0, memoryTotalBytes - memoryUsedBytes);
+                }
             }
 
             NetworkItems net = findNetworkItems(hostId);
@@ -228,10 +260,54 @@ public class ZabbixService {
             List<ZabbixMetrics.MetricPoint> netOutHistory = net.outItemId() != null ? fetchItemHistory(net.outItemId(), net.valueType(), timeFrom) : List.of();
             List<ZabbixMetrics.MetricPoint> temperatureHistory = temp.itemId() != null ? fetchTemperatureHistory(temp.itemId(), timeFrom) : List.of();
 
-            return new ZabbixMetrics(hostId, cpuPercent, memPercent, uptimeSeconds, diskPercent,
+            return new ZabbixMetrics(hostId, cpuPercent, memPercent,
+                    memoryTotalBytes, memoryUsedBytes, memoryAvailableBytes,
+                    uptimeSeconds, diskPercent, diskTotalBytes, diskUsedBytes, diskFreeBytes, diskFilesystem,
                     cpuHistory, memoryHistory, diskHistory, netInHistory, netOutHistory,
                     temp.currentCelsius(), temperatureHistory);
-        }, new ZabbixMetrics(hostId, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), null, List.of()));
+        }, new ZabbixMetrics(hostId, null, null, null, null, null, null, null, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), null, List.of()));
+    }
+
+    private record DiskSize(Long totalBytes, Long usedBytes, Long freeBytes) {
+        static final DiskSize EMPTY = new DiskSize(null, null, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private DiskSize fetchDiskSize(String hostId, String usedPercentKey, Double usedPercent) {
+        String fs = filesystemFromKey(usedPercentKey);
+        if (fs == null) return DiskSize.EMPTY;
+        String prefix = usedPercentKey.startsWith("vfs.fs.dependent.size[") ? "vfs.fs.dependent.size" : "vfs.fs.size";
+        String totalKey = prefix + "[" + fs + ",total]";
+        String freeKey = prefix + "[" + fs + ",free]";
+        String usedKey = prefix + "[" + fs + ",used]";
+        try {
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("output", List.of("itemid", "key_", "lastvalue"));
+            params.put("hostids", List.of(hostId));
+            params.put("monitored", true);
+            params.put("filter", Map.of("key_", List.of(totalKey, freeKey, usedKey)));
+            List<Map<String, Object>> items = client.call("item.get", params);
+            Long total = null;
+            Long free = null;
+            Long used = null;
+            for (Map<String, Object> item : items) {
+                String key = str(item, "key_");
+                if (key.equals(totalKey)) total = parseLongBytes(str(item, "lastvalue"));
+                else if (key.equals(freeKey)) free = parseLongBytes(str(item, "lastvalue"));
+                else if (key.equals(usedKey)) used = parseLongBytes(str(item, "lastvalue"));
+            }
+            if (total == null && free != null && usedPercent != null && usedPercent < 100.0) {
+                total = Math.round(free / (1.0 - (usedPercent / 100.0)));
+            }
+            if (used == null && total != null && free != null) used = Math.max(0, total - free);
+            if (free == null && total != null && used != null) free = Math.max(0, total - used);
+            if (used == null && total != null && usedPercent != null) used = Math.round(total * (usedPercent / 100.0));
+            if (free == null && total != null && used != null) free = Math.max(0, total - used);
+            return new DiskSize(total, used, free);
+        } catch (Exception e) {
+            log.debug("Falha ao localizar totais de disco do host {} fs {}: {}", hostId, fs, e.getMessage());
+            return DiskSize.EMPTY;
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -574,5 +650,11 @@ public class ZabbixService {
     private double parseDouble(String val) {
         try { return Double.parseDouble(val); }
         catch (NumberFormatException e) { return 0.0; }
+    }
+
+    private Long parseLongBytes(String val) {
+        if (val == null || val.isBlank()) return null;
+        try { return Math.round(Double.parseDouble(val)); }
+        catch (NumberFormatException e) { return null; }
     }
 }

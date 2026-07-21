@@ -21,6 +21,13 @@ function formatBytes(v) {
   if (v >= 1e3) return (v / 1e3).toFixed(1) + ' KB'
   return Math.round(v) + ' B'
 }
+function formatCapacityDetails(used, total, free) {
+  const parts = []
+  if (used != null) parts.push(`Usado: ${formatBytes(used)}`)
+  if (total != null) parts.push(`Total: ${formatBytes(total)}`)
+  if (free != null) parts.push(`Livre: ${formatBytes(free)}`)
+  return parts.length ? parts.join(' · ') : undefined
+}
 
 const PERIODS = [
   { label: '2h', hours: 2 },
@@ -216,10 +223,12 @@ export default function MonitoringPage() {
                 yDomain={[0, 100]} yFormatter={v => `${v}%`} />
               <MetricChartCard title="Memória" color="var(--purple)"
                 valueLabel={metrics.memoryUsedPercent != null ? `${metrics.memoryUsedPercent.toFixed(1)}%` : null}
+                note={formatCapacityDetails(metrics.memoryUsedBytes, metrics.memoryTotalBytes, metrics.memoryAvailableBytes)}
                 data={memData} series={[{ dataKey: 'mem', color: 'var(--purple)', label: 'Memória' }]}
                 yDomain={[0, 100]} yFormatter={v => `${v}%`} />
-              <MetricChartCard title="Disco principal" color="var(--cyan)"
+              <MetricChartCard title={metrics.diskFilesystem ? `Disco principal (${metrics.diskFilesystem})` : 'Disco principal'} color="var(--cyan)"
                 valueLabel={metrics.diskUsedPercent != null ? `${metrics.diskUsedPercent.toFixed(1)}%` : null}
+                note={formatCapacityDetails(metrics.diskUsedBytes, metrics.diskTotalBytes, metrics.diskFreeBytes)}
                 data={diskData} series={[{ dataKey: 'disk', color: 'var(--cyan)', label: 'Disco' }]}
                 yDomain={[0, 100]} yFormatter={v => `${v}%`} />
               <MetricChartCard title="Rede (download/upload)"
