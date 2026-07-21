@@ -103,6 +103,7 @@ export default function MonitoringPage() {
   const cpuData = (metrics?.cpuHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), cpu: +p.value.toFixed(1) }))
   const memData = (metrics?.memoryHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), mem: +p.value.toFixed(1) }))
   const diskData = (metrics?.diskHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), disk: +p.value.toFixed(1) }))
+  const tempData = (metrics?.temperatureHistory ?? []).map(p => ({ time: formatTime(p.timestamp, metricsHours), temp: +p.value.toFixed(1) }))
   const netByTime = new Map()
   ;(metrics?.networkInHistory ?? []).forEach(p => {
     netByTime.set(p.timestamp, { ...(netByTime.get(p.timestamp) || {}), ts: p.timestamp, time: formatTime(p.timestamp, metricsHours), in: p.value })
@@ -239,6 +240,13 @@ export default function MonitoringPage() {
                 data={netData}
                 series={[{ dataKey: 'in', color: 'var(--green)', label: 'Download' }, { dataKey: 'out', color: 'var(--orange)', label: 'Upload' }]}
                 yFormatter={formatBytes} />
+              {metrics.temperatureCelsius != null && (
+                <MetricChartCard title="Temperatura" color="var(--red)"
+                  valueLabel={`${metrics.temperatureCelsius.toFixed(1)}°C`}
+                  note="Sensor ACPI via WMI — só disponível em notebooks com esse sensor exposto pelo BIOS/Windows."
+                  data={tempData} series={[{ dataKey: 'temp', color: 'var(--red)', label: 'Temperatura' }]}
+                  yFormatter={v => `${v}°C`} />
+              )}
             </div>
           </section>
         )}

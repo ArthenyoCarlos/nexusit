@@ -1,5 +1,7 @@
 package br.com.nexusit.monitoring;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -13,6 +15,12 @@ import java.util.function.Supplier;
 public class ZabbixService {
 
     private final ZabbixClient client;
+    private final ObjectMapper objectMapper;
+
+    // Item definido no template "Galdino - Notebooks Windows Essencial" — so existe em
+    // hosts com esse template aplicado (notebooks), nao em servidores/outros hosts.
+    private static final String TEMPERATURE_ITEM_KEY =
+            "wmi.getall[root\\wmi,\"SELECT CurrentTemperature,InstanceName FROM MSAcpi_ThermalZoneTemperature\"]";
 
     private static final Map<Integer, String> SEVERITY_LABELS = Map.of(
             0, "Não Classificado",
@@ -204,6 +212,7 @@ public class ZabbixService {
             }
 
             NetworkItems net = findNetworkItems(hostId);
+            TemperatureItem temp = findTemperatureItem(hostId);
 
             long timeFrom = System.currentTimeMillis() / 1000 - (long) hours * 3600;
             List<ZabbixMetrics.MetricPoint> cpuHistory = cpuItemId != null ? fetchItemHistory(cpuItemId, 0, timeFrom) : List.of();
@@ -211,10 +220,12 @@ public class ZabbixService {
             List<ZabbixMetrics.MetricPoint> diskHistory = diskItemId != null ? fetchItemHistory(diskItemId, 0, timeFrom) : List.of();
             List<ZabbixMetrics.MetricPoint> netInHistory = net.inItemId() != null ? fetchItemHistory(net.inItemId(), net.valueType(), timeFrom) : List.of();
             List<ZabbixMetrics.MetricPoint> netOutHistory = net.outItemId() != null ? fetchItemHistory(net.outItemId(), net.valueType(), timeFrom) : List.of();
+            List<ZabbixMetrics.MetricPoint> temperatureHistory = temp.itemId() != null ? fetchTemperatureHistory(temp.itemId(), timeFrom) : List.of();
 
             return new ZabbixMetrics(hostId, cpuPercent, memPercent, uptimeSeconds, diskPercent,
-                    cpuHistory, memoryHistory, diskHistory, netInHistory, netOutHistory);
-        }, new ZabbixMetrics(hostId, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of()));
+                    cpuHistory, memoryHistory, diskHistory, netInHistory, netOutHistory,
+                    temp.currentCelsius(), temperatureHistory);
+        }, new ZabbixMetrics(hostId, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), null, List.of()));
     }
 
     private record NetworkItems(String inItemId, String outItemId, int valueType) {
@@ -269,6 +280,83 @@ public class ZabbixService {
         } catch (Exception e) {
             log.debug("Falha ao localizar itens de rede do host {}: {}", hostId, e.getMessage());
             return NetworkItems.NONE;
+        }
+    }
+
+    private record TemperatureItem(String itemId, Double currentCelsius) {
+        static final TemperatureItem NONE = new TemperatureItem(null, null);
+    }
+
+    @SuppressWarnings("unchecked")
+    private TemperatureItem findTemperatureItem(String hostId) {
+        try {
+            Map<String, Object> params = new LinkedHashMap<>();
+            params.put("output", List.of("itemid", "lastvalue"));
+            params.put("hostids", List.of(hostId));
+            params.put("monitored", true);
+            params.put("filter", Map.of("key_", List.of(TEMPERATURE_ITEM_KEY)));
+
+            List<Map<String, Object>> items = client.call("item.get", params);
+            if (items.isEmpty()) return TemperatureItem.NONE;
+
+            Map<String, Object> item = items.get(0);
+            return new TemperatureItem(str(item, "itemid"), parseTemperatureCelsius(str(item, "lastvalue")));
+        } catch (Exception e) {
+            log.debug("Falha ao localizar item de temperatura do host {}: {}", hostId, e.getMessage());
+            return TemperatureItem.NONE;
+        }
+    }
+
+    /**
+     * O item de temperatura roda uma consulta WMI (MSAcpi_ThermalZoneTemperature) e guarda
+     * o resultado como texto — presumivelmente o JSON que o plugin WMI do Zabbix agent2
+     * retorna para wmi.getall (lista de linhas, uma por zona térmica). CurrentTemperature
+     * vem em décimos de Kelvin (peculiaridade da própria classe ACPI), não em Celsius.
+     * Formato NÃO verificado contra um Zabbix real — parsing defensivo, ignora zonas com
+     * leitura fora de uma faixa plausível (-20°C a 110°C) e usa a mais quente entre as
+     * válidas (a zona mais quente é a mais relevante pra alertar superaquecimento).
+     */
+    private Double parseTemperatureCelsius(String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) return null;
+        try {
+            JsonNode root = objectMapper.readTree(rawJson);
+            Iterable<JsonNode> rows = root.isArray() ? root : List.of(root);
+            double best = Double.NaN;
+            for (JsonNode row : rows) {
+                JsonNode tempNode = row.get("CurrentTemperature");
+                if (tempNode == null || !tempNode.isNumber()) continue;
+                double celsius = (tempNode.asDouble() / 10.0) - 273.15;
+                if (celsius < -20 || celsius > 110) continue;
+                if (Double.isNaN(best) || celsius > best) best = celsius;
+            }
+            return Double.isNaN(best) ? null : best;
+        } catch (Exception e) {
+            log.debug("Falha ao interpretar leitura de temperatura WMI: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<ZabbixMetrics.MetricPoint> fetchTemperatureHistory(String itemId, long timeFrom) {
+        try {
+            Map<String, Object> histParams = new LinkedHashMap<>();
+            histParams.put("itemids", List.of(itemId));
+            histParams.put("history", 4); // text
+            histParams.put("time_from", timeFrom);
+            histParams.put("sortfield", "clock");
+            histParams.put("sortorder", "DESC");
+            histParams.put("limit", 1000);
+
+            List<Map<String, Object>> hist = client.call("history.get", histParams);
+            List<ZabbixMetrics.MetricPoint> points = new ArrayList<>();
+            for (Map<String, Object> h : hist) {
+                Double celsius = parseTemperatureCelsius(str(h, "value"));
+                if (celsius != null) points.add(new ZabbixMetrics.MetricPoint(longVal(h, "clock"), celsius));
+            }
+            return points.reversed();
+        } catch (Exception e) {
+            log.debug("History fetch failed for temperature item {}: {}", itemId, e.getMessage());
+            return List.of();
         }
     }
 

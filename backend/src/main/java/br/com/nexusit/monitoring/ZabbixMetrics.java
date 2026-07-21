@@ -12,7 +12,9 @@ public record ZabbixMetrics(
         List<MetricPoint> memoryHistory,
         List<MetricPoint> diskHistory,
         List<MetricPoint> networkInHistory,
-        List<MetricPoint> networkOutHistory
+        List<MetricPoint> networkOutHistory,
+        Double temperatureCelsius,
+        List<MetricPoint> temperatureHistory
 ) {
     public record MetricPoint(long timestamp, double value) {}
 }
