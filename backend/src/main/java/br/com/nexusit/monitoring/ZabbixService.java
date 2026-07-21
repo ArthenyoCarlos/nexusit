@@ -247,7 +247,11 @@ public class ZabbixService {
             params.put("output", List.of("itemid", "key_", "lastvalue", "value_type"));
             params.put("hostids", List.of(hostId));
             params.put("monitored", true);
-            params.put("search", Map.of("key_", "net.if."));
+            // With searchWildcardsEnabled=true, Zabbix expects an explicit wildcard.
+            // Searching for "net.if." returns zero items on Zabbix 6.x, while
+            // "net.if.*" matches discovered interface metrics such as
+            // net.if.in[...] and net.if.out[...].
+            params.put("search", Map.of("key_", "net.if.*"));
             params.put("searchWildcardsEnabled", true);
 
             List<Map<String, Object>> items = client.call("item.get", params);
