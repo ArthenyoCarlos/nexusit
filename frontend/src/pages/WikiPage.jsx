@@ -57,10 +57,10 @@ export default function WikiPage() {
 
   return (
     <Layout>
-      <div className="page fade-up" style={{ display: 'grid', gridTemplateColumns: '200px minmax(0, 1fr)', gap: 20, alignItems: 'start' }}>
+      <div className="page fade-up wiki-page-grid">
 
         {/* Sidebar categorias */}
-        <div className="card" style={{ padding: '12px 8px', position: 'sticky', top: 76 }}>
+        <div className="card wiki-page-sidebar" style={{ padding: '12px 8px' }}>
           <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-tertiary)', textTransform: 'uppercase', letterSpacing: '0.07em', padding: '0 8px', marginBottom: 8 }}>Categorias</p>
           <button onClick={() => { setQuery(''); setCategory('') }} className={`nav-item${!category && !query ? ' active' : ''}`} style={{ width: '100%', justifyContent: 'space-between' }}>
             <span>Todos</span>

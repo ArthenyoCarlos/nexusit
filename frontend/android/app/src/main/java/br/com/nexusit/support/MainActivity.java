@@ -17,12 +17,15 @@ import com.getcapacitor.BridgeActivity;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 public class MainActivity extends BridgeActivity {
     private static final int RC_AUDIO = 1001;
     private static final int RC_FILE_CHOOSER = 1002;
+    private static final int RC_MEDIA = 1003;
 
-    private PermissionRequest pendingMicRequest;
+    private PermissionRequest pendingMediaRequest;
     private ValueCallback<Uri[]> pendingFileCallback;
     private Uri pendingCameraUri;
 
@@ -46,13 +49,27 @@ public class MainActivity extends BridgeActivity {
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
                 runOnUiThread(() -> {
-                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO)
-                            == PackageManager.PERMISSION_GRANTED) {
+                    List<String> androidPerms = new ArrayList<>();
+                    for (String resource : request.getResources()) {
+                        if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                            androidPerms.add(Manifest.permission.RECORD_AUDIO);
+                        } else if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
+                            androidPerms.add(Manifest.permission.CAMERA);
+                        }
+                    }
+
+                    List<String> missing = new ArrayList<>();
+                    for (String perm : androidPerms) {
+                        if (ContextCompat.checkSelfPermission(MainActivity.this, perm) != PackageManager.PERMISSION_GRANTED) {
+                            missing.add(perm);
+                        }
+                    }
+
+                    if (missing.isEmpty()) {
                         request.grant(request.getResources());
                     } else {
-                        pendingMicRequest = request;
-                        ActivityCompat.requestPermissions(MainActivity.this,
-                                new String[]{Manifest.permission.RECORD_AUDIO}, RC_AUDIO);
+                        pendingMediaRequest = request;
+                        ActivityCompat.requestPermissions(MainActivity.this, missing.toArray(new String[0]), RC_MEDIA);
                     }
                 });
             }
@@ -95,13 +112,17 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == RC_AUDIO && pendingMicRequest != null) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                pendingMicRequest.grant(pendingMicRequest.getResources());
-            } else {
-                pendingMicRequest.deny();
+        if (requestCode == RC_MEDIA && pendingMediaRequest != null) {
+            boolean allGranted = grantResults.length > 0;
+            for (int result : grantResults) {
+                if (result != PackageManager.PERMISSION_GRANTED) { allGranted = false; break; }
             }
-            pendingMicRequest = null;
+            if (allGranted) {
+                pendingMediaRequest.grant(pendingMediaRequest.getResources());
+            } else {
+                pendingMediaRequest.deny();
+            }
+            pendingMediaRequest = null;
         }
     }
 

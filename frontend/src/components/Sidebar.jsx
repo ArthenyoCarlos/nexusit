@@ -24,6 +24,7 @@ const NAV = [
       { label: 'Sistemas',      path: '/systems',    Icon: IconSystems    },
       { label: 'Mapa de Dependências', path: '/dependency-map', Icon: IconDependencyMap },
       { label: 'Inventário',    path: '/inventory',  Icon: IconInventory  },
+      { label: 'Cartuchos',     path: '/cartridges', Icon: IconCartridge  },
       { label: 'Rede',          path: '/network',    Icon: IconNetwork    },
     ],
   },
@@ -161,6 +162,7 @@ function IconWifi()       { return <svg {...i}><path d="M5 12.55a11 11 0 0114.08
 function IconSystems()    { return <svg {...i}><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M6 21h12M12 17v4"/><circle cx="7" cy="10" r="1"/><circle cx="12" cy="10" r="1"/></svg> }
 function IconDependencyMap() { return <svg {...i}><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="12" r="3"/><path d="M8.5 7.5L15.5 10.5M8.5 16.5L15.5 13.5"/></svg> }
 function IconInventory()  { return <svg {...i}><path d="M3 6l9-3 9 3v12l-9 3-9-3V6z"/><path d="M12 3v18M3 6l9 3 9-3"/></svg> }
+function IconCartridge()  { return <svg {...i}><rect x="6" y="2" width="12" height="6" rx="1"/><path d="M8 8v3M16 8v3"/><rect x="4" y="11" width="16" height="11" rx="2"/><path d="M9 16h6"/></svg> }
 function IconNetwork()    { return <svg {...i}><circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v4M12 11l-5.5 6M12 11l5.5 6"/></svg> }
 function IconTicket()     { return <svg {...i}><path d="M15 5v2M15 11v2M15 17v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z"/></svg> }
 function IconCrm()        { return <svg {...i}><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> }

@@ -450,6 +450,18 @@ body {
   .broadcast-grid { grid-template-columns: 1fr; }
 }
 
+.wiki-page-grid {
+  display: grid;
+  grid-template-columns: 200px minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.wiki-page-sidebar { position: sticky; top: 76px; }
+@media (max-width: 700px) {
+  .wiki-page-grid { grid-template-columns: 1fr; }
+  .wiki-page-sidebar { position: static; }
+}
+
 /* ════════════════════════════════════════════════════════════
    CARDS
    ════════════════════════════════════════════════════════════ */

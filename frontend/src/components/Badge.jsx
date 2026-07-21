@@ -17,6 +17,11 @@ const COLORS = {
   ROTEADOR:     'badge-amber',
   IMPRESSORA:   'badge-red',
   NOBREAK:      'badge-orange',
+  // status cartucho
+  EM_ESTOQUE:    'badge-blue',
+  EM_USO:        'badge-green',
+  EM_MANUTENCAO: 'badge-amber',
+  DESCARTADO:    'badge-gray',
 }
 
 const LABELS = {
@@ -25,6 +30,7 @@ const LABELS = {
   MONITORAMENTO: 'Monitoramento', OUTRO: 'Outro',
   COMPUTADOR: 'Computador', SERVIDOR: 'Servidor', SWITCH: 'Switch',
   ROTEADOR: 'Roteador', IMPRESSORA: 'Impressora', NOBREAK: 'Nobreak',
+  EM_ESTOQUE: 'Em estoque', EM_USO: 'Em uso', EM_MANUTENCAO: 'Em manutenção', DESCARTADO: 'Descartado',
 }
 
 export default function Badge({ value }) {

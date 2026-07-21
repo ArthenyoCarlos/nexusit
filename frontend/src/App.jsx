@@ -39,6 +39,7 @@ import UrlMonitorPage from './pages/UrlMonitorPage'
 import ContractsPage from './pages/ContractsPage'
 import WikiPage from './pages/WikiPage'
 import WikiArticlePage from './pages/WikiArticlePage'
+import CartridgesPage from './pages/CartridgesPage'
 import MaintenanceSchedulePage from './pages/MaintenanceSchedulePage'
 import FinancialPage from './pages/FinancialPage'
 import TermosPage from './pages/TermosPage'
@@ -64,9 +65,12 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
 
             {isNative ? (
-              // App mobile: só o CRM de Suporte, sem o restante do NexusIT.
+              // App mobile: CRM de Suporte + Wiki + Cartuchos, sem o restante do NexusIT.
               <Route element={<ProtectedRoute />}>
                 <Route path="/support-crm" element={<SupportCrmPage />} />
+                <Route path="/wiki"        element={<WikiPage />} />
+                <Route path="/wiki/:id"    element={<WikiArticlePage />} />
+                <Route path="/cartridges"  element={<CartridgesPage />} />
                 <Route path="*" element={<Navigate to="/support-crm" replace />} />
               </Route>
             ) : (
@@ -85,6 +89,7 @@ export default function App() {
                   <Route path="/systems/:id"   element={<SystemDetailPage />} />
                   <Route path="/inventory"     element={<InventoryPage />} />
                   <Route path="/inventory/:id" element={<InventoryDetailPage />} />
+                  <Route path="/cartridges"    element={<CartridgesPage />} />
                   <Route path="/tickets"    element={<TicketsPage />} />
                   <Route path="/notes"      element={<NotesPage />} />
                   <Route path="/meetings"   element={<MeetingsPage />} />

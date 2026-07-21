@@ -132,6 +132,12 @@ export default function Layout({ children }) {
   }, [addToast, navigate])
 
   const isNative = Capacitor.isNativePlatform()
+  const NATIVE_TABS = [
+    { path: '/support-crm', label: 'Suporte', icon: '💬' },
+    { path: '/wiki', label: 'Wiki', icon: '📚' },
+    { path: '/cartridges', label: 'Cartuchos', icon: '🖨️' },
+  ]
+  const isTabActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/')
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg-page)' }}>
@@ -223,9 +229,37 @@ export default function Layout({ children }) {
           )}
         </header>
 
-        <main style={{ flex: 1 }}>
+        <main style={{ flex: 1, paddingBottom: isNative ? 64 : 0 }}>
           {children}
         </main>
+
+        {isNative && (
+          <nav style={{
+            position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 10,
+            display: 'flex',
+            background: 'var(--bg-surface)',
+            borderTop: '1px solid var(--border-muted)',
+            paddingBottom: 'env(safe-area-inset-bottom, 0px)',
+          }}>
+            {NATIVE_TABS.map(tab => {
+              const active = isTabActive(tab.path)
+              return (
+                <button
+                  key={tab.path}
+                  onClick={() => navigate(tab.path)}
+                  style={{
+                    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2,
+                    padding: '10px 0 8px', border: 'none', background: 'transparent', cursor: 'pointer',
+                    color: active ? 'var(--accent-text)' : 'var(--text-tertiary)',
+                  }}
+                >
+                  <span style={{ fontSize: 18, lineHeight: 1 }}>{tab.icon}</span>
+                  <span style={{ fontSize: 11, fontWeight: active ? 700 : 500 }}>{tab.label}</span>
+                </button>
+              )
+            })}
+          </nav>
+        )}
       </div>
     </div>
   )
