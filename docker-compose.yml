@@ -123,9 +123,11 @@ services:
       UPDATER_TOKEN: ${UPDATER_TOKEN:-}
       REPO_PATH: ${NEXUSIT_REPO_PATH:-/opt/nexusit}
       COMPOSE_ENV_FILE: /opt/env/nexusit/.env
+      GIT_SSH_COMMAND: ssh -i /run/secrets/nexusit_github_ed25519 -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new -o UserKnownHostsFile=/tmp/github_known_hosts
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - /opt/env/nexusit/.env:/opt/env/nexusit/.env:ro
+      - /home/galdino/.ssh/nexusit_github_ed25519:/run/secrets/nexusit_github_ed25519:ro
       - ${NEXUSIT_REPO_PATH:-/opt/nexusit}:${NEXUSIT_REPO_PATH:-/opt/nexusit}
     expose:
       - "9000"

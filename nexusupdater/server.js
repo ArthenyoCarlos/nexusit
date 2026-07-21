@@ -57,20 +57,33 @@ function readLatestChangelogSection() {
 app.get('/status', async (req, res) => {
   try {
     await ensureSafeGitDirectory()
-    await execAsync('git fetch origin main --quiet', { cwd: REPO_PATH, timeout: 30000 })
+    let fetchError = null
+    try {
+      await execAsync('git fetch origin main --quiet', { cwd: REPO_PATH, timeout: 30000 })
+    } catch (e) {
+      fetchError = e.message
+    }
+
     const { stdout: current } = await execAsync('git rev-parse HEAD', { cwd: REPO_PATH })
     const { stdout: latest } = await execAsync('git rev-parse origin/main', { cwd: REPO_PATH })
+    const { stdout: divergence } = await execAsync('git rev-list --left-right --count HEAD...origin/main', { cwd: REPO_PATH })
+      .catch(() => ({ stdout: '0\t0' }))
+    const [aheadRaw, behindRaw] = divergence.trim().split(/\s+/)
+    const ahead = Number(aheadRaw || 0)
+    const behind = Number(behindRaw || 0)
     const currentCommit = current.trim()
     const latestCommit = latest.trim()
 
     res.json({
       currentCommit,
       latestCommit,
-      updateAvailable: currentCommit !== latestCommit,
+      ahead,
+      behind,
+      updateAvailable: behind > 0,
       changelog: readLatestChangelogSection(),
       updating: state.updating,
       lastUpdateAt: state.lastUpdateAt,
-      lastError: state.lastError,
+      lastError: fetchError || state.lastError,
     })
   } catch (e) {
     res.status(500).json({ error: 'falha ao checar atualizacoes: ' + e.message })
