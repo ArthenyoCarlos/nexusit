@@ -3,6 +3,7 @@ package br.com.nexusit.support;
 import br.com.nexusit.glpi.GlpiService;
 import br.com.nexusit.glpi.GlpiTicket;
 import br.com.nexusit.glpi.GlpiUserRef;
+import br.com.nexusit.monitoring.ZabbixService;
 import br.com.nexusit.push.PushNotificationService;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,12 +37,13 @@ class SupportConversationEngineTest {
     @Mock BotAtendimentoTiStateStore stateStore;
     @Mock AudioTranscriptionService audioTranscriptionService;
     @Mock PushNotificationService pushNotificationService;
+    @Mock ZabbixService zabbixService;
 
     SupportConversationEngine engine;
 
     @BeforeEach
     void setUp() {
-        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, technicianRepo, glpiService, evolutionApiClient, stateStore, audioTranscriptionService, pushNotificationService);
+        engine = new SupportConversationEngine(contactRepo, conversationRepo, messageRepo, technicianRepo, glpiService, evolutionApiClient, stateStore, audioTranscriptionService, pushNotificationService, zabbixService);
         lenient().when(contactRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(conversationRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));
         lenient().when(messageRepo.save(any())).thenAnswer(inv -> inv.getArgument(0));

@@ -3,6 +3,8 @@ package br.com.nexusit.support;
 import br.com.nexusit.glpi.GlpiService;
 import br.com.nexusit.glpi.GlpiTicket;
 import br.com.nexusit.glpi.GlpiUserRef;
+import br.com.nexusit.monitoring.ZabbixProblem;
+import br.com.nexusit.monitoring.ZabbixService;
 import br.com.nexusit.push.PushNotificationService;
 import br.com.nexusit.whatsapp.EvolutionApiClient;
 import lombok.RequiredArgsConstructor;
@@ -13,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -57,6 +60,7 @@ public class SupportConversationEngine {
     private final BotAtendimentoTiStateStore stateStore;
     private final AudioTranscriptionService audioTranscriptionService;
     private final PushNotificationService pushNotificationService;
+    private final ZabbixService zabbixService;
 
     @Transactional
     public void onInboundMessage(InboundWhatsappMessage msg) {
@@ -211,21 +215,33 @@ public class SupportConversationEngine {
     }
 
     private void handleDirectSupportRequest(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String transcription) {
-        String description = descriptionFrom(msg, transcription);
+        createTicketAndReply(conversation, contact, msg, descriptionFrom(msg, transcription));
+    }
+
+    /**
+     * Antes de abrir o chamado, checa se já existe um problema ativo no Zabbix que pareça
+     * relacionado ao relato (mesma categoria inferida) — se sim, o chamado ainda é aberto
+     * normalmente (mantém o registro/acompanhamento), mas a resposta ao funcionário já
+     * avisa que a equipe está ciente, em vez do texto genérico de "chamado aberto".
+     */
+    private void createTicketAndReply(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String description) {
         int priority = inferPriority(description);
+        String category = inferCategory(description);
+        ZabbixProblem relatedProblem = findRelatedActiveProblem(category);
+
         int ticketId = glpiService.createTicket(
                 autoTitle(description),
-                structuredTicketDescription(contact, description, inferCategory(description), priority),
+                structuredTicketDescription(contact, description, category, priority, relatedProblem),
                 contact.getGlpiUserId(),
                 priority,
-                inferCategory(description)
+                category
         );
         conversation.setGlpiTicketId(ticketId);
         conversation.setState(ConversationState.PENDING_TECH);
         conversationRepo.save(conversation);
         attachMediaIfAny(ticketId, msg);
         notifyQueueOfNewTicket(conversation, contact, ticketId);
-        sendAndRecord(conversation, openedTicketText(ticketId, priority));
+        sendAndRecord(conversation, openedTicketText(ticketId, priority, relatedProblem));
     }
 
     private boolean looksLikeSupportRequest(InboundWhatsappMessage msg) {
@@ -245,22 +261,7 @@ public class SupportConversationEngine {
 
     private void handleAwaitingDescription(SupportConversation conversation, WhatsappContact contact, InboundWhatsappMessage msg, String transcription) {
         if (conversation.getGlpiTicketId() == null) {
-            String description = descriptionFrom(msg, transcription);
-            int priority = inferPriority(description);
-            String category = inferCategory(description);
-            int ticketId = glpiService.createTicket(
-                    autoTitle(description),
-                    structuredTicketDescription(contact, description, category, priority),
-                    contact.getGlpiUserId(),
-                    priority,
-                    category
-            );
-            conversation.setGlpiTicketId(ticketId);
-            conversation.setState(ConversationState.PENDING_TECH);
-            conversationRepo.save(conversation);
-            attachMediaIfAny(ticketId, msg);
-            notifyQueueOfNewTicket(conversation, contact, ticketId);
-            sendAndRecord(conversation, openedTicketText(ticketId, priority));
+            createTicketAndReply(conversation, contact, msg, descriptionFrom(msg, transcription));
         } else {
             appendFollowupOnly(conversation, msg, transcription);
         }
@@ -417,6 +418,42 @@ public class SupportConversationEngine {
         return "Suporte TI";
     }
 
+    // Vocabulário separado do inferCategory(description): nomes de problema do Zabbix são
+    // técnicos ("Interface eth0 down"), bem diferentes de como um funcionário descreve o
+    // mesmo problema ("sem internet aqui no caixa") — por isso duas listas de palavras-chave
+    // distintas em vez de reaproveitar o mesmo mapa para os dois lados.
+    private static final Map<String, List<String>> ZABBIX_PROBLEM_CATEGORY_KEYWORDS = Map.of(
+            "Rede/Internet",    List.of("network", "rede", "internet", "link", "interface", "gateway", "dns", "wan", "lan", "conectividade"),
+            "Impressoras",      List.of("printer", "impressora"),
+            "Coletores/Mobile", List.of("wireless", "wifi", "wi-fi", "access point", "unifi", " ap "),
+            "Sistemas/WinThor", List.of("winthor", "database", "banco de dados", "sql", "servidor de aplicacao"),
+            "Computadores",     List.of("cpu", "memory", "memoria", "disk", "disco", "space is low", "uptime")
+    );
+
+    private String inferCategoryFromZabbixProblemName(String problemName) {
+        String t = normalize(problemName);
+        for (Map.Entry<String, List<String>> entry : ZABBIX_PROBLEM_CATEGORY_KEYWORDS.entrySet()) {
+            if (entry.getValue().stream().anyMatch(t::contains)) return entry.getKey();
+        }
+        return null;
+    }
+
+    /**
+     * "Suporte TI" é o bucket genérico de fallback do inferCategory() — correlacionar com
+     * ele daria falso-positivo pra praticamente qualquer problema ativo no Zabbix, então
+     * fica de fora. Severidade >= 2 (Warning) ignora só o ruído "Não Classificado"/Info.
+     */
+    private ZabbixProblem findRelatedActiveProblem(String employeeCategory) {
+        if (employeeCategory == null || "Suporte TI".equals(employeeCategory)) return null;
+        List<ZabbixProblem> problems = zabbixService.getProblems();
+        if (problems == null || problems.isEmpty()) return null;
+        return problems.stream()
+                .filter(p -> p.severity() >= 2)
+                .filter(p -> employeeCategory.equals(inferCategoryFromZabbixProblemName(p.name())))
+                .max(Comparator.comparingInt(ZabbixProblem::severity))
+                .orElse(null);
+    }
+
     private int inferPriority(String description) {
         String t = normalize(description);
         if (t.contains("urgente") || t.contains("parado geral") || t.contains("todos parados")
@@ -441,22 +478,37 @@ public class SupportConversationEngine {
         };
     }
 
-    private String openedTicketText(int ticketId, int priority) {
+    private String openedTicketText(int ticketId, int priority, ZabbixProblem relatedProblem) {
+        if (relatedProblem != null) {
+            return "🔔 Já identificamos uma instabilidade em andamento (" + relatedProblem.hostName() +
+                    ": " + relatedProblem.name() + ") e nossa equipe já está atuando nisso.\n\n" +
+                    "Mesmo assim registrei seu relato no chamado #" + ticketId + " pra acompanharmos até normalizar. " +
+                    "Assim que resolver, avisamos por aqui.";
+        }
         return "✅ Chamado #" + ticketId + " aberto com sucesso.\n\n" +
                 "Prioridade inicial: *" + priorityLabel(priority) + "*.\n" +
                 "Um técnico irá assumir pelo NexusIT. Se lembrar de mais algum detalhe, pode enviar aqui que será anexado ao chamado.";
     }
 
-    private String structuredTicketDescription(WhatsappContact contact, String description, String category, int priority) {
+    private String structuredTicketDescription(WhatsappContact contact, String description, String category, int priority, ZabbixProblem relatedProblem) {
         String requester = contact.getGlpiUserName() != null && !contact.getGlpiUserName().isBlank()
                 ? contact.getGlpiUserName() : contact.getDisplayName();
-        return "Origem: WhatsApp TI Galdino\n" +
-                "Solicitante: " + firstNonBlank(requester, contact.getPhoneNumber()) + "\n" +
-                "Telefone: " + contact.getPhoneNumber() + "\n" +
-                "Categoria sugerida: " + category + "\n" +
-                "Prioridade sugerida: " + priorityLabel(priority) + "\n\n" +
-                "Relato do usuário:\n" + description + "\n\n" +
-                "Checklist inicial sugerido:\n" + suggestedChecklist(category, description);
+        StringBuilder sb = new StringBuilder()
+                .append("Origem: WhatsApp TI Galdino\n")
+                .append("Solicitante: ").append(firstNonBlank(requester, contact.getPhoneNumber())).append("\n")
+                .append("Telefone: ").append(contact.getPhoneNumber()).append("\n")
+                .append("Categoria sugerida: ").append(category).append("\n")
+                .append("Prioridade sugerida: ").append(priorityLabel(priority)).append("\n");
+        if (relatedProblem != null) {
+            sb.append("\n⚠️ Possível correlação com problema ativo no Zabbix:\n")
+                    .append("- Host: ").append(relatedProblem.hostName()).append("\n")
+                    .append("- Problema: ").append(relatedProblem.name())
+                    .append(" (severidade: ").append(relatedProblem.severityLabel()).append(")\n")
+                    .append("- Event ID: ").append(relatedProblem.id()).append("\n");
+        }
+        sb.append("\nRelato do usuário:\n").append(description).append("\n\n")
+                .append("Checklist inicial sugerido:\n").append(suggestedChecklist(category, description));
+        return sb.toString();
     }
 
     private String suggestedChecklist(String category, String description) {
