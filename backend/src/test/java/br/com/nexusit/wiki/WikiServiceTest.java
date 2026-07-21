@@ -4,6 +4,7 @@ import br.com.nexusit.ticketwiki.TicketWikiLinkRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -12,13 +13,20 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 /**
- * Busca da Wiki é um scorer local por relevância (título/categoria/tags/conteúdo), sem
- * LLM externo -- ver WikiService.search(). Esses testes travam o comportamento básico:
- * relevância bate o alvo certo e ignora consultas curtas demais.
+ * A correspondência de texto em si roda no Postgres (full-text search em português +
+ * similaridade de título — ver V41__wiki_fulltext_search.sql e
+ * WikiRepository.searchFullText), fora do alcance de um teste unitário sem banco real.
+ * Esses testes travam o que continua em Java: montagem da tsquery (com expansão de
+ * sinônimos de TI) e os bônus de negócio (uso em chamados, recência) aplicados por cima
+ * do que o repositório devolve.
  */
 @ExtendWith(MockitoExtension.class)
 class WikiServiceTest {
@@ -58,24 +66,44 @@ class WikiServiceTest {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        lenient().when(repo.findAllByOrderByUpdatedAtDesc())
+        lenient().when(repo.searchFullText(anyString(), anyString()))
                 .thenReturn(List.of(vpnArticle, printerArticle));
         lenient().when(ticketWikiLinkRepository.countByWikiArticleIds(org.mockito.ArgumentMatchers.any()))
                 .thenReturn(List.of());
     }
 
     @Test
-    void ranksArticleMatchingQueryAboveUnrelatedOne() {
-        List<WikiResponse> results = service.search("vpn");
+    void buildsTsQueryWithSynonymExpansion() {
+        service.search("computador lento");
 
-        assertThat(results).extracting(WikiResponse::title).containsExactly("Como configurar VPN");
+        ArgumentCaptor<String> tsQueryCaptor = ArgumentCaptor.forClass(String.class);
+        verify(repo).searchFullText(tsQueryCaptor.capture(), eq("computador lento"));
+
+        String tsQuery = tsQueryCaptor.getValue();
+        assertThat(tsQuery).contains("computador").contains("notebook");
+        assertThat(tsQuery).contains("lento").contains("devagar");
+        assertThat(tsQuery).contains("&"); // grupos de palavras diferentes ficam em AND
     }
 
     @Test
-    void matchesByContentEvenWhenTitleDiffersFromQuery() {
-        List<WikiResponse> results = service.search("cartucho impressora");
+    void preservesRepositoryOrder_whenNoUsageOrRecencyDifference() {
+        List<WikiResponse> results = service.search("vpn");
 
-        assertThat(results).extracting(WikiResponse::title).containsExactly("Trocar cartucho da impressora");
+        assertThat(results).extracting(WikiResponse::title)
+                .containsExactly("Como configurar VPN", "Trocar cartucho da impressora");
+    }
+
+    @Test
+    void usageBonusCanReorderResults() {
+        when(ticketWikiLinkRepository.countByWikiArticleIds(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(List.of(new TicketWikiLinkRepository.WikiArticleLinkCount() {
+                    @Override public UUID getWikiArticleId() { return printerArticle.getId(); }
+                    @Override public Long getLinkedTicketCount() { return 5L; }
+                }));
+
+        List<WikiResponse> results = service.search("vpn impressora");
+
+        assertThat(results.get(0).title()).isEqualTo("Trocar cartucho da impressora");
     }
 
     @Test
@@ -83,10 +111,12 @@ class WikiServiceTest {
         List<WikiResponse> results = service.search("vp");
 
         assertThat(results).isEmpty();
+        verifyNoInteractions(repo);
     }
 
     @Test
     void blankQueryReturnsNoResults() {
         assertThat(service.search("   ")).isEmpty();
+        verifyNoInteractions(repo);
     }
 }
