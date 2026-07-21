@@ -5,7 +5,7 @@ import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWiki
 import { getTicketAssetLinks, createTicketAssetLink, deleteTicketAssetLink } from '../services/ticketAssetLinks'
 import { getSystems } from '../services/systems'
 import { getInventory } from '../services/inventory'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from '../utils/ticketIntelligence'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, hasSpecificResolution, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
 import Modal from '../components/Modal'
@@ -393,7 +393,15 @@ export default function TicketsPage() {
       const proceed = window.confirm(`Encontramos ${wikiSuggestions.length} artigo(s) parecido(s) na Wiki. Deseja criar um novo artigo mesmo assim?`)
       if (!proceed) return
     }
-    const resolution = assistantDraft?.type === 'resolution' ? assistantDraft.text : buildSuggestedResolution(detail)
+    let resolution = assistantDraft?.type === 'resolution' ? assistantDraft.text : buildSuggestedResolution(detail)
+    if (!hasSpecificResolution(resolution)) {
+      const provided = window.prompt('Ainda não encontramos uma ação técnica específica neste chamado. Descreva o que foi feito para resolver, antes de documentar na Wiki:', '')
+      if (!provided?.trim()) {
+        setActionMsg({ type: 'error', text: 'Documentação cancelada — descreva a ação técnica realizada antes de documentar na Wiki.' })
+        return
+      }
+      resolution = provided.trim()
+    }
     const article = buildWikiArticleFromTicket(detail, resolution)
     setWikiCreating(true)
     try {
@@ -434,10 +442,14 @@ export default function TicketsPage() {
 
   const handleCloseAndDocument = async () => {
     if (!detail || !selected) return
-    const resolution = followupText.trim() || (assistantDraft?.type === 'resolution' ? assistantDraft.text : buildSuggestedResolution(detail))
-    if (isPendingResolutionDraft(resolution)) {
-      const proceed = window.confirm('Este chamado ainda parece não ter uma ação técnica registrada. Deseja fechar e documentar mesmo assim?')
-      if (!proceed) return
+    let resolution = followupText.trim() || (assistantDraft?.type === 'resolution' ? assistantDraft.text : buildSuggestedResolution(detail))
+    if (!hasSpecificResolution(resolution)) {
+      const provided = window.prompt('Este chamado ainda não tem uma ação técnica específica registrada. Descreva o que foi feito para resolver, antes de fechar e documentar:', '')
+      if (!provided?.trim()) {
+        setActionMsg({ type: 'error', text: 'Fechamento cancelado — descreva a ação técnica realizada antes de documentar.' })
+        return
+      }
+      resolution = provided.trim()
     } else if (!window.confirm('Fechar este chamado e documentar a resolução na Wiki?')) {
       return
     }

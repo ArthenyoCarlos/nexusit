@@ -130,6 +130,28 @@ export function isPendingResolutionDraft(text = '') {
   return /Resolução pendente:/i.test(cleanHtml(text))
 }
 
+const CASUAL_REPLY_RE = /^(vlw|valeu|blz|beleza|ok(ay)?|certo|show|de nada|feito|resolvido|pronto|obrigad[oa]s?|obg|tranquilo|falou|👍|✅)[\s!.,]*$/i
+
+function stripAuthorPrefix(text = '') {
+  return text.replace(/^\[[^\]]{1,80}\]\s*/, '').trim()
+}
+
+// Verifica se existe de fato uma ação técnica específica descrita (seja no texto
+// já formatado pelo template — extraindo a linha "Ação executada:" — seja num
+// texto livre digitado pelo técnico). Respostas curtas/casuais como "vlw" ou o
+// aviso de chamado Zabbix ainda sem ação não contam como resolução específica.
+export function hasSpecificResolution(resolutionText = '') {
+  const text = cleanHtml(resolutionText)
+  if (!text) return false
+  if (isPendingResolutionDraft(text)) return false
+  const actionField = fieldFromText(text, 'Ação executada')
+  const candidate = stripAuthorPrefix(actionField || text)
+  if (!candidate) return false
+  if (CASUAL_REPLY_RE.test(candidate)) return false
+  if (candidate.length < 15) return false
+  return true
+}
+
 export function buildWikiLinkFollowup(article, origin = '') {
   const title = article?.title || 'Artigo da Wiki'
   const id = article?.id || ''

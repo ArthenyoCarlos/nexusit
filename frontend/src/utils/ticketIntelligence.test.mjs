@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from './ticketIntelligence.js'
+import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, isPendingResolutionDraft, hasSpecificResolution, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from './ticketIntelligence.js'
 
 const detail = {
   ticket: {
@@ -68,6 +68,13 @@ assert.doesNotMatch(zabbixResolution, /Ação executada: Chamado aberto automati
 assert.doesNotMatch(zabbixResolution, /Resultado: atendimento registrado/)
 assert.equal(isPendingResolutionDraft(zabbixResolution), true)
 assert.equal(isPendingResolutionDraft(resolution), false)
+
+assert.equal(hasSpecificResolution(resolution), true)
+assert.equal(hasSpecificResolution(zabbixResolution), false)
+assert.equal(hasSpecificResolution(''), false)
+assert.equal(hasSpecificResolution('Causa provável: instabilidade.\nAção executada: [TI Arthenyo Carlos] vlw ze!\nResultado: atendimento registrado.'), false)
+assert.equal(hasSpecificResolution('[TI Arthenyo Carlos] Feito'), false)
+assert.equal(hasSpecificResolution('Troquei o cabo de rede da estação 12 e o sistema normalizou.'), true)
 
 const wikiFollowup = buildWikiLinkFollowup({ title: article.title, id: 'abc-123' }, 'https://nexus.local')
 assert.match(wikiFollowup, /Documentação gerada automaticamente na Wiki do NexusIT/)
