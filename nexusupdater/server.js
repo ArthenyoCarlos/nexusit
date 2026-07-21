@@ -12,7 +12,7 @@ const REPO_PATH = process.env.REPO_PATH || '/opt/nexusit'
 const COMPOSE_ENV_FILE = process.env.COMPOSE_ENV_FILE || '/opt/env/nexusit/.env'
 const COMPOSE_FILE = path.join(REPO_PATH, 'docker-compose.yml')
 const CHANGELOG_PATH = path.join(REPO_PATH, 'CHANGELOG.md')
-const BACKEND_HEALTH_URL = process.env.BACKEND_HEALTH_URL || 'http://nexusit-backend:8080/actuator/health'
+const BACKEND_HEALTH_URL = process.env.BACKEND_HEALTH_URL || 'http://nexusit-backend:8080/api/glpi/tickets'
 
 const state = {
   updating: false,
@@ -115,10 +115,7 @@ async function waitForBackendHealthy(retries = 12, delayMs = 10000) {
   for (let i = 0; i < retries; i++) {
     try {
       const res = await fetch(BACKEND_HEALTH_URL, { signal: AbortSignal.timeout(5000) })
-      if (res.ok) {
-        const body = await res.json()
-        if (body.status === 'UP') return true
-      }
+      if (res.ok) return true
     } catch (e) {
       // backend ainda subindo (container reiniciando, app inicializando) -- tenta de novo
     }
