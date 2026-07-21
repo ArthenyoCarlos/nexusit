@@ -478,10 +478,23 @@ public class SupportConversationEngine {
         };
     }
 
+    /**
+     * Muitos ambientes Zabbix (inclusive este) já nomeiam o alerta com o host embutido
+     * (ex.: "ts: disco C: acima de 80%"). Prefixar o host de novo nessa frase geraria
+     * "ts: ts: disco C..." — então só prefixa quando o nome ainda não começa com o host.
+     */
+    private String problemLabel(ZabbixProblem p) {
+        String host = p.hostName() == null ? "" : p.hostName().trim();
+        String name = p.name() == null ? "" : p.name().trim();
+        if (host.isBlank()) return name;
+        if (normalize(name).startsWith(normalize(host))) return name;
+        return host + ": " + name;
+    }
+
     private String openedTicketText(int ticketId, int priority, ZabbixProblem relatedProblem) {
         if (relatedProblem != null) {
-            return "🔔 Já identificamos uma instabilidade em andamento (" + relatedProblem.hostName() +
-                    ": " + relatedProblem.name() + ") e nossa equipe já está atuando nisso.\n\n" +
+            return "🔔 Já identificamos uma instabilidade em andamento (" + problemLabel(relatedProblem) +
+                    ") e nossa equipe já está atuando nisso.\n\n" +
                     "Mesmo assim registrei seu relato no chamado #" + ticketId + " pra acompanharmos até normalizar. " +
                     "Assim que resolver, avisamos por aqui.";
         }
