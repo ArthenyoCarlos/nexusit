@@ -5,7 +5,7 @@ import Badge from '../components/Badge'
 import ConfirmDialog from '../components/ConfirmDialog'
 import QrScannerModal from '../components/QrScannerModal'
 import {
-  getCartridges, getCartridge, createCartridge,
+  getCartridges, getCartridge, createCartridge, installCartridge,
   startMaintenance, finishMaintenance, discardCartridge, getCartridgeEtiqueta,
 } from '../services/cartridges'
 
@@ -13,7 +13,7 @@ const STATUSES = ['EM_ESTOQUE', 'EM_USO', 'EM_MANUTENCAO', 'DESCARTADO']
 const EMPTY_FORM = { model: '', printerModel: '', initialSector: '' }
 
 const EVENT_ICON = {
-  CADASTRO: '📦', INICIO_MANUTENCAO: '🔧', FIM_MANUTENCAO: '✅', DESCARTE: '🗑️',
+  CADASTRO: '📦', INSTALACAO: '📥', INICIO_MANUTENCAO: '🔧', FIM_MANUTENCAO: '✅', DESCARTE: '🗑️',
 }
 
 export default function CartridgesPage() {
@@ -101,15 +101,32 @@ export default function CartridgesPage() {
     load()
   }
 
+  const handleInstall = async () => {
+    if (!sectorInput.trim()) {
+      setActionError('Informe o setor para instalar o cartucho.')
+      return
+    }
+    setActionLoading(true)
+    setActionError('')
+    try {
+      const updated = await installCartridge(detail.cartridge.id, { sector: sectorInput.trim() })
+      setDetail(updated)
+      setSectorInput('')
+    } catch (err) {
+      setActionError(err.response?.data?.detail ?? 'Erro ao instalar cartucho.')
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
   const handleStartMaintenance = async () => {
     setActionLoading(true)
     setActionError('')
     try {
-      const updated = await startMaintenance(detail.cartridge.id, { sector: sectorInput || null })
+      const updated = await startMaintenance(detail.cartridge.id, { sector: null })
       setDetail(updated)
-      setSectorInput('')
     } catch (err) {
-      setActionError(err.response?.data?.detail ?? 'Erro ao iniciar manutenção.')
+      setActionError(err.response?.data?.detail ?? 'Erro ao retirar cartucho para manutenção.')
     } finally {
       setActionLoading(false)
     }
@@ -263,8 +280,11 @@ export default function CartridgesPage() {
             <input value={form.printerModel} onChange={f('printerModel')} className="input" placeholder="Ex: HP DeskJet 2136" />
           </div>
           <div>
-            <label className="input-label">Setor inicial (opcional)</label>
+            <label className="input-label">Setor de instalação (opcional)</label>
             <input value={form.initialSector} onChange={f('initialSector')} className="input" placeholder="Ex: Recepção, Financeiro..." />
+            <p className="muted" style={{ fontSize: 11.5, marginTop: 4 }}>
+              Se preenchido, o cartucho já entra cadastrado como "Em uso" nesse setor. Deixe em branco se ele for ficar em estoque.
+            </p>
           </div>
 
           {formError && <div className="alert alert-red"><p>{formError}</p></div>}
@@ -306,16 +326,22 @@ export default function CartridgesPage() {
                 {printLoading ? 'Gerando...' : '🏷️ Imprimir etiqueta'}
               </button>
 
-              {detail.cartridge.status !== 'EM_MANUTENCAO' && detail.cartridge.status !== 'DESCARTADO' && (
+              {detail.cartridge.status === 'EM_ESTOQUE' && (
                 <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                   <input
                     value={sectorInput} onChange={e => setSectorInput(e.target.value)}
-                    placeholder="Setor (opcional)" className="input" style={{ width: 160, height: 32 }}
+                    placeholder="Setor de instalação *" className="input" style={{ width: 170, height: 32 }}
                   />
-                  <button onClick={handleStartMaintenance} disabled={actionLoading} className="btn btn-primary btn-sm">
-                    🔧 Iniciar manutenção
+                  <button onClick={handleInstall} disabled={actionLoading} className="btn btn-primary btn-sm">
+                    📥 Instalar em setor
                   </button>
                 </div>
+              )}
+
+              {detail.cartridge.status === 'EM_USO' && (
+                <button onClick={handleStartMaintenance} disabled={actionLoading} className="btn btn-primary btn-sm">
+                  🔧 Retirar para manutenção
+                </button>
               )}
 
               {detail.cartridge.status === 'EM_MANUTENCAO' && (

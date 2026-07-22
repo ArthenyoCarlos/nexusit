@@ -14,7 +14,8 @@ public record CartridgeEventResponse(
 ) {
     private static final java.util.Map<CartridgeEventType, String> LABELS = java.util.Map.of(
             CartridgeEventType.CADASTRO, "Cadastrado",
-            CartridgeEventType.INICIO_MANUTENCAO, "Manutenção iniciada",
+            CartridgeEventType.INSTALACAO, "Instalado em setor",
+            CartridgeEventType.INICIO_MANUTENCAO, "Retirado para manutenção",
             CartridgeEventType.FIM_MANUTENCAO, "Manutenção finalizada",
             CartridgeEventType.DESCARTE, "Descartado"
     );

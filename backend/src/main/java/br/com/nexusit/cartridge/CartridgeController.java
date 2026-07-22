@@ -43,6 +43,13 @@ public class CartridgeController {
         return service.create(req, user);
     }
 
+    @PostMapping("/{id}/install")
+    public CartridgeDetailResponse install(@PathVariable UUID id,
+                                            @Valid @RequestBody InstallRequest req,
+                                            @AuthenticationPrincipal User user) {
+        return service.install(id, req, user);
+    }
+
     @PostMapping("/{id}/start-maintenance")
     public CartridgeDetailResponse startMaintenance(@PathVariable UUID id,
                                                      @RequestBody(required = false) MaintenanceStartRequest req,
