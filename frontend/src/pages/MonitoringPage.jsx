@@ -28,6 +28,41 @@ function formatCapacityDetails(used, total, free) {
   if (free != null) parts.push(`Livre: ${formatBytes(free)}`)
   return parts.length ? parts.join(' · ') : undefined
 }
+function formatPercent(v) {
+  return v == null ? '—' : `${Number(v).toFixed(1)}%`
+}
+function ProcessTopList({ title, rows = [], metric = 'cpu' }) {
+  const accent = metric === 'memory' ? 'var(--purple)' : 'var(--accent-text)'
+  return (
+    <div className="card" style={{ padding: 16 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+        <div>
+          <h3 style={{ fontSize: 13.5, fontWeight: 700, color: 'var(--text-primary)' }}>{title}</h3>
+          <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>Top processos via Zabbix — sem linha de comando/argumentos</p>
+        </div>
+      </div>
+      {rows.length === 0 ? (
+        <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)' }}>Sem dados coletados para este host.</p>
+      ) : (
+        <div style={{ display: 'grid', gap: 8 }}>
+          {rows.slice(0, 8).map((p, idx) => (
+            <div key={`${p.name}-${idx}`} style={{ display: 'grid', gridTemplateColumns: '24px minmax(0,1fr) auto', alignItems: 'center', gap: 10, padding: '8px 0', borderBottom: idx === rows.length - 1 ? 'none' : '1px solid var(--border)' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, color: accent }}>#{idx + 1}</span>
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 650, color: 'var(--text-primary)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{p.name}</p>
+                <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)' }}>{p.count > 1 ? `${p.count} processos` : `PID ${p.pids?.[0] ?? '—'}`}</p>
+              </div>
+              <div style={{ textAlign: 'right', fontSize: 12.5, color: 'var(--text-secondary)' }}>
+                <strong style={{ color: accent }}>{metric === 'memory' ? formatBytes(p.rssBytes) : formatPercent(p.cpuPercent)}</strong>
+                <div style={{ fontSize: 11, color: 'var(--text-tertiary)' }}>{metric === 'memory' ? formatPercent(p.memoryPercent) : formatBytes(p.rssBytes)}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 
 const PERIODS = [
   { label: '2h', hours: 2 },
@@ -243,6 +278,11 @@ export default function MonitoringPage() {
                   data={tempData} series={[{ dataKey: 'temp', color: 'var(--red)', label: 'Temperatura' }]}
                   yFormatter={v => `${v}°C`} />
               )}
+            </div>
+
+            <div style={{ marginTop: 12, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+              <ProcessTopList title="Mais consumindo CPU" rows={metrics.topCpuProcesses ?? []} metric="cpu" />
+              <ProcessTopList title="Mais consumindo memória RAM" rows={metrics.topMemoryProcesses ?? []} metric="memory" />
             </div>
           </section>
         )}

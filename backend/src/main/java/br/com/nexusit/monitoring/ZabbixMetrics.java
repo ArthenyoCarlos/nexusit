@@ -21,7 +21,18 @@ public record ZabbixMetrics(
         List<MetricPoint> networkInHistory,
         List<MetricPoint> networkOutHistory,
         Double temperatureCelsius,
-        List<MetricPoint> temperatureHistory
+        List<MetricPoint> temperatureHistory,
+        List<ProcessTopEntry> topCpuProcesses,
+        List<ProcessTopEntry> topMemoryProcesses
 ) {
     public record MetricPoint(long timestamp, double value) {}
+
+    public record ProcessTopEntry(
+            String name,
+            List<Long> pids,
+            Integer count,
+            Double cpuPercent,
+            Double memoryPercent,
+            Long rssBytes
+    ) {}
 }

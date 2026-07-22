@@ -6,6 +6,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.io.DataInputStream;
+import java.io.DataOutputStream;
+import java.net.InetSocketAddress;
+import java.net.Socket;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -21,6 +28,9 @@ public class ZabbixService {
     // hosts com esse template aplicado (notebooks), nao em servidores/outros hosts.
     private static final String TEMPERATURE_ITEM_KEY =
             "wmi.getall[root\\wmi,\"SELECT CurrentTemperature,InstanceName FROM MSAcpi_ThermalZoneTemperature\"]";
+
+    private static final String PROCESS_TOP_AGENT_KEY = "proc.get[]";
+    private static final int ZABBIX_AGENT_PORT = 10050;
 
     private static final Map<Integer, String> SEVERITY_LABELS = Map.of(
             0, "Não Classificado",
@@ -251,6 +261,7 @@ public class ZabbixService {
 
             NetworkItems net = findNetworkItems(hostId);
             TemperatureItem temp = findTemperatureItem(hostId);
+            ProcessTop processTop = fetchProcessTop(hostId);
 
             long timeFrom = System.currentTimeMillis() / 1000 - (long) hours * 3600;
             List<ZabbixMetrics.MetricPoint> cpuHistory = cpuItemId != null ? fetchItemHistory(cpuItemId, 0, timeFrom) : List.of();
@@ -264,8 +275,9 @@ public class ZabbixService {
                     memoryTotalBytes, memoryUsedBytes, memoryAvailableBytes,
                     uptimeSeconds, diskPercent, diskTotalBytes, diskUsedBytes, diskFreeBytes, diskFilesystem,
                     cpuHistory, memoryHistory, diskHistory, netInHistory, netOutHistory,
-                    temp.currentCelsius(), temperatureHistory);
-        }, new ZabbixMetrics(hostId, null, null, null, null, null, null, null, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), null, List.of()));
+                    temp.currentCelsius(), temperatureHistory,
+                    processTop.cpu(), processTop.memory());
+        }, new ZabbixMetrics(hostId, null, null, null, null, null, null, null, null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of(), null, List.of(), List.of(), List.of()));
     }
 
     private record DiskSize(Long totalBytes, Long usedBytes, Long freeBytes) {
@@ -526,6 +538,181 @@ public class ZabbixService {
             log.debug("History fetch failed for item {}: {}", itemId, e.getMessage());
             return List.of();
         }
+    }
+
+    private record ProcessTop(
+            List<ZabbixMetrics.ProcessTopEntry> cpu,
+            List<ZabbixMetrics.ProcessTopEntry> memory
+    ) {
+        static final ProcessTop EMPTY = new ProcessTop(List.of(), List.of());
+    }
+
+    private record ProcessSnapshot(
+            long pid,
+            String name,
+            double cpuTimeSeconds,
+            double memoryPercent,
+            long rssBytes
+    ) {}
+
+    private ProcessTop fetchProcessTop(String hostId) {
+        try {
+            String ip = fetchHostMainIp(hostId);
+            if (ip.isBlank()) return ProcessTop.EMPTY;
+
+            List<ProcessSnapshot> first = fetchAgentProcesses(ip);
+            if (first.isEmpty()) return ProcessTop.EMPTY;
+            try {
+                Thread.sleep(800);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return ProcessTop.EMPTY;
+            }
+            List<ProcessSnapshot> second = fetchAgentProcesses(ip);
+            if (second.isEmpty()) return ProcessTop.EMPTY;
+
+            return buildProcessTop(first, second, 0.8);
+        } catch (Exception e) {
+            log.debug("Falha ao consultar top processos do host {}: {}", hostId, e.getMessage());
+            return ProcessTop.EMPTY;
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private String fetchHostMainIp(String hostId) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("output", List.of("hostid"));
+        params.put("hostids", List.of(hostId));
+        params.put("selectInterfaces", List.of("ip", "main"));
+        List<Map<String, Object>> hosts = client.call("host.get", params);
+        if (hosts.isEmpty()) return "";
+        List<Map<String, Object>> ifaces = (List<Map<String, Object>>) hosts.get(0).get("interfaces");
+        if (ifaces == null || ifaces.isEmpty()) return "";
+        String mainIp = ifaces.stream()
+                .filter(i -> "1".equals(str(i, "main")))
+                .findFirst()
+                .map(i -> str(i, "ip"))
+                .orElse(str(ifaces.get(0), "ip"));
+        // Quando o host monitorado é o próprio SRV-INTERNO, consultar pelo IP LAN
+        // a partir do container pode sair por uma bridge não autorizada no Agent.
+        // O gateway Docker 172.18.0.1 é o próprio host e já está permitido no agent2.
+        if ("192.168.2.210".equals(mainIp)) return "172.18.0.1";
+        return mainIp;
+    }
+
+    private List<ProcessSnapshot> fetchAgentProcesses(String ip) throws Exception {
+        String payload = zabbixAgentGet(ip, PROCESS_TOP_AGENT_KEY);
+        if (payload == null || payload.isBlank() || payload.startsWith("ZBX_NOTSUPPORTED")) return List.of();
+        JsonNode root = objectMapper.readTree(payload);
+        if (!root.isArray()) return List.of();
+        List<ProcessSnapshot> result = new ArrayList<>();
+        for (JsonNode row : root) {
+            if (row == null || !row.isObject()) continue;
+            long pid = row.path("pid").asLong(-1L);
+            String name = safeProcessName(row.path("name").asText(""));
+            if (pid < 0 || name.isBlank()) continue;
+            double cpuTime = row.path("cputime_user").asDouble(0.0) + row.path("cputime_system").asDouble(0.0);
+            long rssBytes = processRssBytes(row);
+            double memPercent = row.path("pmem").asDouble(0.0);
+            result.add(new ProcessSnapshot(pid, name, Math.max(0.0, cpuTime), Math.max(0.0, memPercent), Math.max(0L, rssBytes)));
+        }
+        return result;
+    }
+
+    private String zabbixAgentGet(String ip, String key) throws Exception {
+        byte[] keyBytes = key.getBytes(StandardCharsets.UTF_8);
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(ip, ZABBIX_AGENT_PORT), 2500);
+            socket.setSoTimeout(5000);
+            DataOutputStream out = new DataOutputStream(socket.getOutputStream());
+            out.write("ZBXD\1".getBytes(StandardCharsets.US_ASCII));
+            out.write(ByteBuffer.allocate(8).order(ByteOrder.LITTLE_ENDIAN).putLong(keyBytes.length).array());
+            out.write(keyBytes);
+            out.flush();
+
+            DataInputStream in = new DataInputStream(socket.getInputStream());
+            byte[] header = in.readNBytes(5);
+            if (header.length == 5 && new String(header, StandardCharsets.US_ASCII).equals("ZBXD\1")) {
+                byte[] lenBytes = in.readNBytes(8);
+                long len = ByteBuffer.wrap(lenBytes).order(ByteOrder.LITTLE_ENDIAN).getLong();
+                if (len <= 0 || len > 2_000_000) return "";
+                return new String(in.readNBytes((int) len), StandardCharsets.UTF_8);
+            }
+            byte[] rest = in.readAllBytes();
+            byte[] combined = new byte[header.length + rest.length];
+            System.arraycopy(header, 0, combined, 0, header.length);
+            System.arraycopy(rest, 0, combined, header.length, rest.length);
+            return new String(combined, StandardCharsets.UTF_8);
+        }
+    }
+
+    private long processRssBytes(JsonNode row) {
+        if (row.has("rss") && row.path("rss").asLong(-1L) >= 0) return row.path("rss").asLong();
+        if (row.has("wkset") && row.path("wkset").asLong(-1L) >= 0) return row.path("wkset").asLong() * 1024L;
+        if (row.has("pss") && row.path("pss").asLong(-1L) >= 0) return row.path("pss").asLong();
+        return 0L;
+    }
+
+    private ProcessTop buildProcessTop(List<ProcessSnapshot> first, List<ProcessSnapshot> second, double intervalSeconds) {
+        Map<Long, ProcessSnapshot> beforeByPid = new HashMap<>();
+        for (ProcessSnapshot p : first) beforeByPid.put(p.pid(), p);
+
+        Map<String, MutableProcessTop> cpuAgg = new HashMap<>();
+        Map<String, MutableProcessTop> memAgg = new HashMap<>();
+        for (ProcessSnapshot current : second) {
+            double cpuPercent = 0.0;
+            ProcessSnapshot before = beforeByPid.get(current.pid());
+            if (before != null) {
+                cpuPercent = Math.max(0.0, ((current.cpuTimeSeconds() - before.cpuTimeSeconds()) / intervalSeconds) * 100.0);
+            }
+            accumulateProcess(cpuAgg, current, cpuPercent);
+            accumulateProcess(memAgg, current, cpuPercent);
+        }
+        return new ProcessTop(toProcessEntries(cpuAgg.values(), Comparator.comparingDouble(MutableProcessTop::cpuPercent).reversed()),
+                toProcessEntries(memAgg.values(), Comparator.comparingLong(MutableProcessTop::rssBytes).reversed()));
+    }
+
+    private static class MutableProcessTop {
+        final String name;
+        final List<Long> pids = new ArrayList<>();
+        int count;
+        double cpuPercent;
+        double memoryPercent;
+        long rssBytes;
+        MutableProcessTop(String name) { this.name = name; }
+        double cpuPercent() { return cpuPercent; }
+        long rssBytes() { return rssBytes; }
+    }
+
+    private void accumulateProcess(Map<String, MutableProcessTop> agg, ProcessSnapshot snapshot, double cpuPercent) {
+        MutableProcessTop row = agg.computeIfAbsent(snapshot.name(), MutableProcessTop::new);
+        row.count++;
+        if (row.pids.size() < 5) row.pids.add(snapshot.pid());
+        row.cpuPercent += cpuPercent;
+        row.memoryPercent += snapshot.memoryPercent();
+        row.rssBytes += snapshot.rssBytes();
+    }
+
+    private List<ZabbixMetrics.ProcessTopEntry> toProcessEntries(Collection<MutableProcessTop> rows, Comparator<MutableProcessTop> comparator) {
+        return rows.stream()
+                .sorted(comparator)
+                .limit(8)
+                .map(row -> new ZabbixMetrics.ProcessTopEntry(
+                        row.name,
+                        row.pids,
+                        Math.max(1, row.count),
+                        Math.round(row.cpuPercent * 10.0) / 10.0,
+                        Math.round(row.memoryPercent * 10.0) / 10.0,
+                        Math.max(0L, row.rssBytes)
+                ))
+                .toList();
+    }
+
+    private String safeProcessName(String raw) {
+        if (raw == null) return "";
+        String cleaned = raw.replaceAll("[\\p{Cntrl}]", "").trim();
+        if (cleaned.length() > 80) cleaned = cleaned.substring(0, 80);
+        return cleaned;
     }
 
     // ── Recent History ────────────────────────────────────────────────────
