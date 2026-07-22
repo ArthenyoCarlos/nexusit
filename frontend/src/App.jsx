@@ -65,12 +65,14 @@ export default function App() {
             <Route path="/login" element={<LoginPage />} />
 
             {isNative ? (
-              // App mobile: CRM de Suporte + Wiki + Cartuchos, sem o restante do NexusIT.
+              // App mobile: CRM de Suporte + Wiki + Cartuchos + Inventário, sem o restante do NexusIT.
               <Route element={<ProtectedRoute />}>
-                <Route path="/support-crm" element={<SupportCrmPage />} />
-                <Route path="/wiki"        element={<WikiPage />} />
-                <Route path="/wiki/:id"    element={<WikiArticlePage />} />
-                <Route path="/cartridges"  element={<CartridgesPage />} />
+                <Route path="/support-crm"   element={<SupportCrmPage />} />
+                <Route path="/wiki"          element={<WikiPage />} />
+                <Route path="/wiki/:id"      element={<WikiArticlePage />} />
+                <Route path="/cartridges"    element={<CartridgesPage />} />
+                <Route path="/inventory"     element={<InventoryPage />} />
+                <Route path="/inventory/:id" element={<InventoryDetailPage />} />
                 <Route path="*" element={<Navigate to="/support-crm" replace />} />
               </Route>
             ) : (

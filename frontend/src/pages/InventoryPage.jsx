@@ -204,7 +204,7 @@ export default function InventoryPage() {
       {/* Modal form */}
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? 'Editar Item' : 'Novo Item'} size="lg">
         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+          <div className="form-grid-2">
             <div style={{ gridColumn: 'span 2' }}>
               <label className="input-label">Nome *</label>
               <input required value={form.name} onChange={f('name')} className="input"

@@ -217,7 +217,7 @@ export default function InventoryDetailPage() {
           </button>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="inventory-detail-grid">
 
           {/* Especificações */}
           <div className="card" style={{ padding: '20px 24px' }}>
@@ -334,7 +334,7 @@ export default function InventoryDetailPage() {
 
             {mOpen && (
               <form onSubmit={handleAddMaintenance} style={{ background: 'var(--bg-muted)', borderRadius: 10, padding: '16px', marginBottom: 16, display: 'flex', flexDirection: 'column', gap: 10 }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                <div className="form-grid-2" style={{ gap: 10 }}>
                   <div style={{ gridColumn: '1/-1' }}>
                     <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-secondary)' }}>Título *</label>
                     <input required value={mForm.title} onChange={e => setMForm(f => ({...f, title: e.target.value}))} className="input" style={{ marginTop: 4 }} placeholder="Ex: Troca de HD" />

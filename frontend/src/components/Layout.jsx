@@ -136,6 +136,7 @@ export default function Layout({ children }) {
     { path: '/support-crm', label: 'Suporte', icon: '💬' },
     { path: '/wiki', label: 'Wiki', icon: '📚' },
     { path: '/cartridges', label: 'Cartuchos', icon: '🖨️' },
+    { path: '/inventory', label: 'Inventário', icon: '📦' },
   ]
   const isTabActive = (path) => location.pathname === path || location.pathname.startsWith(path + '/')
 
