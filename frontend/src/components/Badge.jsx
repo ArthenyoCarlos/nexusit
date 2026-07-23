@@ -17,6 +17,10 @@ const COLORS = {
   ROTEADOR:     'badge-amber',
   IMPRESSORA:   'badge-red',
   NOBREAK:      'badge-orange',
+  MONITOR:      'badge-blue',
+  DVR:          'badge-purple',
+  COLETOR:      'badge-cyan',
+  UNIFI:        'badge-green',
   // status cartucho
   EM_ESTOQUE:    'badge-blue',
   EM_USO:        'badge-green',
@@ -30,6 +34,7 @@ const LABELS = {
   MONITORAMENTO: 'Monitoramento', OUTRO: 'Outro',
   COMPUTADOR: 'Computador', SERVIDOR: 'Servidor', SWITCH: 'Switch',
   ROTEADOR: 'Roteador', IMPRESSORA: 'Impressora', NOBREAK: 'Nobreak',
+  MONITOR: 'Monitor', DVR: 'DVR', COLETOR: 'Coletor', UNIFI: 'UniFi',
   EM_ESTOQUE: 'Em estoque', EM_USO: 'Em uso', EM_MANUTENCAO: 'Em manutenção', DESCARTADO: 'Descartado',
 }
 

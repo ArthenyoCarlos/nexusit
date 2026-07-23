@@ -9,7 +9,7 @@ import { getInventory, createItem, updateItem, deleteItem } from '../services/in
 import { downloadInventoryCsv } from '../services/reports'
 import { getUsers } from '../services/users'
 
-const TYPES   = ['COMPUTADOR', 'SERVIDOR', 'SWITCH', 'ROTEADOR', 'IMPRESSORA', 'NOBREAK', 'OUTRO']
+const TYPES   = ['COMPUTADOR', 'SERVIDOR', 'SWITCH', 'ROTEADOR', 'IMPRESSORA', 'NOBREAK', 'MONITOR', 'DVR', 'COLETOR', 'UNIFI', 'OUTRO']
 const STATUSES = ['ACTIVE', 'INACTIVE', 'MAINTENANCE']
 const EMPTY_FORM = {
   name: '', type: 'COMPUTADOR', brand: '', model: '', serialNumber: '',
@@ -112,7 +112,8 @@ export default function InventoryPage() {
 
   const statusLabel = { ACTIVE: 'Ativo', INACTIVE: 'Inativo', MAINTENANCE: 'Manutenção' }
   const typeLabel   = { COMPUTADOR: 'Computador', SERVIDOR: 'Servidor', SWITCH: 'Switch',
-                        ROTEADOR: 'Roteador', IMPRESSORA: 'Impressora', NOBREAK: 'Nobreak', OUTRO: 'Outro' }
+                        ROTEADOR: 'Roteador', IMPRESSORA: 'Impressora', NOBREAK: 'Nobreak',
+                        MONITOR: 'Monitor', DVR: 'DVR', COLETOR: 'Coletor', UNIFI: 'UniFi', OUTRO: 'Outro' }
 
   return (
     <Layout>

@@ -64,7 +64,8 @@ function QrCode({ value, size = 160 }) {
 
 const TYPE_ICON = {
   COMPUTADOR: '🖥️', SERVIDOR: '🖥️', SWITCH: '🔀', ROTEADOR: '📡',
-  IMPRESSORA: '🖨️', NOBREAK: '🔋', OUTRO: '📦',
+  IMPRESSORA: '🖨️', NOBREAK: '🔋', MONITOR: '🖥️', DVR: '🎥',
+  COLETOR: '📱', UNIFI: '📶', OUTRO: '📦',
 }
 
 export default function InventoryDetailPage() {
@@ -138,7 +139,8 @@ export default function InventoryDetailPage() {
   const statusLabel = { ACTIVE: 'Ativo', INACTIVE: 'Inativo', MAINTENANCE: 'Manutenção' }
   const typeLabel   = {
     COMPUTADOR: 'Computador', SERVIDOR: 'Servidor', SWITCH: 'Switch',
-    ROTEADOR: 'Roteador', IMPRESSORA: 'Impressora', NOBREAK: 'Nobreak', OUTRO: 'Outro',
+    ROTEADOR: 'Roteador', IMPRESSORA: 'Impressora', NOBREAK: 'Nobreak',
+    MONITOR: 'Monitor', DVR: 'DVR', COLETOR: 'Coletor', UNIFI: 'UniFi', OUTRO: 'Outro',
   }
 
   const handlePrint = async () => {
