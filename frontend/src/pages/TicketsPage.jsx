@@ -148,6 +148,8 @@ export default function TicketsPage() {
   const [technicianFilter, setTechnicianFilter] = useState('')
   const [sectorFilter, setSectorFilter] = useState('')
   const [search, setSearch] = useState('')
+  const [sortField, setSortField] = useState(null)
+  const [sortDir, setSortDir] = useState('asc')
   const [selected, setSelected] = useState(null)
   const [detail, setDetail] = useState(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -509,6 +511,26 @@ export default function TicketsPage() {
     return true
   })
 
+  const handleSort = (key) => {
+    if (!key) return
+    if (key === sortField) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+    else { setSortField(key); setSortDir('asc') }
+  }
+
+  const sorted = sortField ? [...filtered].sort((a, b) => {
+    let va = a[sortField]
+    let vb = b[sortField]
+    if (sortField === 'origin') { va = va || 'MANUAL'; vb = vb || 'MANUAL' }
+    let cmp
+    if (va == null && vb == null) cmp = 0
+    else if (va == null) cmp = 1
+    else if (vb == null) cmp = -1
+    else if (sortField === 'openedAt') cmp = new Date(va) - new Date(vb)
+    else if (typeof va === 'number' && typeof vb === 'number') cmp = va - vb
+    else cmp = String(va).localeCompare(String(vb), 'pt-BR')
+    return sortDir === 'asc' ? cmp : -cmp
+  }) : filtered
+
   const requesterOptions = Array.from(new Set(tickets.map(t => t.requester).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   const technicianOptions = Array.from(new Set(tickets.map(t => t.assignedTo).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
   const sectorOptions = Array.from(new Set(tickets.map(t => t.category).filter(Boolean))).sort((a, b) => a.localeCompare(b, 'pt-BR'))
@@ -612,8 +634,23 @@ export default function TicketsPage() {
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>#</th><th>Título</th><th>Origem</th><th>Prioridade</th><th>Status</th>
-                  <th>Solicitante</th><th>Atribuído</th><th>Abertura</th>
+                  {[
+                    { label: '#', sortKey: 'id' },
+                    { label: 'Título', sortKey: 'title' },
+                    { label: 'Origem', sortKey: 'origin' },
+                    { label: 'Prioridade', sortKey: 'priority' },
+                    { label: 'Status', sortKey: 'status' },
+                    { label: 'Solicitante', sortKey: 'requester' },
+                    { label: 'Atribuído', sortKey: 'assignedTo' },
+                    { label: 'Abertura', sortKey: 'openedAt' },
+                  ].map(col => (
+                    <th key={col.label} className="sortable-header" onClick={() => handleSort(col.sortKey)}>
+                      {col.label}
+                      {sortField === col.sortKey && (
+                        <span className="sort-arrow">{sortDir === 'asc' ? ' ▲' : ' ▼'}</span>
+                      )}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -633,7 +670,7 @@ export default function TicketsPage() {
                         : 'Nenhum chamado corresponde aos filtros.'}
                     </td>
                   </tr>
-                ) : filtered.map(t => (
+                ) : sorted.map(t => (
                   <tr key={t.id} onClick={() => openDetail(t)} style={{ cursor: 'pointer' }}>
                     <td className="mono">{t.id}</td>
                     <td>
