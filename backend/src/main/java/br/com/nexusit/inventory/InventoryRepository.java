@@ -22,13 +22,13 @@ public interface InventoryRepository extends JpaRepository<InventoryItem, UUID> 
               AND (:search IS NULL OR :search = ''
                    OR LOWER(i.name) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(i.serialNumber, '')) LIKE LOWER(CONCAT('%', :search, '%')))
-              AND (:tombamento IS NULL OR LOWER(i.tombamento) = LOWER(:tombamento))
-              AND (:name IS NULL OR LOWER(i.name) = LOWER(:name))
-              AND (:brand IS NULL OR LOWER(i.brand) = LOWER(:brand))
-              AND (:model IS NULL OR LOWER(i.model) = LOWER(:model))
-              AND (:serialNumber IS NULL OR LOWER(i.serialNumber) = LOWER(:serialNumber))
-              AND (:location IS NULL OR LOWER(i.location) = LOWER(:location))
-              AND (:responsibleName IS NULL OR LOWER(r.name) = LOWER(:responsibleName))
+              AND (:tombamento IS NULL OR :tombamento = '' OR LOWER(i.tombamento) = LOWER(:tombamento))
+              AND (:name IS NULL OR :name = '' OR LOWER(i.name) = LOWER(:name))
+              AND (:brand IS NULL OR :brand = '' OR LOWER(i.brand) = LOWER(:brand))
+              AND (:model IS NULL OR :model = '' OR LOWER(i.model) = LOWER(:model))
+              AND (:serialNumber IS NULL OR :serialNumber = '' OR LOWER(i.serialNumber) = LOWER(:serialNumber))
+              AND (:location IS NULL OR :location = '' OR LOWER(i.location) = LOWER(:location))
+              AND (:responsibleName IS NULL OR :responsibleName = '' OR LOWER(r.name) = LOWER(:responsibleName))
             """,
             countQuery = """
             SELECT COUNT(i) FROM InventoryItem i
@@ -38,13 +38,13 @@ public interface InventoryRepository extends JpaRepository<InventoryItem, UUID> 
               AND (:search IS NULL OR :search = ''
                    OR LOWER(i.name) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(i.serialNumber, '')) LIKE LOWER(CONCAT('%', :search, '%')))
-              AND (:tombamento IS NULL OR LOWER(i.tombamento) = LOWER(:tombamento))
-              AND (:name IS NULL OR LOWER(i.name) = LOWER(:name))
-              AND (:brand IS NULL OR LOWER(i.brand) = LOWER(:brand))
-              AND (:model IS NULL OR LOWER(i.model) = LOWER(:model))
-              AND (:serialNumber IS NULL OR LOWER(i.serialNumber) = LOWER(:serialNumber))
-              AND (:location IS NULL OR LOWER(i.location) = LOWER(:location))
-              AND (:responsibleName IS NULL OR LOWER(r.name) = LOWER(:responsibleName))
+              AND (:tombamento IS NULL OR :tombamento = '' OR LOWER(i.tombamento) = LOWER(:tombamento))
+              AND (:name IS NULL OR :name = '' OR LOWER(i.name) = LOWER(:name))
+              AND (:brand IS NULL OR :brand = '' OR LOWER(i.brand) = LOWER(:brand))
+              AND (:model IS NULL OR :model = '' OR LOWER(i.model) = LOWER(:model))
+              AND (:serialNumber IS NULL OR :serialNumber = '' OR LOWER(i.serialNumber) = LOWER(:serialNumber))
+              AND (:location IS NULL OR :location = '' OR LOWER(i.location) = LOWER(:location))
+              AND (:responsibleName IS NULL OR :responsibleName = '' OR LOWER(r.name) = LOWER(:responsibleName))
             """)
     Page<InventoryItem> findByFilters(
             @Param("type") ItemType type,

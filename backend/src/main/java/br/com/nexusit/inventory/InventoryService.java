@@ -22,9 +22,13 @@ public class InventoryService {
                                             String tombamento, String name, String brand, String model,
                                             String serialNumber, String location, String responsibleName,
                                             Pageable pageable) {
-        return repository.findByFilters(type, status, search, tombamento, name, brand, model,
-                        serialNumber, location, responsibleName, pageable)
+        return repository.findByFilters(type, status, safe(search), safe(tombamento), safe(name), safe(brand), safe(model),
+                        safe(serialNumber), safe(location), safe(responsibleName), pageable)
                 .map(InventoryResponse::from);
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 
     public InventoryResponse findById(UUID id) {
