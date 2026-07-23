@@ -23,10 +23,10 @@ public interface CartridgeRepository extends JpaRepository<Cartridge, UUID> {
                    OR LOWER(c.code) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(c.currentSector, '')) LIKE LOWER(CONCAT('%', :search, '%'))
                    OR LOWER(COALESCE(c.printerModel, '')) LIKE LOWER(CONCAT('%', :search, '%')))
-              AND (:code IS NULL OR LOWER(c.code) = LOWER(:code))
-              AND (:model IS NULL OR LOWER(c.model) = LOWER(:model))
-              AND (:printerModel IS NULL OR LOWER(c.printerModel) = LOWER(:printerModel))
-              AND (:currentSector IS NULL OR LOWER(c.currentSector) = LOWER(:currentSector))
+              AND (:code IS NULL OR :code = '' OR LOWER(c.code) = LOWER(:code))
+              AND (:model IS NULL OR :model = '' OR LOWER(c.model) = LOWER(:model))
+              AND (:printerModel IS NULL OR :printerModel = '' OR LOWER(c.printerModel) = LOWER(:printerModel))
+              AND (:currentSector IS NULL OR :currentSector = '' OR LOWER(c.currentSector) = LOWER(:currentSector))
             """)
     Page<Cartridge> findByFilters(
             @Param("status") CartridgeStatus status,

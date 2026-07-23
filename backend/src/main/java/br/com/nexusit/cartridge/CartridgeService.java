@@ -29,8 +29,13 @@ public class CartridgeService {
 
     public Page<CartridgeResponse> list(CartridgeStatus status, String search, String code, String model,
                                          String printerModel, String currentSector, Pageable pageable) {
-        return repository.findByFilters(status, search, code, model, printerModel, currentSector, pageable)
+        return repository.findByFilters(status, safe(search), safe(code), safe(model),
+                        safe(printerModel), safe(currentSector), pageable)
                 .map(CartridgeResponse::from);
+    }
+
+    private String safe(String value) {
+        return value == null ? "" : value.trim();
     }
 
     public CartridgeDetailResponse findById(UUID id) {
