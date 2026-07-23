@@ -8,7 +8,7 @@ import { getSystems } from '../services/systems'
 import { getLicenses } from '../services/licenses'
 import { getContracts } from '../services/contracts'
 import { getMonitors } from '../services/urlmonitor'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 import { severityOf } from '../utils/severity'
 import { computeHealthScore, computeHealthBreakdown, healthScoreColor, healthScoreBg, healthScoreLabel } from '../utils/healthScore'
 import HealthBreakdown from '../components/HealthBreakdown'
@@ -38,7 +38,7 @@ export default function DashboardPage() {
   useEffect(() => {
     Promise.allSettled([
       getHosts(), getProblems(), getSystems({}),
-      getTickets(null), getLicenses(), getContracts(), getMonitors(), getInventory(),
+      getTickets(null), getLicenses(), getContracts(), getMonitors(), getAllInventory(),
     ]).then(([hostsR, probR, sysR, tickR, licR, ctrR, monR, invR]) => {
       const hosts     = hostsR.status === 'fulfilled' ? hostsR.value.data    : []
       const problems  = probR.status  === 'fulfilled' ? probR.value.data     : []

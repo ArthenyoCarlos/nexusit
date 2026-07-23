@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import Layout from '../components/Layout'
 import Badge from '../components/Badge'
 import { getSystems } from '../services/systems'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 
 export default function DependencyMapPage() {
   const [systems, setSystems] = useState([])
@@ -11,7 +11,7 @@ export default function DependencyMapPage() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([getSystems(), getInventory()])
+    Promise.all([getSystems(), getAllInventory()])
       .then(([sys, inv]) => { setSystems(sys); setInventory(inv) })
       .finally(() => setLoading(false))
   }, [])

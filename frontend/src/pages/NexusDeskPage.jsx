@@ -4,7 +4,7 @@ import Modal from '../components/Modal'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { getNexusDeskDevices, createNexusDeskDevice, updateNexusDeskDevice, deleteNexusDeskDevice, connectNexusDeskDevice, getNexusDeskSessions } from '../services/nexusdesk'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 import { buildRustDeskUri } from '../utils/rustdesk'
 
 const EMPTY_FORM = { name: '', rustdeskId: '', password: '', notes: '', inventoryItemId: '' }
@@ -45,7 +45,7 @@ export default function NexusDeskPage() {
     } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { if (isAdmin) { load(); getInventory().then(setInventory).catch(() => {}) } }, [isAdmin, load])
+  useEffect(() => { if (isAdmin) { load(); getAllInventory().then(setInventory).catch(() => {}) } }, [isAdmin, load])
 
   if (!isAdmin) {
     return (

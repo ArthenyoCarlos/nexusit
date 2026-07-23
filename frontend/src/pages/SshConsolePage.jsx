@@ -5,7 +5,7 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import SshTerminal from '../components/SshTerminal'
 import { useAuth } from '../contexts/AuthContext'
 import { getSshHosts, createSshHost, updateSshHost, deleteSshHost, resetHostKey } from '../services/sshHosts'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 
 const EMPTY_FORM = {
   name: '', host: '', port: 22, username: '', authType: 'PASSWORD',
@@ -33,7 +33,7 @@ export default function SshConsolePage() {
     try { setHosts(await getSshHosts()) } finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { if (isAdmin) { load(); getInventory().then(setInventory).catch(() => {}) } }, [isAdmin, load])
+  useEffect(() => { if (isAdmin) { load(); getAllInventory().then(setInventory).catch(() => {}) } }, [isAdmin, load])
 
   if (!isAdmin) {
     return (

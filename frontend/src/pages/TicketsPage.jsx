@@ -4,7 +4,7 @@ import { createArticle, searchWiki } from '../services/wiki'
 import { getTicketWikiLinks, createTicketWikiLink } from '../services/ticketWikiLinks'
 import { getTicketAssetLinks, createTicketAssetLink, deleteTicketAssetLink } from '../services/ticketAssetLinks'
 import { getSystems } from '../services/systems'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 import { buildTicketSummary, buildSuggestedResolution, buildWikiArticleFromTicket, buildWikiLinkFollowup, hasSpecificResolution, buildWikiSearchQueries, mergeWikiSuggestions, shouldWarnBeforeCreatingWikiArticle, detectDuplicateTicketGroups, findDuplicateTicketsFor } from '../utils/ticketIntelligence'
 import { useAuth } from '../contexts/AuthContext'
 import Layout from '../components/Layout'
@@ -203,7 +203,7 @@ export default function TicketsPage() {
 
   useEffect(() => {
     getSystems().then(setSystemsList).catch(() => setSystemsList([]))
-    getInventory().then(setInventoryList).catch(() => setInventoryList([]))
+    getAllInventory().then(setInventoryList).catch(() => setInventoryList([]))
   }, [])
 
   const fetchTickets = useCallback(async () => {

@@ -6,7 +6,7 @@ import { getTickets } from '../services/glpi'
 import { getLicenses } from '../services/licenses'
 import { getContracts } from '../services/contracts'
 import { getMonitors } from '../services/urlmonitor'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 import { getFinancialSummary } from '../services/financial'
 import { computeHealthScore, computeHealthBreakdown, healthScoreColor, healthScoreBg, healthScoreLabel } from '../utils/healthScore'
 import HealthBreakdown from '../components/HealthBreakdown'
@@ -75,7 +75,7 @@ export default function ExecutiveDashboardPage() {
   useEffect(() => {
     Promise.allSettled([
       getHosts(), getProblems(), getTickets(null),
-      getLicenses(), getContracts(), getMonitors(), getInventory(), getFinancialSummary(),
+      getLicenses(), getContracts(), getMonitors(), getAllInventory(), getFinancialSummary(),
     ]).then(([hostsR, probR, tickR, licR, ctrR, monR, invR, finR]) => {
       setData({
         hosts:     hostsR.status === 'fulfilled' ? hostsR.value.data : [],

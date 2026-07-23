@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Layout from '../components/Layout'
 import { createTermo } from '../services/termos'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 
 const EMPTY = { responsavelNome:'', cpf:'', cargo:'', setor:'', dataEntrega:new Date().toISOString().slice(0,10), tipoEquipamento:'Notebook', marca:'', modelo:'', numeroSerie:'', tombamento:'', condicaoInicial:'', observacoes:'', acessorios:['Carregador'] }
 
 export default function TermoNovoPage() {
   const nav = useNavigate(); const [form,setForm]=useState(EMPTY); const [inventory,setInventory]=useState([]); const [saving,setSaving]=useState(false)
-  useEffect(()=>{ getInventory().then(setInventory).catch(()=>{}) }, [])
+  useEffect(()=>{ getAllInventory().then(setInventory).catch(()=>{}) }, [])
   const set = (k,v)=>setForm(f=>({...f,[k]:v}))
   const submit = async e => { e.preventDefault(); setSaving(true); try { const t=await createTermo({...form, acessorios: form.acessorios.filter(Boolean)}); nav(`/termos/${t.id}`) } finally { setSaving(false) } }
   const pickInventory = id => { const item=inventory.find(i=>i.id===id); if(!item) return; setForm(f=>({...f, tombamento:item.tombamento||'', tipoEquipamento:item.type||f.tipoEquipamento, marca:item.brand||'', modelo:item.model||'', numeroSerie:item.serialNumber||''})) }

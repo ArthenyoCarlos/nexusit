@@ -6,7 +6,7 @@ import Badge from '../components/Badge'
 import ConfirmDialog from '../components/ConfirmDialog'
 import { useAuth } from '../contexts/AuthContext'
 import { getSystems, createSystem, updateSystem, deleteSystem } from '../services/systems'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 import { getUsers } from '../services/users'
 
 const CATEGORIES = ['ERP', 'CRM', 'INTERNO', 'CLOUD', 'MONITORAMENTO', 'OUTRO']
@@ -52,7 +52,7 @@ export default function SystemsPage() {
   useEffect(() => {
     if (isAdmin) {
       getUsers().then(setUsers).catch(() => {})
-      getInventory({ type: 'SERVIDOR' }).then(setServers).catch(() => {})
+      getAllInventory({ type: 'SERVIDOR' }).then(setServers).catch(() => {})
     }
   }, [isAdmin])
 

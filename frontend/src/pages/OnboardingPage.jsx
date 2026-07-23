@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { getChecklists, createChecklist, deleteChecklist } from '../services/onboarding'
 import { getActiveTemplates } from '../services/onboardingTemplates'
 import { getUsers } from '../services/users'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 
 const EMPTY_FORM = { type: 'ONBOARDING', employeeName: '', department: '', startDate: '', notes: '', templateId: '', employeeUserId: '', inventoryItemId: '' }
 
@@ -50,7 +50,7 @@ export default function OnboardingPage() {
 
   useEffect(() => {
     getUsers().then(setUsers).catch(() => {})
-    getInventory().then(setInventory).catch(() => {})
+    getAllInventory().then(setInventory).catch(() => {})
   }, [])
 
   useEffect(() => {

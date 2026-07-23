@@ -5,7 +5,7 @@ import { getTickets } from '../services/glpi'
 import { getProblems, getHosts } from '../services/monitoring'
 import { getLicenses } from '../services/licenses'
 import { getContracts } from '../services/contracts'
-import { getInventory } from '../services/inventory'
+import { getAllInventory } from '../services/inventory'
 import { getMonitors } from '../services/urlmonitor'
 
 // ─────────────────────────────────────────────────────────
@@ -303,7 +303,7 @@ async function buildUrlsDownResponse() {
 }
 
 async function buildInventoryMaintenanceResponse() {
-  const inventory = await getInventory()
+  const inventory = await getAllInventory()
   const maint     = inventory.filter(i => i.status === 'MAINTENANCE')
 
   if (maint.length === 0) return '✅ Nenhum ativo em manutenção no inventário.'
@@ -318,7 +318,7 @@ async function buildInventoryMaintenanceResponse() {
 }
 
 async function buildInventoryIncompleteResponse() {
-  const inventory = await getInventory()
+  const inventory = await getAllInventory()
   const noTomb    = inventory.filter(i => !i.tombamento)
   const noSerial  = inventory.filter(i => !i.serialNumber)
 
