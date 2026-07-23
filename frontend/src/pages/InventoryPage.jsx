@@ -18,13 +18,17 @@ const EMPTY_FORM = {
   warrantyUntil: '', value: '',
 }
 const PAGE_SIZE = 20
-const EMPTY_COLUMN_FILTERS = {
-  tombamento: '', name: '', brand: '', model: '', serialNumber: '', location: '', responsibleName: '',
-}
-const COLUMN_FILTER_LABEL = {
-  tombamento: 'Tombamento', name: 'Nome', brand: 'Marca', model: 'Modelo',
-  serialNumber: 'Nº Série', location: 'Localização', responsibleName: 'Responsável',
-}
+const COLUMNS = [
+  { label: 'Tombamento', sortKey: 'tombamento' },
+  { label: 'Nome', sortKey: 'name' },
+  { label: 'Tipo', sortKey: 'type' },
+  { label: 'Marca / Modelo', sortKey: 'brand' },
+  { label: 'Nº Série', sortKey: 'serialNumber' },
+  { label: 'Localização', sortKey: 'location' },
+  { label: 'Responsável', sortKey: 'responsible.name' },
+  { label: 'Status', sortKey: 'status' },
+  { label: '', sortKey: null },
+]
 
 export default function InventoryPage() {
   const { user } = useAuth()
@@ -37,7 +41,8 @@ export default function InventoryPage() {
   const [search, setSearch]     = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS)
+  const [sortField, setSortField] = useState('name')
+  const [sortDir, setSortDir]     = useState('asc')
 
   const [page, setPage]                 = useState(0)
   const [totalElements, setTotalElements] = useState(0)
@@ -55,13 +60,10 @@ export default function InventoryPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = { page, size: PAGE_SIZE }
+      const params = { page, size: PAGE_SIZE, sort: `${sortField},${sortDir}` }
       if (filterType)   params.type   = filterType
       if (filterStatus) params.status = filterStatus
       if (search)       params.search = search
-      Object.entries(columnFilters).forEach(([key, value]) => {
-        if (value) params[key] = value
-      })
       const data = await getInventory(params)
       setItems(data.content)
       setTotalElements(data.totalElements)
@@ -69,7 +71,7 @@ export default function InventoryPage() {
     } finally {
       setLoading(false)
     }
-  }, [filterType, filterStatus, search, columnFilters, page])
+  }, [filterType, filterStatus, search, sortField, sortDir, page])
 
   useEffect(() => { load() }, [load])
   useEffect(() => { if (isAdmin) getUsers().then(setUsers).catch(() => {}) }, [isAdmin])
@@ -78,19 +80,11 @@ export default function InventoryPage() {
   const handleFilterTypeChange = (e) => { setPage(0); setFilterType(e.target.value) }
   const handleFilterStatusChange = (e) => { setPage(0); setFilterStatus(e.target.value) }
 
-  const toggleColumnFilter = (key, value) => {
-    if (!value) return
+  const handleSort = (key) => {
+    if (!key) return
     setPage(0)
-    setColumnFilters(prev => ({ ...prev, [key]: prev[key] === value ? '' : value }))
-  }
-
-  const toggleBrandModelFilter = (item) => {
-    if (!item.brand && !item.model) return
-    setPage(0)
-    setColumnFilters(prev => {
-      const isActive = prev.brand === (item.brand || '') && prev.model === (item.model || '')
-      return isActive ? { ...prev, brand: '', model: '' } : { ...prev, brand: item.brand || '', model: item.model || '' }
-    })
+    if (key === sortField) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+    else { setSortField(key); setSortDir('asc') }
   }
 
   const clearFilters = () => {
@@ -98,14 +92,9 @@ export default function InventoryPage() {
     setSearch('')
     setFilterType('')
     setFilterStatus('')
-    setColumnFilters(EMPTY_COLUMN_FILTERS)
   }
 
-  const activeColumnFilters = Object.entries(columnFilters).filter(([, v]) => v)
-  const hasActiveFilters = !!(search || filterType || filterStatus || activeColumnFilters.length)
-
-  const toggleTypeFilter = (type) => { setPage(0); setFilterType(prev => prev === type ? '' : type) }
-  const toggleStatusFilter = (status) => { setPage(0); setFilterStatus(prev => prev === status ? '' : status) }
+  const hasActiveFilters = !!(search || filterType || filterStatus)
 
   const openCreate = () => {
     setEditing(null)
@@ -203,17 +192,6 @@ export default function InventoryPage() {
           )}
         </div>
 
-        {activeColumnFilters.length > 0 && (
-          <div className="filter-chips">
-            {activeColumnFilters.map(([key, value]) => (
-              <span key={key} className="filter-chip">
-                {COLUMN_FILTER_LABEL[key]}: <strong>{value}</strong>
-                <button type="button" onClick={() => { setPage(0); setColumnFilters(prev => ({ ...prev, [key]: '' })) }} aria-label="Remover filtro">✕</button>
-              </span>
-            ))}
-          </div>
-        )}
-
         {/* Tabela */}
         <div className="card" style={{ overflow: 'hidden' }}>
           {loading ? (
@@ -231,64 +209,33 @@ export default function InventoryPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    {['Tombamento', 'Nome', 'Tipo', 'Marca / Modelo', 'Nº Série', 'Localização', 'Responsável', 'Status', ''].map(h => (
-                      <th key={h}>{h}</th>
+                    {COLUMNS.map(col => (
+                      <th
+                        key={col.label || 'actions'}
+                        className={col.sortKey ? 'sortable-header' : ''}
+                        onClick={() => handleSort(col.sortKey)}
+                      >
+                        {col.label}
+                        {col.sortKey && sortField === col.sortKey && (
+                          <span className="sort-arrow">{sortDir === 'asc' ? ' ▲' : ' ▼'}</span>
+                        )}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {items.map(item => (
                     <tr key={item.id}>
-                      <td
-                        className={`mono clickable-cell ${columnFilters.tombamento === item.tombamento ? 'active-filter' : ''}`}
-                        style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}
-                        onClick={() => toggleColumnFilter('tombamento', item.tombamento)}
-                        title="Clique para filtrar por este tombamento"
-                      >
+                      <td className="mono" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>
                         {item.tombamento || '—'}
                       </td>
-                      <td
-                        className={`clickable-cell ${columnFilters.name === item.name ? 'active-filter' : ''}`}
-                        style={{ fontWeight: 500 }}
-                        onClick={() => toggleColumnFilter('name', item.name)}
-                        title="Clique para filtrar por este nome"
-                      >
-                        {item.name}
-                      </td>
-                      <td className="clickable-cell" onClick={() => toggleTypeFilter(item.type)} title="Clique para filtrar por este tipo">
-                        <Badge value={item.type} />
-                      </td>
-                      <td
-                        className={`muted clickable-cell ${columnFilters.brand === (item.brand || '') && columnFilters.model === (item.model || '') && (item.brand || item.model) ? 'active-filter' : ''}`}
-                        onClick={() => toggleBrandModelFilter(item)}
-                        title="Clique para filtrar por marca / modelo"
-                      >
-                        {[item.brand, item.model].filter(Boolean).join(' / ') || '—'}
-                      </td>
-                      <td
-                        className={`mono clickable-cell ${columnFilters.serialNumber === item.serialNumber ? 'active-filter' : ''}`}
-                        onClick={() => toggleColumnFilter('serialNumber', item.serialNumber)}
-                        title="Clique para filtrar por este nº de série"
-                      >
-                        {item.serialNumber || '—'}
-                      </td>
-                      <td
-                        className={`muted clickable-cell ${columnFilters.location === item.location ? 'active-filter' : ''}`}
-                        onClick={() => toggleColumnFilter('location', item.location)}
-                        title="Clique para filtrar por esta localização"
-                      >
-                        {item.location || '—'}
-                      </td>
-                      <td
-                        className={`muted clickable-cell ${columnFilters.responsibleName === item.responsible?.name ? 'active-filter' : ''}`}
-                        onClick={() => toggleColumnFilter('responsibleName', item.responsible?.name)}
-                        title="Clique para filtrar por este responsável"
-                      >
-                        {item.responsible?.name || '—'}
-                      </td>
-                      <td className="clickable-cell" onClick={() => toggleStatusFilter(item.status)} title="Clique para filtrar por este status">
-                        <Badge value={item.status} />
-                      </td>
+                      <td style={{ fontWeight: 500 }}>{item.name}</td>
+                      <td><Badge value={item.type} /></td>
+                      <td className="muted">{[item.brand, item.model].filter(Boolean).join(' / ') || '—'}</td>
+                      <td className="mono">{item.serialNumber || '—'}</td>
+                      <td className="muted">{item.location || '—'}</td>
+                      <td className="muted">{item.responsible?.name || '—'}</td>
+                      <td><Badge value={item.status} /></td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                           <button onClick={() => navigate(`/inventory/${item.id}`)} className="btn btn-default btn-sm">Detalhes</button>

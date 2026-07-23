@@ -13,8 +13,15 @@ import {
 const STATUSES = ['EM_ESTOQUE', 'EM_USO', 'EM_MANUTENCAO', 'DESCARTADO']
 const EMPTY_FORM = { model: '', printerModel: '', initialSector: '' }
 const PAGE_SIZE = 20
-const EMPTY_COLUMN_FILTERS = { code: '', model: '', printerModel: '', currentSector: '' }
-const COLUMN_FILTER_LABEL = { code: 'Código', model: 'Modelo', printerModel: 'Impressora', currentSector: 'Setor' }
+const COLUMNS = [
+  { label: 'Código', sortKey: 'code' },
+  { label: 'Modelo', sortKey: 'model' },
+  { label: 'Impressora', sortKey: 'printerModel' },
+  { label: 'Setor atual', sortKey: 'currentSector' },
+  { label: 'Status', sortKey: 'status' },
+  { label: 'Atualizado em', sortKey: 'updatedAt' },
+  { label: '', sortKey: null },
+]
 
 const EVENT_ICON = {
   CADASTRO: '📦', INSTALACAO: '📥', INICIO_MANUTENCAO: '🔧', FIM_MANUTENCAO: '✅', DESCARTE: '🗑️',
@@ -25,7 +32,8 @@ export default function CartridgesPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
-  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS)
+  const [sortField, setSortField] = useState('updatedAt')
+  const [sortDir, setSortDir]     = useState('desc')
 
   const [page, setPage]                   = useState(0)
   const [totalElements, setTotalElements] = useState(0)
@@ -53,12 +61,9 @@ export default function CartridgesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = { page, size: PAGE_SIZE }
+      const params = { page, size: PAGE_SIZE, sort: `${sortField},${sortDir}` }
       if (filterStatus) params.status = filterStatus
       if (search) params.search = search
-      Object.entries(columnFilters).forEach(([key, value]) => {
-        if (value) params[key] = value
-      })
       const data = await getCartridges(params)
       setCartridges(data.content)
       setTotalElements(data.totalElements)
@@ -66,30 +71,27 @@ export default function CartridgesPage() {
     } finally {
       setLoading(false)
     }
-  }, [filterStatus, search, columnFilters, page])
+  }, [filterStatus, search, sortField, sortDir, page])
 
   useEffect(() => { load() }, [load])
 
   const handleSearchChange = (e) => { setPage(0); setSearch(e.target.value) }
   const handleFilterStatusChange = (e) => { setPage(0); setFilterStatus(e.target.value) }
 
-  const toggleColumnFilter = (key, value) => {
-    if (!value) return
+  const handleSort = (key) => {
+    if (!key) return
     setPage(0)
-    setColumnFilters(prev => ({ ...prev, [key]: prev[key] === value ? '' : value }))
+    if (key === sortField) setSortDir(prev => prev === 'asc' ? 'desc' : 'asc')
+    else { setSortField(key); setSortDir('asc') }
   }
-
-  const toggleStatusFilter = (status) => { setPage(0); setFilterStatus(prev => prev === status ? '' : status) }
 
   const clearFilters = () => {
     setPage(0)
     setSearch('')
     setFilterStatus('')
-    setColumnFilters(EMPTY_COLUMN_FILTERS)
   }
 
-  const activeColumnFilters = Object.entries(columnFilters).filter(([, v]) => v)
-  const hasActiveFilters = !!(search || filterStatus || activeColumnFilters.length)
+  const hasActiveFilters = !!(search || filterStatus)
 
   const openCreate = () => {
     setForm(EMPTY_FORM)
@@ -263,17 +265,6 @@ export default function CartridgesPage() {
           )}
         </div>
 
-        {activeColumnFilters.length > 0 && (
-          <div className="filter-chips">
-            {activeColumnFilters.map(([key, value]) => (
-              <span key={key} className="filter-chip">
-                {COLUMN_FILTER_LABEL[key]}: <strong>{value}</strong>
-                <button type="button" onClick={() => { setPage(0); setColumnFilters(prev => ({ ...prev, [key]: '' })) }} aria-label="Remover filtro">✕</button>
-              </span>
-            ))}
-          </div>
-        )}
-
         <div className="card" style={{ overflow: 'hidden' }}>
           {loading ? (
             <div style={{ padding: 20, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -290,47 +281,28 @@ export default function CartridgesPage() {
               <table className="data-table">
                 <thead>
                   <tr>
-                    {['Código', 'Modelo', 'Impressora', 'Setor atual', 'Status', 'Atualizado em', ''].map(h => (
-                      <th key={h}>{h}</th>
+                    {COLUMNS.map(col => (
+                      <th
+                        key={col.label || 'actions'}
+                        className={col.sortKey ? 'sortable-header' : ''}
+                        onClick={() => handleSort(col.sortKey)}
+                      >
+                        {col.label}
+                        {col.sortKey && sortField === col.sortKey && (
+                          <span className="sort-arrow">{sortDir === 'asc' ? ' ▲' : ' ▼'}</span>
+                        )}
+                      </th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {cartridges.map(c => (
                     <tr key={c.id}>
-                      <td
-                        className={`mono clickable-cell ${columnFilters.code === c.code ? 'active-filter' : ''}`}
-                        style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}
-                        onClick={() => toggleColumnFilter('code', c.code)}
-                        title="Clique para filtrar por este código"
-                      >
-                        {c.code}
-                      </td>
-                      <td
-                        className={`clickable-cell ${columnFilters.model === c.model ? 'active-filter' : ''}`}
-                        style={{ fontWeight: 500 }}
-                        onClick={() => toggleColumnFilter('model', c.model)}
-                        title="Clique para filtrar por este modelo"
-                      >
-                        {c.model}
-                      </td>
-                      <td
-                        className={`muted clickable-cell ${columnFilters.printerModel === c.printerModel ? 'active-filter' : ''}`}
-                        onClick={() => toggleColumnFilter('printerModel', c.printerModel)}
-                        title="Clique para filtrar por esta impressora"
-                      >
-                        {c.printerModel || '—'}
-                      </td>
-                      <td
-                        className={`muted clickable-cell ${columnFilters.currentSector === c.currentSector ? 'active-filter' : ''}`}
-                        onClick={() => toggleColumnFilter('currentSector', c.currentSector)}
-                        title="Clique para filtrar por este setor"
-                      >
-                        {c.currentSector || '—'}
-                      </td>
-                      <td className="clickable-cell" onClick={() => toggleStatusFilter(c.status)} title="Clique para filtrar por este status">
-                        <Badge value={c.status} />
-                      </td>
+                      <td className="mono" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>{c.code}</td>
+                      <td style={{ fontWeight: 500 }}>{c.model}</td>
+                      <td className="muted">{c.printerModel || '—'}</td>
+                      <td className="muted">{c.currentSector || '—'}</td>
+                      <td><Badge value={c.status} /></td>
                       <td className="muted">{new Date(c.updatedAt).toLocaleString('pt-BR')}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
