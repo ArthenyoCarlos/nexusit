@@ -4,6 +4,7 @@ import Modal from '../components/Modal'
 import Badge from '../components/Badge'
 import ConfirmDialog from '../components/ConfirmDialog'
 import QrScannerModal from '../components/QrScannerModal'
+import Pagination from '../components/Pagination'
 import {
   getCartridges, getCartridge, createCartridge, installCartridge,
   startMaintenance, finishMaintenance, discardCartridge, getCartridgeEtiqueta,
@@ -11,6 +12,9 @@ import {
 
 const STATUSES = ['EM_ESTOQUE', 'EM_USO', 'EM_MANUTENCAO', 'DESCARTADO']
 const EMPTY_FORM = { model: '', printerModel: '', initialSector: '' }
+const PAGE_SIZE = 20
+const EMPTY_COLUMN_FILTERS = { code: '', model: '', printerModel: '', currentSector: '' }
+const COLUMN_FILTER_LABEL = { code: 'Código', model: 'Modelo', printerModel: 'Impressora', currentSector: 'Setor' }
 
 const EVENT_ICON = {
   CADASTRO: '📦', INSTALACAO: '📥', INICIO_MANUTENCAO: '🔧', FIM_MANUTENCAO: '✅', DESCARTE: '🗑️',
@@ -21,6 +25,11 @@ export default function CartridgesPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [columnFilters, setColumnFilters] = useState(EMPTY_COLUMN_FILTERS)
+
+  const [page, setPage]                   = useState(0)
+  const [totalElements, setTotalElements] = useState(0)
+  const [totalPages, setTotalPages]       = useState(0)
 
   const [createOpen, setCreateOpen] = useState(false)
   const [form, setForm] = useState(EMPTY_FORM)
@@ -44,16 +53,43 @@ export default function CartridgesPage() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const params = {}
+      const params = { page, size: PAGE_SIZE }
       if (filterStatus) params.status = filterStatus
       if (search) params.search = search
-      setCartridges(await getCartridges(params))
+      Object.entries(columnFilters).forEach(([key, value]) => {
+        if (value) params[key] = value
+      })
+      const data = await getCartridges(params)
+      setCartridges(data.content)
+      setTotalElements(data.totalElements)
+      setTotalPages(data.totalPages)
     } finally {
       setLoading(false)
     }
-  }, [filterStatus, search])
+  }, [filterStatus, search, columnFilters, page])
 
   useEffect(() => { load() }, [load])
+
+  const handleSearchChange = (e) => { setPage(0); setSearch(e.target.value) }
+  const handleFilterStatusChange = (e) => { setPage(0); setFilterStatus(e.target.value) }
+
+  const toggleColumnFilter = (key, value) => {
+    if (!value) return
+    setPage(0)
+    setColumnFilters(prev => ({ ...prev, [key]: prev[key] === value ? '' : value }))
+  }
+
+  const toggleStatusFilter = (status) => { setPage(0); setFilterStatus(prev => prev === status ? '' : status) }
+
+  const clearFilters = () => {
+    setPage(0)
+    setSearch('')
+    setFilterStatus('')
+    setColumnFilters(EMPTY_COLUMN_FILTERS)
+  }
+
+  const activeColumnFilters = Object.entries(columnFilters).filter(([, v]) => v)
+  const hasActiveFilters = !!(search || filterStatus || activeColumnFilters.length)
 
   const openCreate = () => {
     setForm(EMPTY_FORM)
@@ -198,7 +234,7 @@ export default function CartridgesPage() {
         <div className="page-header">
           <div className="page-header-left">
             <h1>Cartuchos de Impressora</h1>
-            <p>{cartridges.length} cartucho(s) encontrado(s)</p>
+            <p>{totalElements} cartucho(s) encontrado(s)</p>
           </div>
           <div style={{ display: 'flex', gap: 8 }}>
             <button onClick={() => setScannerOpen(true)} className="btn btn-default">📷 Escanear QR</button>
@@ -214,15 +250,29 @@ export default function CartridgesPage() {
 
         <div className="filter-bar">
           <input
-            value={search} onChange={e => setSearch(e.target.value)}
+            value={search} onChange={handleSearchChange}
             placeholder="Buscar por código, modelo ou setor..."
             className="input" style={{ width: 240, height: 32 }}
           />
-          <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="input" style={{ width: 'auto', height: 32 }}>
+          <select value={filterStatus} onChange={handleFilterStatusChange} className="input" style={{ width: 'auto', height: 32 }}>
             <option value="">Todos os status</option>
             {STATUSES.map(s => <option key={s} value={s}>{statusLabel[s]}</option>)}
           </select>
+          {hasActiveFilters && (
+            <button type="button" onClick={clearFilters} className="btn btn-default btn-sm">✕ Limpar filtros</button>
+          )}
         </div>
+
+        {activeColumnFilters.length > 0 && (
+          <div className="filter-chips">
+            {activeColumnFilters.map(([key, value]) => (
+              <span key={key} className="filter-chip">
+                {COLUMN_FILTER_LABEL[key]}: <strong>{value}</strong>
+                <button type="button" onClick={() => { setPage(0); setColumnFilters(prev => ({ ...prev, [key]: '' })) }} aria-label="Remover filtro">✕</button>
+              </span>
+            ))}
+          </div>
+        )}
 
         <div className="card" style={{ overflow: 'hidden' }}>
           {loading ? (
@@ -248,11 +298,39 @@ export default function CartridgesPage() {
                 <tbody>
                   {cartridges.map(c => (
                     <tr key={c.id}>
-                      <td className="mono" style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}>{c.code}</td>
-                      <td style={{ fontWeight: 500 }}>{c.model}</td>
-                      <td className="muted">{c.printerModel || '—'}</td>
-                      <td className="muted">{c.currentSector || '—'}</td>
-                      <td><Badge value={c.status} /></td>
+                      <td
+                        className={`mono clickable-cell ${columnFilters.code === c.code ? 'active-filter' : ''}`}
+                        style={{ fontSize: 12, color: 'var(--accent)', fontWeight: 600 }}
+                        onClick={() => toggleColumnFilter('code', c.code)}
+                        title="Clique para filtrar por este código"
+                      >
+                        {c.code}
+                      </td>
+                      <td
+                        className={`clickable-cell ${columnFilters.model === c.model ? 'active-filter' : ''}`}
+                        style={{ fontWeight: 500 }}
+                        onClick={() => toggleColumnFilter('model', c.model)}
+                        title="Clique para filtrar por este modelo"
+                      >
+                        {c.model}
+                      </td>
+                      <td
+                        className={`muted clickable-cell ${columnFilters.printerModel === c.printerModel ? 'active-filter' : ''}`}
+                        onClick={() => toggleColumnFilter('printerModel', c.printerModel)}
+                        title="Clique para filtrar por esta impressora"
+                      >
+                        {c.printerModel || '—'}
+                      </td>
+                      <td
+                        className={`muted clickable-cell ${columnFilters.currentSector === c.currentSector ? 'active-filter' : ''}`}
+                        onClick={() => toggleColumnFilter('currentSector', c.currentSector)}
+                        title="Clique para filtrar por este setor"
+                      >
+                        {c.currentSector || '—'}
+                      </td>
+                      <td className="clickable-cell" onClick={() => toggleStatusFilter(c.status)} title="Clique para filtrar por este status">
+                        <Badge value={c.status} />
+                      </td>
                       <td className="muted">{new Date(c.updatedAt).toLocaleString('pt-BR')}</td>
                       <td>
                         <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
@@ -266,6 +344,8 @@ export default function CartridgesPage() {
             </div>
           )}
         </div>
+
+        <Pagination page={page} totalPages={totalPages} totalElements={totalElements} onPageChange={setPage} />
       </div>
 
       {/* Modal de criação */}

@@ -2,11 +2,12 @@ package br.com.nexusit.inventory;
 
 import br.com.nexusit.user.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Year;
-import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -17,11 +18,13 @@ public class InventoryService {
     private final InventoryRepository repository;
     private final UserRepository userRepository;
 
-    public List<InventoryResponse> findAll(ItemType type, ItemStatus status, String search) {
-        List<InventoryItem> items = (search != null && !search.isBlank())
-                ? repository.findByFiltersWithSearch(type, status, search)
-                : repository.findByTypeAndStatus(type, status);
-        return items.stream().map(InventoryResponse::from).toList();
+    public Page<InventoryResponse> findAll(ItemType type, ItemStatus status, String search,
+                                            String tombamento, String name, String brand, String model,
+                                            String serialNumber, String location, String responsibleName,
+                                            Pageable pageable) {
+        return repository.findByFilters(type, status, search, tombamento, name, brand, model,
+                        serialNumber, location, responsibleName, pageable)
+                .map(InventoryResponse::from);
     }
 
     public InventoryResponse findById(UUID id) {

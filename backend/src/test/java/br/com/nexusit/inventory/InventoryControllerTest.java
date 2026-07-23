@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageImpl;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -15,6 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -38,12 +40,14 @@ class InventoryControllerTest {
 
     @Test
     void listAll_returnsOkWithItems() throws Exception {
-        given(service.findAll(null, null, null)).willReturn(List.of(sampleResponse()));
+        given(service.findAll(isNull(), isNull(), isNull(), isNull(), isNull(), isNull(),
+                isNull(), isNull(), isNull(), isNull(), any()))
+                .willReturn(new PageImpl<>(List.of(sampleResponse())));
 
         mockMvc.perform(get("/api/inventory"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].name").value("Computador Dell"))
-                .andExpect(jsonPath("$[0].type").value("COMPUTADOR"));
+                .andExpect(jsonPath("$.content[0].name").value("Computador Dell"))
+                .andExpect(jsonPath("$.content[0].type").value("COMPUTADOR"));
     }
 
     @Test

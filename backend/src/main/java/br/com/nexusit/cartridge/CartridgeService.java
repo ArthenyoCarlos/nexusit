@@ -3,6 +3,8 @@ package br.com.nexusit.cartridge;
 import br.com.nexusit.user.User;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,18 +27,10 @@ public class CartridgeService {
     private final CartridgeRepository repository;
     private final CartridgeEventRepository eventRepository;
 
-    public List<CartridgeResponse> list(String status, String search) {
-        List<Cartridge> all = repository.findAllByOrderByUpdatedAtDesc();
-        String q = search == null ? "" : search.trim().toLowerCase();
-        return all.stream()
-                .filter(c -> status == null || status.isBlank() || c.getStatus().name().equals(status))
-                .filter(c -> q.isBlank()
-                        || c.getModel().toLowerCase().contains(q)
-                        || c.getCode().toLowerCase().contains(q)
-                        || (c.getCurrentSector() != null && c.getCurrentSector().toLowerCase().contains(q))
-                        || (c.getPrinterModel() != null && c.getPrinterModel().toLowerCase().contains(q)))
-                .map(CartridgeResponse::from)
-                .toList();
+    public Page<CartridgeResponse> list(CartridgeStatus status, String search, String code, String model,
+                                         String printerModel, String currentSector, Pageable pageable) {
+        return repository.findByFilters(status, search, code, model, printerModel, currentSector, pageable)
+                .map(CartridgeResponse::from);
     }
 
     public CartridgeDetailResponse findById(UUID id) {
