@@ -533,7 +533,7 @@ function InfoLine({ label, value, warn = false }) {
   )
 }
 
-function UnstableApsSection({ instability, onCreateTicket, onAnalyze, busyTicket }) {
+function UnstableApsSection({ instability, analysis, analysisRef, onCloseAnalysis, onCreateTicket, onAnalyze, busyTicket }) {
   const items = instability?.items ?? []
   const recommended = items.filter(item => item.ticketRecommended)
   return (
@@ -552,6 +552,19 @@ function UnstableApsSection({ instability, onCreateTicket, onAnalyze, busyTicket
           <span className="badge badge-gray">{instability?.estimatedOfflineMinutes24h ?? 0}min offline</span>
         </div>
       </div>
+
+      {analysis && (
+        <div ref={analysisRef} className="card" style={{ padding: 14, marginBottom: 14, borderColor: 'rgba(59,130,246,.35)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+            <div>
+              <p className="label-caps">Análise com Hermes</p>
+              <h3 style={{ color: 'var(--text-primary)', fontSize: 14, marginTop: 4 }}>{analysis.title}</h3>
+            </div>
+            <button className="btn btn-secondary" onClick={onCloseAnalysis}>Fechar</button>
+          </div>
+          <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', fontSize: 12.5, marginTop: 10, lineHeight: 1.45 }}>{analysis.text}</pre>
+        </div>
+      )}
 
       {items.length === 0 ? (
         <div style={{ padding: 14, borderRadius: 12, background: 'var(--bg-subtle)', border: '1px dashed var(--border-muted)', color: 'var(--text-tertiary)', fontSize: 13 }}>
@@ -611,6 +624,7 @@ export default function UnifiApMonitoringPage() {
   const [busyTicket, setBusyTicket] = useState(null)
   const [notice, setNotice] = useState('')
   const [analysis, setAnalysis] = useState(null)
+  const analysisRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState(null)
@@ -683,6 +697,8 @@ export default function UnifiApMonitoringPage() {
     try {
       const res = await getIncidentAnalysis(item.incidentId)
       setAnalysis({ title: item.apName, text: res.data.analysis })
+      setNotice('Análise gerada na seção APs instáveis.')
+      setTimeout(() => analysisRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
     } catch (e) {
       setNotice(e?.response?.data?.message || e?.message || 'Falha ao analisar incidente do AP.')
     }
@@ -736,15 +752,6 @@ export default function UnifiApMonitoringPage() {
 
         {error && <div className="card" style={{ padding: 16, borderColor: 'var(--red)', color: 'var(--red)' }}>{error}</div>}
         {notice && <div className="card" style={{ padding: 14, marginBottom: 16, borderColor: notice.includes('Falha') ? 'var(--red)' : 'var(--green)', color: notice.includes('Falha') ? 'var(--red)' : 'var(--green)' }}>{notice}</div>}
-        {analysis && (
-          <div className="card" style={{ padding: 14, marginBottom: 16, borderColor: 'rgba(59,130,246,.35)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
-              <div><p className="label-caps">Análise com Hermes</p><h3 style={{ color: 'var(--text-primary)', fontSize: 14, marginTop: 4 }}>{analysis.title}</h3></div>
-              <button className="btn btn-secondary" onClick={() => setAnalysis(null)}>Fechar</button>
-            </div>
-            <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', fontSize: 12.5, marginTop: 10, lineHeight: 1.45 }}>{analysis.text}</pre>
-          </div>
-        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 22 }}>
           <Kpi label="APs monitorados" value={summary.total} hint="Coleta a cada 1 minuto" detail={kpiDetails.total} />
@@ -768,7 +775,7 @@ export default function UnifiApMonitoringPage() {
           </div>
         </section>
 
-        <UnstableApsSection instability={instability} onCreateTicket={handleCreateInvestigationTicket} onAnalyze={handleAnalyzeIncident} busyTicket={busyTicket} />
+        <UnstableApsSection instability={instability} analysis={analysis} analysisRef={analysisRef} onCloseAnalysis={() => setAnalysis(null)} onCreateTicket={handleCreateInvestigationTicket} onAnalyze={handleAnalyzeIncident} busyTicket={busyTicket} />
 
         <ClientMonitorSection payload={payload} />
 

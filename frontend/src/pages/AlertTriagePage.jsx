@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Layout from '../components/Layout'
 import { createAlertTicket, decideAlert, getAlertTriage, getIncidentAnalysis, updateAlertRuleEnabled } from '../services/monitoring'
 
@@ -44,6 +44,7 @@ export default function AlertTriagePage() {
   const [showSuppressed, setShowSuppressed] = useState(true)
   const [reason, setReason] = useState('')
   const [analysis, setAnalysis] = useState(null)
+  const analysisRef = useRef(null)
 
   const load = useCallback(async () => {
     try {
@@ -121,7 +122,7 @@ export default function AlertTriagePage() {
         </div>
 
         {analysis && (
-          <div className="card" style={{ padding: 14, marginBottom: 18, borderColor: 'rgba(59,130,246,.35)' }}>
+          <div ref={analysisRef} className="card" style={{ padding: 14, marginBottom: 18, borderColor: 'rgba(59,130,246,.35)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
               <div>
                 <p className="label-caps">Análise com Hermes</p>
@@ -163,6 +164,7 @@ export default function AlertTriagePage() {
                       <button className="btn btn-secondary" disabled={!!busy || !item.incidentId} onClick={() => run(`analysis-${item.eventId}`, async () => {
                         const res = await getIncidentAnalysis(item.incidentId)
                         setAnalysis({ title: `${item.hostName}: ${item.alertName}`, text: res.data.analysis })
+                        setTimeout(() => analysisRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50)
                         return 'Análise gerada abaixo.'
                       })}>Analisar</button>
                       <button className="btn btn-secondary" disabled={!!busy} onClick={() => run(`silence-${item.eventId}`, async () => {
