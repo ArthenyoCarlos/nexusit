@@ -15,6 +15,7 @@ const NAV = [
       { label: 'Dash. Executivo', path: '/dashboard/executive', Icon: IconExecutive, adminOnly: true },
       { label: 'NexusAI',       path: '/hermes',     Icon: IconHermes     },
       { label: 'Monitoramento', path: '/monitoring', Icon: IconMonitor    },
+      { label: 'Triagem Alertas', path: '/monitoring/triage', Icon: IconMonitor },
       { label: 'APs UniFi',     path: '/monitoring/aps', Icon: IconWifi   },
     ],
   },

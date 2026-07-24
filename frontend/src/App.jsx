@@ -10,6 +10,7 @@ import SystemsPage from './pages/SystemsPage'
 import DependencyMapPage from './pages/DependencyMapPage'
 import InventoryPage from './pages/InventoryPage'
 import MonitoringPage from './pages/MonitoringPage'
+import AlertTriagePage from './pages/AlertTriagePage'
 import UnifiApMonitoringPage from './pages/UnifiApMonitoringPage'
 import TvDashboardPage from './pages/TvDashboardPage'
 import TicketsPage from './pages/TicketsPage'
@@ -85,6 +86,7 @@ export default function App() {
                   <Route path="/dashboard/executive" element={<ExecutiveDashboardPage />} />
                   <Route path="/hermes"     element={<HermesPage />} />
                   <Route path="/monitoring" element={<MonitoringPage />} />
+                  <Route path="/monitoring/triage" element={<AlertTriagePage />} />
                   <Route path="/monitoring/aps" element={<UnifiApMonitoringPage />} />
                   <Route path="/systems"        element={<SystemsPage />} />
                   <Route path="/dependency-map" element={<DependencyMapPage />} />
