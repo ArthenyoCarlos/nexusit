@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import Layout from '../components/Layout'
-import { createAlertTicket, decideAlert, getAlertTriage, updateAlertRuleEnabled } from '../services/monitoring'
+import { createAlertTicket, decideAlert, getAlertTriage, getIncidentAnalysis, updateAlertRuleEnabled } from '../services/monitoring'
 
 const ACTION_LABELS = {
   SHOW_ONLY: 'Mostrar na triagem',
@@ -43,6 +43,7 @@ export default function AlertTriagePage() {
   const [msg, setMsg] = useState(null)
   const [showSuppressed, setShowSuppressed] = useState(true)
   const [reason, setReason] = useState('')
+  const [analysis, setAnalysis] = useState(null)
 
   const load = useCallback(async () => {
     try {
@@ -119,6 +120,19 @@ export default function AlertTriagePage() {
           </div>
         </div>
 
+        {analysis && (
+          <div className="card" style={{ padding: 14, marginBottom: 18, borderColor: 'rgba(59,130,246,.35)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'start' }}>
+              <div>
+                <p className="label-caps">Análise com Hermes</p>
+                <h3 style={{ color: 'var(--text-primary)', fontSize: 14, marginTop: 4 }}>{analysis.title}</h3>
+              </div>
+              <button className="btn btn-secondary" onClick={() => setAnalysis(null)}>Fechar</button>
+            </div>
+            <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', fontSize: 12.5, marginTop: 10, lineHeight: 1.45 }}>{analysis.text}</pre>
+          </div>
+        )}
+
         <section style={{ marginBottom: 26 }}>
           <p className="label-caps" style={{ marginBottom: 10 }}>Alertas ativos do Zabbix</p>
           {loading ? <div className="skeleton" style={{ height: 160 }} /> : items.length === 0 ? (
@@ -137,14 +151,20 @@ export default function AlertTriagePage() {
                       <h3 style={{ fontSize: 15, color: 'var(--text-primary)', marginBottom: 4 }}>{item.hostName}</h3>
                       <p style={{ fontSize: 13.2, color: 'var(--text-secondary)' }}>{item.alertName}</p>
                       <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 7 }}>Detectado: {fmtClock(item.clock)} · Event ID: {item.eventId}</p>
+                      <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 5 }}>Incidente: {item.incidentId ? item.incidentId.slice(0, 8) : '—'} · Ocorrências: {item.occurrenceCount ?? 1} {item.glpiTicketId ? `· GLPI #${item.glpiTicketId}` : ''}</p>
                       {item.ruleReason && <p style={{ fontSize: 12, color: 'var(--text-tertiary)', marginTop: 5 }}>Motivo: {item.ruleReason}</p>}
                       <p style={{ fontSize: 12.5, color: 'var(--text-secondary)', marginTop: 8 }}>{item.recommendation}</p>
                     </div>
                     <div style={{ display: 'flex', gap: 8, alignItems: 'flex-start', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                       <button className="btn btn-primary" disabled={!!busy} onClick={() => run(`ticket-${item.eventId}`, async () => {
                         const res = await createAlertTicket(item.eventId)
-                        return `Chamado GLPI #${res.data.ticketId} criado para ${item.hostName}.`
-                      })}>Criar GLPI</button>
+                        return `${res.data.created ? 'Chamado GLPI criado' : 'Chamado já existia'} #${res.data.ticketId} para ${item.hostName}.`
+                      })}>{item.glpiTicketId ? `GLPI #${item.glpiTicketId}` : 'Criar GLPI'}</button>
+                      <button className="btn btn-secondary" disabled={!!busy || !item.incidentId} onClick={() => run(`analysis-${item.eventId}`, async () => {
+                        const res = await getIncidentAnalysis(item.incidentId)
+                        setAnalysis({ title: `${item.hostName}: ${item.alertName}`, text: res.data.analysis })
+                        return 'Análise gerada abaixo.'
+                      })}>Analisar</button>
                       <button className="btn btn-secondary" disabled={!!busy} onClick={() => run(`silence-${item.eventId}`, async () => {
                         await decideAlert({ eventId: item.eventId, action: 'SILENCE_TEMPORARILY', reason: reason || 'Silenciado pela triagem NexusIT' })
                         return 'Alerta silenciado por 24h.'

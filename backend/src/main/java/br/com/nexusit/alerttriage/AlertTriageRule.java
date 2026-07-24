@@ -40,6 +40,15 @@ public class AlertTriageRule {
     @Column(name = "silenced_until")
     private LocalDateTime silencedUntil;
 
+    @Column(name = "min_duration_minutes")
+    private Integer minDurationMinutes;
+
+    @Column(name = "recurrence_window_minutes")
+    private Integer recurrenceWindowMinutes;
+
+    @Column(name = "recurrence_count_threshold")
+    private Integer recurrenceCountThreshold;
+
     @Column(nullable = false)
     private boolean enabled;
 

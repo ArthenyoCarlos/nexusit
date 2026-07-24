@@ -6,5 +6,8 @@ public record AlertTriageDecisionRequest(
         String eventId,
         AlertTriageAction action,
         String reason,
-        LocalDateTime silencedUntil
+        LocalDateTime silencedUntil,
+        Integer minDurationMinutes,
+        Integer recurrenceWindowMinutes,
+        Integer recurrenceCountThreshold
 ) {}

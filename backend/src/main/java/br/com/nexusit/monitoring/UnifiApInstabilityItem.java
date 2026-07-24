@@ -27,5 +27,8 @@ public record UnifiApInstabilityItem(
         boolean ticketRecommended,
         int score,
         String recommendation,
-        String reason
+        String reason,
+        java.util.UUID incidentId,
+        Integer glpiTicketId,
+        int occurrenceCount
 ) {}

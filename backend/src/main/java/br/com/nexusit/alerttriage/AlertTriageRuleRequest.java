@@ -10,5 +10,8 @@ public record AlertTriageRuleRequest(
         AlertTriageAction action,
         String reason,
         LocalDateTime silencedUntil,
+        Integer minDurationMinutes,
+        Integer recurrenceWindowMinutes,
+        Integer recurrenceCountThreshold,
         Boolean enabled
 ) {}

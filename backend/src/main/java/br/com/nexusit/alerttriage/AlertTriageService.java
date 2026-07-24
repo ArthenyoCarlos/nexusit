@@ -1,6 +1,8 @@
 package br.com.nexusit.alerttriage;
 
 import br.com.nexusit.glpi.GlpiClient;
+import br.com.nexusit.incident.CorrelatedIncident;
+import br.com.nexusit.incident.CorrelatedIncidentService;
 import br.com.nexusit.monitoring.ZabbixProblem;
 import br.com.nexusit.monitoring.ZabbixService;
 import br.com.nexusit.user.User;
@@ -22,6 +24,7 @@ public class AlertTriageService {
     private final AlertTriageRuleRepository repository;
     private final ZabbixService zabbixService;
     private final GlpiClient glpiClient;
+    private final CorrelatedIncidentService incidentService;
 
     @Value("${application.glpi.category-id:${GLPI_CATEGORY_ID:1}}")
     private int glpiCategoryId;
@@ -29,6 +32,7 @@ public class AlertTriageService {
     @Value("${application.glpi.assign-user-id:${GLPI_ASSIGN_USER_ID:2}}")
     private int glpiAssignUserId;
 
+    @Transactional
     public AlertTriageSummary getSummary(boolean includeSuppressed) {
         List<AlertTriageRule> rules = repository.findByEnabledTrueOrderByUpdatedAtDesc();
         List<AlertTriageRuleResponse> allRules = repository.findAllByOrderByUpdatedAtDesc().stream()
@@ -44,12 +48,20 @@ public class AlertTriageService {
             boolean suppressed = action == AlertTriageAction.IGNORE || action == AlertTriageAction.SILENCE_TEMPORARILY;
             if (suppressed && !includeSuppressed) continue;
             long age = Math.max(0, now - p.clock());
-            boolean ticketEligible = action == AlertTriageAction.CREATE_TICKET_IMMEDIATELY || p.severity() >= 4;
+            CorrelatedIncident incident = incidentService.touchZabbix(p);
+            boolean durationReady = rule == null || rule.getMinDurationMinutes() == null || age >= rule.getMinDurationMinutes() * 60L;
+            boolean recurrenceReady = rule == null || rule.getRecurrenceCountThreshold() == null || incident.getOccurrenceCount() >= rule.getRecurrenceCountThreshold();
+            boolean ticketEligible = incident.getOpenGlpiTicketId() != null
+                    || action == AlertTriageAction.CREATE_TICKET_IMMEDIATELY
+                    || (action == AlertTriageAction.CREATE_TICKET_AFTER_DELAY && durationReady)
+                    || (action == AlertTriageAction.CREATE_TICKET_ON_RECURRENCE && recurrenceReady)
+                    || (rule == null && p.severity() >= 4);
             String status = switch (action) {
                 case IGNORE -> "DESCARTADO";
                 case SILENCE_TEMPORARILY -> "SILENCIADO";
                 case CREATE_TICKET_IMMEDIATELY -> "ACIONAVEL";
-                case CREATE_TICKET_AFTER_DELAY, CREATE_TICKET_ON_RECURRENCE -> "AGUARDANDO_REGRA";
+                case CREATE_TICKET_AFTER_DELAY -> durationReady ? "ACIONAVEL_POR_DURACAO" : "AGUARDANDO_DURACAO";
+                case CREATE_TICKET_ON_RECURRENCE -> recurrenceReady ? "ACIONAVEL_POR_RECORRENCIA" : "AGUARDANDO_RECORRENCIA";
                 case SHOW_ONLY -> "TRIAGEM";
             };
             items.add(new AlertTriageItem(
@@ -57,7 +69,8 @@ public class AlertTriageService {
                     status, action, AlertTriageRuleResponse.label(action), rule != null ? rule.getId() : null,
                     rule != null ? rule.getReason() : null, rule != null ? rule.getSilencedUntil() : null,
                     ticketEligible,
-                    recommendation(p, action, age)));
+                    recommendation(p, action, age, rule, incident), incident.getId(), incident.getOpenGlpiTicketId(),
+                    incident.getOccurrenceCount(), incident.getSummary(), incident.getRecommendation()));
         }
         int ignored = (int) items.stream().filter(i -> i.action() == AlertTriageAction.IGNORE).count();
         int silenced = (int) items.stream().filter(i -> i.action() == AlertTriageAction.SILENCE_TEMPORARILY).count();
@@ -77,6 +90,9 @@ public class AlertTriageService {
                 .action(req.action() != null ? req.action() : AlertTriageAction.SHOW_ONLY)
                 .reason(blankToNull(req.reason()))
                 .silencedUntil(req.silencedUntil())
+                .minDurationMinutes(req.minDurationMinutes())
+                .recurrenceWindowMinutes(req.recurrenceWindowMinutes())
+                .recurrenceCountThreshold(req.recurrenceCountThreshold())
                 .enabled(req.enabled() == null || req.enabled())
                 .createdBy(user)
                 .build();
@@ -97,6 +113,9 @@ public class AlertTriageService {
                 .action(action)
                 .reason(blankToNull(req.reason()))
                 .silencedUntil(until)
+                .minDurationMinutes(req.minDurationMinutes())
+                .recurrenceWindowMinutes(req.recurrenceWindowMinutes())
+                .recurrenceCountThreshold(req.recurrenceCountThreshold())
                 .enabled(true)
                 .createdBy(user)
                 .build();
@@ -113,6 +132,9 @@ public class AlertTriageService {
         if (req.action() != null) rule.setAction(req.action());
         rule.setReason(blankToNull(req.reason()));
         rule.setSilencedUntil(req.silencedUntil());
+        rule.setMinDurationMinutes(req.minDurationMinutes());
+        rule.setRecurrenceWindowMinutes(req.recurrenceWindowMinutes());
+        rule.setRecurrenceCountThreshold(req.recurrenceCountThreshold());
         rule.setEnabled(req.enabled() == null || req.enabled());
         return AlertTriageRuleResponse.from(repository.save(rule));
     }
@@ -127,8 +149,13 @@ public class AlertTriageService {
     @Transactional
     public Map<String, Object> createTicket(String eventId) {
         ZabbixProblem p = findProblem(eventId);
-        int ticketId = createGlpiTicket(p);
-        return Map.of("ticketId", ticketId, "eventId", p.id(), "hostName", p.hostName(), "alertName", p.name());
+        CorrelatedIncident incident = incidentService.touchZabbix(p);
+        Map<String, Object> result = incidentService.createOrReuseTicket(incident.getId(), "Solicitado pela Central de Triagem de Alertas do NexusIT.");
+        return new LinkedHashMap<>(result) {{
+            put("eventId", p.id());
+            put("hostName", p.hostName());
+            put("alertName", p.name());
+        }};
     }
 
     public Optional<AlertTriageRule> findBestRule(ZabbixProblem p, List<AlertTriageRule> rules) {
@@ -150,9 +177,18 @@ public class AlertTriageService {
         return p.severity() >= 4 ? AlertTriageAction.CREATE_TICKET_IMMEDIATELY : AlertTriageAction.SHOW_ONLY;
     }
 
-    private String recommendation(ZabbixProblem p, AlertTriageAction action, long ageSeconds) {
+    private String recommendation(ZabbixProblem p, AlertTriageAction action, long ageSeconds, AlertTriageRule rule, CorrelatedIncident incident) {
+        if (incident != null && incident.getOpenGlpiTicketId() != null) return "Já existe GLPI vinculado: #" + incident.getOpenGlpiTicketId() + ". Novas evidências viram follow-up.";
         if (action == AlertTriageAction.IGNORE) return "Alerta descartado por regra. Não abre GLPI.";
         if (action == AlertTriageAction.SILENCE_TEMPORARILY) return "Alerta silenciado temporariamente. Pode ser reativado nas regras.";
+        if (action == AlertTriageAction.CREATE_TICKET_AFTER_DELAY && rule != null && rule.getMinDurationMinutes() != null) {
+            long target = rule.getMinDurationMinutes() * 60L;
+            return ageSeconds >= target ? "Persistência atingida: pode abrir GLPI." : "Aguardando persistir por " + rule.getMinDurationMinutes() + " min antes de abrir GLPI.";
+        }
+        if (action == AlertTriageAction.CREATE_TICKET_ON_RECURRENCE && rule != null && rule.getRecurrenceCountThreshold() != null) {
+            int count = incident != null ? incident.getOccurrenceCount() : 0;
+            return count >= rule.getRecurrenceCountThreshold() ? "Recorrência atingida: pode abrir GLPI." : "Aguardando recorrência: " + count + "/" + rule.getRecurrenceCountThreshold() + " ocorrência(s).";
+        }
         if (p.severity() >= 4) return "Severidade alta: recomendado criar chamado se ainda não existir.";
         if (ageSeconds < 600) return "Evento recente: manter em observação antes de abrir GLPI.";
         return "Avaliar recorrência/duração e criar chamado se exigir ação humana.";

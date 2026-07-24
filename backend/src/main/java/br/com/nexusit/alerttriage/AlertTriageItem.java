@@ -18,5 +18,10 @@ public record AlertTriageItem(
         String ruleReason,
         LocalDateTime silencedUntil,
         boolean ticketEligible,
-        String recommendation
+        String recommendation,
+        java.util.UUID incidentId,
+        Integer glpiTicketId,
+        int occurrenceCount,
+        String incidentSummary,
+        String incidentRecommendation
 ) {}

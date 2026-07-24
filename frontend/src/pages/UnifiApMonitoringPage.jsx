@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Layout from '../components/Layout'
 import MetricChartCard from '../components/MetricChartCard'
-import { createUnifiApInvestigationTicket, getUnifiApInstability, getUnifiApPanel, getUnifiApHistory } from '../services/monitoring'
+import { createUnifiApInvestigationTicket, getIncidentAnalysis, getUnifiApInstability, getUnifiApPanel, getUnifiApHistory } from '../services/monitoring'
 import { analyzeMonitoredClients, buildApSummary, enrichAps, explainApLast24h, explainKpiSummary, explainUnifiEvent, formatDuration, formatMs, formatRateKbps, normalizeMac, statusLabel } from '../utils/unifiApPanel'
 
 const statusStyle = {
@@ -533,7 +533,7 @@ function InfoLine({ label, value, warn = false }) {
   )
 }
 
-function UnstableApsSection({ instability, onCreateTicket, busyTicket }) {
+function UnstableApsSection({ instability, onCreateTicket, onAnalyze, busyTicket }) {
   const items = instability?.items ?? []
   const recommended = items.filter(item => item.ticketRecommended)
   return (
@@ -569,13 +569,18 @@ function UnstableApsSection({ instability, onCreateTicket, busyTicket }) {
                       <strong style={{ color: 'var(--text-primary)', fontSize: 14 }}>{item.apName}</strong>
                       <span className="badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>{item.ticketRecommended ? 'Abrir GLPI recomendado' : 'Observar'}</span>
                       <span className="badge badge-gray">score {item.score}</span>
+                      <span className="badge badge-gray">ocorr. {item.occurrenceCount ?? 1}</span>
+                      {item.glpiTicketId && <span className="badge badge-blue">GLPI #{item.glpiTicketId}</span>}
                     </div>
                     <p style={{ color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: 1.45 }}>{item.reason}</p>
                     <p style={{ color: s.color, fontSize: 12.5, marginTop: 6, fontWeight: 700 }}>{item.recommendation}</p>
                   </div>
-                  <button type="button" className="btn btn-primary" disabled={busyTicket === item.apName} onClick={() => onCreateTicket(item)} style={{ whiteSpace: 'nowrap' }}>
-                    {busyTicket === item.apName ? 'Criando...' : 'Criar GLPI'}
-                  </button>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn btn-primary" disabled={busyTicket === item.apName} onClick={() => onCreateTicket(item)} style={{ whiteSpace: 'nowrap' }}>
+                      {busyTicket === item.apName ? 'Criando...' : (item.glpiTicketId ? `GLPI #${item.glpiTicketId}` : 'Criar GLPI')}
+                    </button>
+                    <button type="button" className="btn btn-secondary" disabled={!item.incidentId} onClick={() => onAnalyze(item)} style={{ whiteSpace: 'nowrap' }}>Analisar</button>
+                  </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginTop: 11 }}>
                   <MiniMetric label="Quedas 24h" value={`${item.downWindows24h}`} tone={item.downWindows24h ? 'warning' : 'healthy'} />
@@ -605,6 +610,7 @@ export default function UnifiApMonitoringPage() {
   const [instability, setInstability] = useState(null)
   const [busyTicket, setBusyTicket] = useState(null)
   const [notice, setNotice] = useState('')
+  const [analysis, setAnalysis] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState(null)
@@ -672,6 +678,16 @@ export default function UnifiApMonitoringPage() {
     }
   }
 
+  const handleAnalyzeIncident = async (item) => {
+    if (!item.incidentId) return
+    try {
+      const res = await getIncidentAnalysis(item.incidentId)
+      setAnalysis({ title: item.apName, text: res.data.analysis })
+    } catch (e) {
+      setNotice(e?.response?.data?.message || e?.message || 'Falha ao analisar incidente do AP.')
+    }
+  }
+
   const aps = useMemo(() => enrichAps(payload?.aps ?? []), [payload])
   const filteredAps = useMemo(() => {
     const q = apSearch.trim().toLowerCase()
@@ -720,6 +736,15 @@ export default function UnifiApMonitoringPage() {
 
         {error && <div className="card" style={{ padding: 16, borderColor: 'var(--red)', color: 'var(--red)' }}>{error}</div>}
         {notice && <div className="card" style={{ padding: 14, marginBottom: 16, borderColor: notice.includes('Falha') ? 'var(--red)' : 'var(--green)', color: notice.includes('Falha') ? 'var(--red)' : 'var(--green)' }}>{notice}</div>}
+        {analysis && (
+          <div className="card" style={{ padding: 14, marginBottom: 16, borderColor: 'rgba(59,130,246,.35)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10 }}>
+              <div><p className="label-caps">Análise com Hermes</p><h3 style={{ color: 'var(--text-primary)', fontSize: 14, marginTop: 4 }}>{analysis.title}</h3></div>
+              <button className="btn btn-secondary" onClick={() => setAnalysis(null)}>Fechar</button>
+            </div>
+            <pre style={{ whiteSpace: 'pre-wrap', color: 'var(--text-secondary)', fontSize: 12.5, marginTop: 10, lineHeight: 1.45 }}>{analysis.text}</pre>
+          </div>
+        )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 22 }}>
           <Kpi label="APs monitorados" value={summary.total} hint="Coleta a cada 1 minuto" detail={kpiDetails.total} />
@@ -743,7 +768,7 @@ export default function UnifiApMonitoringPage() {
           </div>
         </section>
 
-        <UnstableApsSection instability={instability} onCreateTicket={handleCreateInvestigationTicket} busyTicket={busyTicket} />
+        <UnstableApsSection instability={instability} onCreateTicket={handleCreateInvestigationTicket} onAnalyze={handleAnalyzeIncident} busyTicket={busyTicket} />
 
         <ClientMonitorSection payload={payload} />
 

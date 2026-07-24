@@ -1,6 +1,8 @@
 package br.com.nexusit.monitoring;
 
 import br.com.nexusit.glpi.GlpiClient;
+import br.com.nexusit.incident.CorrelatedIncident;
+import br.com.nexusit.incident.CorrelatedIncidentService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +26,7 @@ public class UnifiApInstabilityService {
     private final UnifiApMetricSampleRepository repository;
     private final ObjectMapper objectMapper;
     private final GlpiClient glpiClient;
+    private final CorrelatedIncidentService incidentService;
 
     @Value("${application.glpi.category-id:${GLPI_CATEGORY_ID:1}}")
     private int glpiCategoryId;
@@ -31,6 +34,7 @@ public class UnifiApInstabilityService {
     @Value("${application.glpi.assign-user-id:${GLPI_ASSIGN_USER_ID:2}}")
     private int glpiAssignUserId;
 
+    @Transactional
     public UnifiApInstabilitySummary getInstability() {
         Map<String, JsonNode> snapshotAps = readSnapshotAps();
         LocalDateTime now = LocalDateTime.now();
@@ -70,7 +74,7 @@ public class UnifiApInstabilityService {
                     ? "Recomendado abrir GLPI de investigação: verificar PoE/energia, cabo, porta do switch e logs UniFi."
                     : "Manter em observação. Abrir GLPI se repetir, virar perda total ou afetar usuários.";
 
-            items.add(new UnifiApInstabilityItem(
+            UnifiApInstabilityItem baseItem = new UnifiApInstabilityItem(
                     apName,
                     textField(ap, "ip"), textField(ap, "mac"), status, tone,
                     w1.samples, w6.samples, Math.max(w24.samples, intField(ap, "samples24h", 0)),
@@ -79,7 +83,17 @@ public class UnifiApInstabilityService {
                     w1.downWindows, w6.downWindows, w24.downWindows,
                     offlineMin, reboots, audit, intField(ap, "currentClientCount", 0),
                     textField(ap, "switchName"), textField(ap, "switchPort"),
-                    recommended, score, recommendation, reason));
+                    recommended, score, recommendation, reason, null, null, 0);
+            CorrelatedIncident incident = incidentService.touchUnifiAp(baseItem);
+            items.add(new UnifiApInstabilityItem(
+                    baseItem.apName(), baseItem.ip(), baseItem.mac(), baseItem.status(), baseItem.tone(),
+                    baseItem.samples1h(), baseItem.samples6h(), baseItem.samples24h(),
+                    baseItem.downSamples1h(), baseItem.downSamples6h(), baseItem.downSamples24h(),
+                    baseItem.lossSamples1h(), baseItem.lossSamples6h(), baseItem.lossSamples24h(),
+                    baseItem.downWindows1h(), baseItem.downWindows6h(), baseItem.downWindows24h(),
+                    baseItem.estimatedOfflineMinutes24h(), baseItem.reboots24h(), baseItem.auditEvents24h(), baseItem.currentClients(),
+                    baseItem.switchName(), baseItem.switchPort(), baseItem.ticketRecommended(), baseItem.score(),
+                    baseItem.recommendation(), baseItem.reason(), incident.getId(), incident.getOpenGlpiTicketId(), incident.getOccurrenceCount()));
         }
         items.sort(Comparator.comparing(UnifiApInstabilityItem::ticketRecommended).reversed()
                 .thenComparing(UnifiApInstabilityItem::score).reversed()
@@ -96,13 +110,12 @@ public class UnifiApInstabilityService {
                 .filter(i -> i.apName().equalsIgnoreCase(apName))
                 .findFirst()
                 .orElseThrow(() -> new NoSuchElementException("AP não encontrado na lista de instabilidade"));
-        Optional<Integer> existing = findOpenTicket(item.apName());
-        if (existing.isPresent()) {
-            addFollowup(existing.get(), "Nova solicitação pela Central de APs instáveis. O chamado já existia para este AP.\n\n" + item.reason());
-            return Map.of("ticketId", existing.get(), "created", false, "apName", item.apName(), "message", "Chamado aberto já existia; adicionado follow-up.");
-        }
-        int ticketId = createTicket(item, customReason);
-        return Map.of("ticketId", ticketId, "created", true, "apName", item.apName(), "message", "Chamado GLPI criado.");
+        if (item.incidentId() == null) throw new IllegalStateException("Incidente do AP ainda não foi correlacionado");
+        Map<String, Object> result = incidentService.createOrReuseTicket(item.incidentId(), customReason == null ? item.reason() : customReason);
+        return new LinkedHashMap<>(result) {{
+            put("apName", item.apName());
+            put("message", Boolean.TRUE.equals(get("created")) ? "Chamado GLPI criado." : "Chamado aberto já existia; adicionado follow-up.");
+        }};
     }
 
     private int createTicket(UnifiApInstabilityItem item, String customReason) {

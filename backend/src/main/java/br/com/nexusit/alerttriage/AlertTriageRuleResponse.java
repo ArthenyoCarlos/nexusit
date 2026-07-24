@@ -13,6 +13,9 @@ public record AlertTriageRuleResponse(
         String actionLabel,
         String reason,
         LocalDateTime silencedUntil,
+        Integer minDurationMinutes,
+        Integer recurrenceWindowMinutes,
+        Integer recurrenceCountThreshold,
         boolean enabled,
         String createdBy,
         LocalDateTime createdAt,
@@ -21,7 +24,8 @@ public record AlertTriageRuleResponse(
     public static AlertTriageRuleResponse from(AlertTriageRule r) {
         return new AlertTriageRuleResponse(
                 r.getId(), r.getHostPattern(), r.getAlertPattern(), r.getSeverityMin(), r.getSeverityMax(),
-                r.getAction(), label(r.getAction()), r.getReason(), r.getSilencedUntil(), r.isEnabled(),
+                r.getAction(), label(r.getAction()), r.getReason(), r.getSilencedUntil(),
+                r.getMinDurationMinutes(), r.getRecurrenceWindowMinutes(), r.getRecurrenceCountThreshold(), r.isEnabled(),
                 r.getCreatedBy() != null ? r.getCreatedBy().getName() : null,
                 r.getCreatedAt(), r.getUpdatedAt());
     }
