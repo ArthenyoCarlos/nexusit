@@ -202,6 +202,7 @@ public class ZabbixService {
             items.addAll(findFilesystemPercentItems(hostId));
 
             String cpuItemId = null;
+            boolean cpuHistoryIsIdle = false;
             String memItemId = null;
             String diskItemId = null;
             Map<String, Object> bestDiskItem = null;
@@ -214,9 +215,11 @@ public class ZabbixService {
                 if (key.startsWith("system.cpu.util") && !key.contains("idle")) {
                     cpuPercent = dval;
                     cpuItemId = str(item, "itemid");
+                    cpuHistoryIsIdle = false;
                 } else if (key.contains("idle")) {
                     cpuPercent = 100.0 - dval;
                     cpuItemId = str(item, "itemid");
+                    cpuHistoryIsIdle = true;
                 } else if (key.equals("vm.memory.size[pavailable]")) {
                     memPercent = 100.0 - dval;
                     memItemId = str(item, "itemid");
@@ -264,7 +267,7 @@ public class ZabbixService {
             ProcessTop processTop = fetchProcessTop(hostId);
 
             long timeFrom = System.currentTimeMillis() / 1000 - (long) hours * 3600;
-            List<ZabbixMetrics.MetricPoint> cpuHistory = cpuItemId != null ? fetchItemHistory(cpuItemId, 0, timeFrom) : List.of();
+            List<ZabbixMetrics.MetricPoint> cpuHistory = cpuItemId != null ? fetchCpuHistory(cpuItemId, cpuHistoryIsIdle, timeFrom) : List.of();
             List<ZabbixMetrics.MetricPoint> memoryHistory = memItemId != null ? fetchItemHistory(memItemId, 0, timeFrom) : List.of();
             List<ZabbixMetrics.MetricPoint> diskHistory = diskItemId != null ? fetchItemHistory(diskItemId, 0, timeFrom) : List.of();
             List<ZabbixMetrics.MetricPoint> netInHistory = net.inItemId() != null ? fetchItemHistory(net.inItemId(), net.valueType(), timeFrom) : List.of();
@@ -516,6 +519,14 @@ public class ZabbixService {
         int end = key.lastIndexOf(']');
         if (start < 0 || end < 0 || end <= start) return null;
         return key.substring(start + 1, end);
+    }
+
+    private List<ZabbixMetrics.MetricPoint> fetchCpuHistory(String itemId, boolean idleItem, long timeFrom) {
+        List<ZabbixMetrics.MetricPoint> points = fetchItemHistory(itemId, 0, timeFrom);
+        if (!idleItem) return points;
+        return points.stream()
+                .map(p -> new ZabbixMetrics.MetricPoint(p.timestamp(), Math.max(0.0, Math.min(100.0, 100.0 - p.value()))))
+                .toList();
     }
 
     @SuppressWarnings("unchecked")
