@@ -20,6 +20,7 @@ public class ZabbixController {
 
     private final ZabbixService service;
     private final UnifiApHistoryService unifiApHistoryService;
+    private final UnifiApInstabilityService unifiApInstabilityService;
     private final ObjectMapper objectMapper;
 
     @GetMapping("/hosts")
@@ -62,5 +63,15 @@ public class ZabbixController {
     @GetMapping("/unifi-aps/history")
     public List<UnifiApMetricPoint> getUnifiApHistory(@RequestParam String apName, @RequestParam(defaultValue = "24") int hours) {
         return unifiApHistoryService.getHistory(apName, hours);
+    }
+
+    @GetMapping("/unifi-aps/instability")
+    public UnifiApInstabilitySummary getUnifiApInstability() {
+        return unifiApInstabilityService.getInstability();
+    }
+
+    @PostMapping("/unifi-aps/instability/tickets")
+    public java.util.Map<String, Object> createUnifiApInvestigationTicket(@RequestBody UnifiApInvestigationTicketRequest request) {
+        return unifiApInstabilityService.createInvestigationTicket(request.apName(), request.reason());
     }
 }

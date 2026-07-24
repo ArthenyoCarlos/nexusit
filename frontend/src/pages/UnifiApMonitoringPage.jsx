@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Layout from '../components/Layout'
 import MetricChartCard from '../components/MetricChartCard'
-import { getUnifiApPanel, getUnifiApHistory } from '../services/monitoring'
+import { createUnifiApInvestigationTicket, getUnifiApInstability, getUnifiApPanel, getUnifiApHistory } from '../services/monitoring'
 import { analyzeMonitoredClients, buildApSummary, enrichAps, explainApLast24h, explainKpiSummary, explainUnifiEvent, formatDuration, formatMs, formatRateKbps, normalizeMac, statusLabel } from '../utils/unifiApPanel'
 
 const statusStyle = {
@@ -533,8 +533,78 @@ function InfoLine({ label, value, warn = false }) {
   )
 }
 
+function UnstableApsSection({ instability, onCreateTicket, busyTicket }) {
+  const items = instability?.items ?? []
+  const recommended = items.filter(item => item.ticketRecommended)
+  return (
+    <section className="card" style={{ padding: 16, marginBottom: 22, border: recommended.length ? '1px solid rgba(239,68,68,.38)' : '1px solid var(--border-muted)' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', marginBottom: 12, flexWrap: 'wrap' }}>
+        <div>
+          <p className="label-caps">APs instáveis</p>
+          <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--text-primary)', marginTop: 4 }}>Quando cair demais, abrir chamado de investigação</h2>
+          <p style={{ fontSize: 12.5, color: 'var(--text-tertiary)', marginTop: 4, lineHeight: 1.45 }}>
+            Critério inicial: recomendar GLPI se houver queda recorrente, 5+ amostras down, 10+ perdas parciais ou 2+ reboots em 24h.
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+          <span className="badge badge-amber">{instability?.unstableCount ?? 0} com sinal</span>
+          <span className="badge" style={{ color: recommended.length ? 'var(--red)' : 'var(--green)', border: `1px solid ${recommended.length ? 'rgba(239,68,68,.38)' : 'rgba(34,197,94,.32)'}` }}>{instability?.ticketRecommendedCount ?? 0} recomendado(s)</span>
+          <span className="badge badge-gray">{instability?.estimatedOfflineMinutes24h ?? 0}min offline</span>
+        </div>
+      </div>
+
+      {items.length === 0 ? (
+        <div style={{ padding: 14, borderRadius: 12, background: 'var(--bg-subtle)', border: '1px dashed var(--border-muted)', color: 'var(--text-tertiary)', fontSize: 13 }}>
+          Nenhum AP com queda, perda ou reboot relevante nas últimas 24h.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gap: 10 }}>
+          {items.map(item => {
+            const s = statusStyle[item.tone] ?? statusStyle.warning
+            return (
+              <div key={item.apName} style={{ border: `1px solid ${s.border}`, background: 'var(--bg-subtle)', borderRadius: 14, padding: 13 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 12, alignItems: 'start' }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', marginBottom: 5 }}>
+                      <strong style={{ color: 'var(--text-primary)', fontSize: 14 }}>{item.apName}</strong>
+                      <span className="badge" style={{ color: s.color, background: s.bg, border: `1px solid ${s.border}` }}>{item.ticketRecommended ? 'Abrir GLPI recomendado' : 'Observar'}</span>
+                      <span className="badge badge-gray">score {item.score}</span>
+                    </div>
+                    <p style={{ color: 'var(--text-secondary)', fontSize: 12.5, lineHeight: 1.45 }}>{item.reason}</p>
+                    <p style={{ color: s.color, fontSize: 12.5, marginTop: 6, fontWeight: 700 }}>{item.recommendation}</p>
+                  </div>
+                  <button type="button" className="btn btn-primary" disabled={busyTicket === item.apName} onClick={() => onCreateTicket(item)} style={{ whiteSpace: 'nowrap' }}>
+                    {busyTicket === item.apName ? 'Criando...' : 'Criar GLPI'}
+                  </button>
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: 8, marginTop: 11 }}>
+                  <MiniMetric label="Quedas 24h" value={`${item.downWindows24h}`} tone={item.downWindows24h ? 'warning' : 'healthy'} />
+                  <MiniMetric label="Down amostras" value={`${item.downSamples24h}`} tone={item.downSamples24h ? 'warning' : 'healthy'} />
+                  <MiniMetric label="Perda parcial" value={`${item.lossSamples24h}`} tone={item.lossSamples24h ? 'warning' : 'healthy'} />
+                  <MiniMetric label="Offline estimado" value={`${item.estimatedOfflineMinutes24h}min`} tone={item.estimatedOfflineMinutes24h ? 'warning' : 'healthy'} />
+                  <MiniMetric label="Reboots" value={`${item.reboots24h}`} tone={item.reboots24h ? 'warning' : 'healthy'} />
+                  <MiniMetric label="Clientes" value={`${item.currentClients ?? 0}`} tone="healthy" />
+                </div>
+                <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 8 }}>
+                  <InfoLine label="IP/MAC" value={`${item.ip || '—'} · ${item.mac || '—'}`} />
+                  <InfoLine label="Switch/porta" value={`${item.switchName || 'Switch'} / ${item.switchPort || 'porta pendente'}`} warn={!item.switchPort || item.switchPort === 'unknown'} />
+                  <InfoLine label="Última 1h" value={`${item.lossSamples1h} perda(s), ${item.downWindows1h} queda(s)`} warn={item.lossSamples1h > 0 || item.downWindows1h > 0} />
+                  <InfoLine label="Últimas 6h" value={`${item.lossSamples6h} perda(s), ${item.downWindows6h} queda(s)`} warn={item.lossSamples6h > 0 || item.downWindows6h > 0} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function UnifiApMonitoringPage() {
   const [payload, setPayload] = useState(null)
+  const [instability, setInstability] = useState(null)
+  const [busyTicket, setBusyTicket] = useState(null)
+  const [notice, setNotice] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [lastUpdate, setLastUpdate] = useState(null)
@@ -553,8 +623,9 @@ export default function UnifiApMonitoringPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const res = await getUnifiApPanel()
-      setPayload(res.data)
+      const [panelRes, instabilityRes] = await Promise.all([getUnifiApPanel(), getUnifiApInstability()])
+      setPayload(panelRes.data)
+      setInstability(instabilityRes.data)
       setError('')
       setLastUpdate(new Date())
     } catch (e) {
@@ -584,6 +655,21 @@ export default function UnifiApMonitoringPage() {
   const handleApPeriod = (hours) => {
     setApMetricsHours(hours)
     if (selectedApName) selectAp(selectedApName, hours, false)
+  }
+
+  const handleCreateInvestigationTicket = async (item) => {
+    setBusyTicket(item.apName)
+    setNotice('')
+    try {
+      const res = await createUnifiApInvestigationTicket(item.apName, item.reason)
+      setNotice(`${res.data.created ? 'Chamado criado' : 'Chamado já existia'}: GLPI #${res.data.ticketId} para ${item.apName}.`)
+      const instabilityRes = await getUnifiApInstability()
+      setInstability(instabilityRes.data)
+    } catch (e) {
+      setNotice(e?.response?.data?.message || e?.message || 'Falha ao criar chamado GLPI do AP.')
+    } finally {
+      setBusyTicket(null)
+    }
   }
 
   const aps = useMemo(() => enrichAps(payload?.aps ?? []), [payload])
@@ -633,6 +719,7 @@ export default function UnifiApMonitoringPage() {
         </div>
 
         {error && <div className="card" style={{ padding: 16, borderColor: 'var(--red)', color: 'var(--red)' }}>{error}</div>}
+        {notice && <div className="card" style={{ padding: 14, marginBottom: 16, borderColor: notice.includes('Falha') ? 'var(--red)' : 'var(--green)', color: notice.includes('Falha') ? 'var(--red)' : 'var(--green)' }}>{notice}</div>}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: 14, marginBottom: 22 }}>
           <Kpi label="APs monitorados" value={summary.total} hint="Coleta a cada 1 minuto" detail={kpiDetails.total} />
@@ -655,6 +742,8 @@ export default function UnifiApMonitoringPage() {
             <InfoBlock title="Fonte" value="Hermes + SNMP + ICMP + LLDP" subtitle="Histórico SQLite e JSON consumido pelo NexusIT" />
           </div>
         </section>
+
+        <UnstableApsSection instability={instability} onCreateTicket={handleCreateInvestigationTicket} busyTicket={busyTicket} />
 
         <ClientMonitorSection payload={payload} />
 

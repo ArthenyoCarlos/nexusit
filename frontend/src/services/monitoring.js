@@ -6,6 +6,8 @@ export const getHistory = (hours = 24) => api.get(`/monitoring/history?hours=${h
 export const getHostMetrics = (hostId, hours = 2) => api.get(`/monitoring/hosts/${hostId}/metrics`, { params: { hours } })
 export const getUnifiApPanel = () => api.get('/monitoring/unifi-aps')
 export const getUnifiApHistory = (apName, hours = 24) => api.get('/monitoring/unifi-aps/history', { params: { apName, hours } })
+export const getUnifiApInstability = () => api.get('/monitoring/unifi-aps/instability')
+export const createUnifiApInvestigationTicket = (apName, reason) => api.post('/monitoring/unifi-aps/instability/tickets', { apName, reason })
 export const getAlertTriage = (includeSuppressed = true) => api.get('/monitoring/triage', { params: { includeSuppressed } })
 export const decideAlert = (payload) => api.post('/monitoring/triage/decisions', payload)
 export const createAlertTicket = (eventId) => api.post('/monitoring/triage/tickets', { eventId })

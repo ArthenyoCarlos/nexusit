@@ -1,0 +1,31 @@
+package br.com.nexusit.monitoring;
+
+public record UnifiApInstabilityItem(
+        String apName,
+        String ip,
+        String mac,
+        String status,
+        String tone,
+        int samples1h,
+        int samples6h,
+        int samples24h,
+        int downSamples1h,
+        int downSamples6h,
+        int downSamples24h,
+        int lossSamples1h,
+        int lossSamples6h,
+        int lossSamples24h,
+        int downWindows1h,
+        int downWindows6h,
+        int downWindows24h,
+        int estimatedOfflineMinutes24h,
+        int reboots24h,
+        int auditEvents24h,
+        int currentClients,
+        String switchName,
+        String switchPort,
+        boolean ticketRecommended,
+        int score,
+        String recommendation,
+        String reason
+) {}

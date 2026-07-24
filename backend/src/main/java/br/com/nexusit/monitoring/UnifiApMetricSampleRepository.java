@@ -8,4 +8,5 @@ import java.util.UUID;
 
 public interface UnifiApMetricSampleRepository extends JpaRepository<UnifiApMetricSample, UUID> {
     List<UnifiApMetricSample> findByApNameAndRecordedAtAfterOrderByRecordedAtAsc(String apName, LocalDateTime since);
+    List<UnifiApMetricSample> findByRecordedAtAfterOrderByApNameAscRecordedAtAsc(LocalDateTime since);
 }
