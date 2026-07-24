@@ -23,10 +23,19 @@ const STATE_LABEL = {
 
 function timeAgo(iso) {
   if (!iso) return '—'
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  const diff = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
   if (diff < 60) return `${diff}s atrás`
   if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`
-  return `${Math.floor(diff / 3600)}h atrás`
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`
+  return `${Math.floor(diff / 86400)}d atrás`
+}
+
+function queueWaitLevel(iso) {
+  if (!iso) return null
+  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
+  if (minutes >= 60) return 'danger'
+  if (minutes >= 15) return 'warning'
+  return null
 }
 
 function formatBytes(bytes) {
@@ -149,7 +158,7 @@ function MediaAttachment({ message }) {
       <div style={{ ...boxStyle, padding: 8 }}>
         <audio src={url} controls style={{ display: 'block', width: '100%' }} />
         <div style={{ ...actionStyle, paddingLeft: 0, paddingRight: 0 }}>
-          <span>Áudio · {label}</span>
+          <span>Áudio</span>
           <a href={url} download={label} style={linkStyle}>Baixar</a>
         </div>
         {message.transcription && (
@@ -454,17 +463,25 @@ export default function SupportCrmPage() {
                 <div className="card empty-state" style={{ padding: '16px 14px' }}><p style={{ fontSize: 12.5 }}>Nenhum atendimento aguardando</p></div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {queue.map(c => (
-                    <div key={c.id} className="card" style={{ padding: '12px 14px' }}>
-                      <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{c.contactName || c.contactPhone}</p>
-                      <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                        {c.glpiTicketId ? `Chamado #${c.glpiTicketId}` : '—'} · {timeAgo(c.createdAt)}
-                      </p>
-                      <button onClick={() => handleClaim(c.id)} disabled={claimingId === c.id} className="btn btn-primary btn-sm" style={{ marginTop: 8, width: '100%' }}>
-                        {claimingId === c.id ? 'Assumindo...' : 'Atender'}
-                      </button>
-                    </div>
-                  ))}
+                  {[...queue].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(c => {
+                    const waitLevel = queueWaitLevel(c.createdAt)
+                    return (
+                      <div key={c.id} className="card" style={{ padding: '12px 14px',
+                        border: waitLevel === 'danger' ? '1px solid var(--red-border, #dc2626)' : waitLevel === 'warning' ? '1px solid var(--amber-border, #d97706)' : undefined }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{c.contactName || c.contactPhone}</p>
+                          {waitLevel === 'danger' && <span className="badge badge-red" style={{ fontSize: 9.5 }}>Espera &gt; 1h</span>}
+                          {waitLevel === 'warning' && <span className="badge badge-amber" style={{ fontSize: 9.5 }}>Espera &gt; 15min</span>}
+                        </div>
+                        <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                          {c.glpiTicketId ? `Chamado #${c.glpiTicketId}` : '—'} · {timeAgo(c.createdAt)}
+                        </p>
+                        <button onClick={() => handleClaim(c.id)} disabled={claimingId === c.id} className="btn btn-primary btn-sm" style={{ marginTop: 8, width: '100%' }}>
+                          {claimingId === c.id ? 'Assumindo...' : 'Atender'}
+                        </button>
+                      </div>
+                    )
+                  })}
                 </div>
               )}
             </div>
@@ -475,16 +492,22 @@ export default function SupportCrmPage() {
                 <div className="card empty-state" style={{ padding: '16px 14px' }}><p style={{ fontSize: 12.5 }}>Nenhum atendimento em andamento</p></div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {mine.map(c => (
-                    <button key={c.id} onClick={() => setSelectedId(c.id)}
-                      className="card card-hover" style={{ padding: '12px 14px', textAlign: 'left', width: '100%', cursor: 'pointer',
-                        border: selectedId === c.id ? '2px solid var(--accent)' : '1px solid var(--border)' }}>
-                      <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{c.contactName || c.contactPhone}</p>
-                      <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                        {c.glpiTicketId ? `Chamado #${c.glpiTicketId}` : '—'} · {timeAgo(c.claimedAt)}
-                      </p>
-                    </button>
-                  ))}
+                  {[...mine].sort((a, b) => Number(b.lastMessageAuthor === 'EMPLOYEE') - Number(a.lastMessageAuthor === 'EMPLOYEE')).map(c => {
+                    const awaitingReply = c.lastMessageAuthor === 'EMPLOYEE'
+                    return (
+                      <button key={c.id} onClick={() => setSelectedId(c.id)}
+                        className="card card-hover" style={{ padding: '12px 14px', textAlign: 'left', width: '100%', cursor: 'pointer',
+                          border: selectedId === c.id ? '2px solid var(--accent)' : awaitingReply ? '1px solid var(--warning, #d97706)' : '1px solid var(--border)' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                          <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{c.contactName || c.contactPhone}</p>
+                          {awaitingReply && <span className="badge badge-amber" style={{ fontSize: 9.5 }}>Aguardando resposta</span>}
+                        </div>
+                        <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
+                          {c.glpiTicketId ? `Chamado #${c.glpiTicketId}` : '—'} · {timeAgo(c.lastMessageAt || c.claimedAt)}
+                        </p>
+                      </button>
+                    )
+                  })}
                 </div>
               )}
             </div>

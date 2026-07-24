@@ -414,7 +414,7 @@ function ticketStatusLabel(s) {
 }
 
 function timeAgo(unixSec) {
-  const diff = Math.floor(Date.now() / 1000) - unixSec
+  const diff = Math.max(0, Math.floor(Date.now() / 1000) - unixSec)
   if (diff < 60)    return `${diff}s atrás`
   if (diff < 3600)  return `${Math.floor(diff / 60)}min atrás`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`

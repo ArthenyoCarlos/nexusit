@@ -22,7 +22,7 @@ function formatDuration(ms) {
 
 function timeAgo(iso) {
   if (!iso) return null
-  const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000)
+  const diff = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
   if (diff < 60) return `${diff}s atrás`
   if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`
   if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`
