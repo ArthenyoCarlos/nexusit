@@ -155,7 +155,7 @@ function MediaAttachment({ message }) {
 
   if (isAudio) {
     return (
-      <div style={{ ...boxStyle, padding: 8 }}>
+      <div style={{ ...boxStyle, padding: 8, minWidth: 280 }}>
         <audio src={url} controls style={{ display: 'block', width: '100%' }} />
         <div style={{ ...actionStyle, paddingLeft: 0, paddingRight: 0 }}>
           <span>Áudio</span>
