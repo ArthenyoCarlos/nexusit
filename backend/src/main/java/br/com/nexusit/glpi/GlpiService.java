@@ -375,13 +375,30 @@ public class GlpiService {
     public int createTicket(String title, String content, int requesterGlpiUserId, int priority, String category) {
         Map<String, Object> input = new LinkedHashMap<>();
         input.put("name", ensureOriginPrefix(title, "WHATSAPP"));
-        input.put("content", "[Categoria sugerida: " + (category == null || category.isBlank() ? "Suporte TI" : category) + "]\n\n" + content);
+        input.put("content", content);
         input.put("_users_id_requester", requesterGlpiUserId);
         input.put("priority", priority);
         input.put("urgency", priority);
         input.put("impact", 3);
+        int categoryId = resolveCategoryId(category);
+        if (categoryId > 0) input.put("itilcategories_id", categoryId);
         Map<String, Object> resp = client.post("/Ticket", Map.of("input", input));
         return intVal(resp, "id");
+    }
+
+    // Resolve o nome de setor inferido do relato do funcionário pra um itilcategories_id de
+    // verdade (criando o setor no GLPI se ainda não existir), em vez de só citar o nome
+    // sugerido como texto solto na descrição do chamado.
+    private int resolveCategoryId(String categoryName) {
+        String clean = categoryName == null ? "" : categoryName.trim();
+        if (clean.isBlank()) return 0;
+        return safeCall(() -> {
+            Optional<Map<String, Object>> existing = getCategories().stream()
+                    .filter(c -> clean.equalsIgnoreCase(String.valueOf(c.get("name"))))
+                    .findFirst();
+            if (existing.isPresent()) return intVal(existing.get(), "id");
+            return intVal(createCategory(clean), "id");
+        }, 0);
     }
 
     public void uploadDocumentToTicket(int ticketId, byte[] bytes, String filename, String mime) {

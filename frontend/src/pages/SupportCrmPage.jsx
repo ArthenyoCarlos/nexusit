@@ -6,6 +6,7 @@ import Layout from '../components/Layout'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation, addTechnician, removeTechnician, transferConversation } from '../services/support'
+import { getTicket, updateTicketFields, getCategories, createCategory } from '../services/glpi'
 import { getUsers } from '../services/users'
 import { playAlertSound } from '../utils/alertSound'
 
@@ -19,6 +20,32 @@ function base64ToBlob(base64, mimeType) {
 const STATE_LABEL = {
   AWAITING_NAME: 'Identificando', MENU: 'No menu', AWAITING_DESCRIPTION: 'Descrevendo problema',
   PENDING_TECH: 'Aguardando técnico', HUMAN_ACTIVE: 'Em atendimento', CLOSED: 'Encerrado',
+}
+
+const PRIORITY_OPTIONS = [
+  { value: '6', label: 'Crítica' },
+  { value: '5', label: 'Muito Alta' },
+  { value: '4', label: 'Alta' },
+  { value: '3', label: 'Média' },
+  { value: '2', label: 'Baixa' },
+  { value: '1', label: 'Muito Baixa' },
+]
+const URGENCY_IMPACT_OPTIONS = [
+  { value: '5', label: 'Muito Alta' },
+  { value: '4', label: 'Alta' },
+  { value: '3', label: 'Média' },
+  { value: '2', label: 'Baixa' },
+  { value: '1', label: 'Muito Baixa' },
+]
+
+function splitLockedTitlePrefix(title = '') {
+  const match = String(title || '').trim().match(/^\[(Zabbix|WhatsApp|Whatsapp|GLPI)]\s*(.*)$/i)
+  if (match) {
+    const raw = match[1].toLowerCase()
+    const prefix = raw === 'zabbix' ? '[Zabbix]' : raw === 'glpi' ? '[GLPI]' : '[Whatsapp]'
+    return { prefix, body: match[2] || '' }
+  }
+  return { prefix: '[Whatsapp]', body: String(title || '').trim() }
 }
 
 function timeAgo(iso) {
@@ -199,6 +226,19 @@ export default function SupportCrmPage() {
   const [transferTechId, setTransferTechId] = useState('')
   const [savingTech, setSavingTech] = useState(false)
   const [selectedFilePreview, setSelectedFilePreview] = useState(null)
+  const [ticketPanelOpen, setTicketPanelOpen] = useState(false)
+  const [ticketDetail, setTicketDetail] = useState(null)
+  const [ticketLoading, setTicketLoading] = useState(false)
+  const [ticketSaving, setTicketSaving] = useState(false)
+  const [categories, setCategories] = useState([])
+  const [editTitle, setEditTitle] = useState('')
+  const [editTitlePrefix, setEditTitlePrefix] = useState('[Whatsapp]')
+  const [editCategory, setEditCategory] = useState('')
+  const [editPriority, setEditPriority] = useState('')
+  const [editUrgency, setEditUrgency] = useState('')
+  const [editImpact, setEditImpact] = useState('')
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const [categoryCreating, setCategoryCreating] = useState(false)
   const threadEndRef = useRef(null)
   const threadBodyRef = useRef(null)
   const isNearBottomRef = useRef(true)
@@ -419,6 +459,74 @@ export default function SupportCrmPage() {
   const availableToTransfer = technicianOptions.filter(t => t.active && t.id !== conversation?.claimedById)
 
   useEffect(() => {
+    getCategories().then(res => setCategories(res.data)).catch(() => setCategories([]))
+  }, [])
+
+  useEffect(() => {
+    setTicketPanelOpen(false)
+    setTicketDetail(null)
+  }, [selectedId])
+
+  useEffect(() => {
+    if (!ticketPanelOpen || !conversation?.glpiTicketId) return
+    setTicketLoading(true)
+    getTicket(conversation.glpiTicketId)
+      .then(res => setTicketDetail(res.data))
+      .catch(() => { setTicketDetail(null); toast.add('Não foi possível carregar os dados do chamado.', 'error') })
+      .finally(() => setTicketLoading(false))
+  }, [ticketPanelOpen, conversation?.glpiTicketId])
+
+  useEffect(() => {
+    if (!ticketDetail) return
+    const { prefix, body } = splitLockedTitlePrefix(ticketDetail.ticket.title)
+    setEditTitlePrefix(prefix)
+    setEditTitle(body)
+    setEditPriority(String(ticketDetail.ticket.priority || ''))
+    setEditUrgency(String(ticketDetail.ticket.urgency || ''))
+    setEditImpact(String(ticketDetail.ticket.impact || ''))
+    const match = categories.find(c => c.name === ticketDetail.ticket.category)
+    setEditCategory(match ? String(match.id) : '')
+  }, [ticketDetail, categories])
+
+  const handleSaveTicketFields = async () => {
+    if (!conversation?.glpiTicketId) return
+    const cleanTitle = editTitle.replace(/^\s*\[(Zabbix|WhatsApp|Whatsapp|GLPI)]\s*/i, '').trim()
+    setTicketSaving(true)
+    try {
+      const fields = { itilcategories_id: editCategory ? parseInt(editCategory) : 0 }
+      if (cleanTitle) fields.name = `${editTitlePrefix} ${cleanTitle}`
+      if (editPriority) fields.priority = parseInt(editPriority)
+      if (editUrgency) fields.urgency = parseInt(editUrgency)
+      if (editImpact) fields.impact = parseInt(editImpact)
+      await updateTicketFields(conversation.glpiTicketId, fields)
+      const res = await getTicket(conversation.glpiTicketId)
+      setTicketDetail(res.data)
+      toast.add('Chamado atualizado.', 'success')
+    } catch {
+      toast.add('Não foi possível atualizar o chamado.', 'error')
+    } finally {
+      setTicketSaving(false)
+    }
+  }
+
+  const handleCreateCategory = async () => {
+    if (!newCategoryName.trim()) return
+    setCategoryCreating(true)
+    try {
+      const res = await createCategory(newCategoryName.trim())
+      const updated = await getCategories().then(r => r.data).catch(() => [...categories, res.data])
+      setCategories(updated)
+      setEditCategory(String(res.data.id))
+      setNewCategoryName('')
+      toast.add('Setor criado. Clique em Salvar para aplicar ao chamado.', 'success')
+    } catch {
+      toast.add('Não foi possível criar o setor.', 'error')
+    } finally {
+      setCategoryCreating(false)
+    }
+  }
+
+  useEffect(() => {
     if (!isMine) return undefined
     const handlePaste = (e) => {
       const items = e.clipboardData?.items
@@ -525,6 +633,12 @@ export default function SupportCrmPage() {
                       <p style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--text-primary)' }}>{conversation.contactName || conversation.contactPhone}</p>
                       <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
                         {conversation.contactPhone} · {conversation.glpiTicketId ? `Chamado #${conversation.glpiTicketId}` : 'sem chamado'} · {STATE_LABEL[conversation.state] ?? conversation.state}
+                        {conversation.glpiTicketId && isMine && (
+                          <button type="button" onClick={() => setTicketPanelOpen(o => !o)}
+                            style={{ background: 'none', border: 0, cursor: 'pointer', padding: 0, marginLeft: 8, fontSize: 12, color: 'var(--accent)', textDecoration: 'underline' }}>
+                            {ticketPanelOpen ? 'Fechar edição do chamado' : 'Editar assunto/prioridade/setor'}
+                          </button>
+                        )}
                       </p>
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
                         {conversation.claimedByName && (
@@ -562,6 +676,71 @@ export default function SupportCrmPage() {
                         </select>
                         <button onClick={handleTransfer} disabled={!transferTechId || savingTech} className="btn btn-default btn-sm">Transferir</button>
                       </div>
+                    </div>
+                  )}
+
+                  {ticketPanelOpen && conversation.glpiTicketId && isMine && (
+                    <div className="card" style={{ padding: 12, marginTop: 8, background: 'var(--bg-subtle)' }}>
+                      {ticketLoading || !ticketDetail ? (
+                        <div className="skeleton" style={{ height: 80, borderRadius: 8 }} />
+                      ) : (
+                        <>
+                          <div style={{ marginBottom: 10 }}>
+                            <label className="input-label">Assunto do chamado</label>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                              <span className="badge badge-default" style={{ fontSize: 10.5 }} title="Tag de origem bloqueada — não pode ser alterada">
+                                {editTitlePrefix}
+                              </span>
+                              <input
+                                value={editTitle}
+                                onChange={e => setEditTitle(e.target.value.replace(/^\s*\[(Zabbix|WhatsApp|Whatsapp|GLPI)]\s*/i, ''))}
+                                className="input"
+                                style={{ fontSize: 12.5 }}
+                                placeholder="Digite só o assunto do chamado"
+                              />
+                            </div>
+                          </div>
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 10 }}>
+                            <div>
+                              <label className="input-label">Setor</label>
+                              <select value={editCategory} onChange={e => setEditCategory(e.target.value)} className="input" style={{ fontSize: 12.5 }}>
+                                <option value="">Sem setor</option>
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="input-label">Prioridade</label>
+                              <select value={editPriority} onChange={e => setEditPriority(e.target.value)} className="input" style={{ fontSize: 12.5 }}>
+                                {PRIORITY_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="input-label">Urgência</label>
+                              <select value={editUrgency} onChange={e => setEditUrgency(e.target.value)} className="input" style={{ fontSize: 12.5 }}>
+                                {URGENCY_IMPACT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            </div>
+                            <div>
+                              <label className="input-label">Impacto</label>
+                              <select value={editImpact} onChange={e => setEditImpact(e.target.value)} className="input" style={{ fontSize: 12.5 }}>
+                                {URGENCY_IMPACT_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                              </select>
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', gap: 8, marginTop: 10, alignItems: 'end', flexWrap: 'wrap' }}>
+                            <div style={{ minWidth: 200, flex: 1 }}>
+                              <label className="input-label">Criar novo setor</label>
+                              <input value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} className="input" style={{ fontSize: 12.5 }} placeholder="Ex.: Financeiro, Comercial..." />
+                            </div>
+                            <button onClick={handleCreateCategory} disabled={categoryCreating || !newCategoryName.trim()} className="btn btn-default btn-sm">
+                              {categoryCreating ? 'Criando...' : 'Criar setor'}
+                            </button>
+                            <button onClick={handleSaveTicketFields} disabled={ticketSaving} className="btn btn-primary btn-sm">
+                              {ticketSaving ? 'Salvando...' : 'Salvar chamado'}
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
