@@ -105,20 +105,27 @@ public class AlertTriageService {
         AlertTriageAction action = req.action() != null ? req.action() : AlertTriageAction.SHOW_ONLY;
         LocalDateTime until = action == AlertTriageAction.SILENCE_TEMPORARILY
                 ? (req.silencedUntil() != null ? req.silencedUntil() : LocalDateTime.now().plusHours(24)) : null;
-        AlertTriageRule rule = AlertTriageRule.builder()
-                .hostPattern(p.hostName())
-                .alertPattern(p.name())
-                .severityMin(p.severity())
-                .severityMax(p.severity())
-                .action(action)
-                .reason(blankToNull(req.reason()))
-                .silencedUntil(until)
-                .minDurationMinutes(req.minDurationMinutes())
-                .recurrenceWindowMinutes(req.recurrenceWindowMinutes())
-                .recurrenceCountThreshold(req.recurrenceCountThreshold())
-                .enabled(true)
-                .createdBy(user)
-                .build();
+        AlertTriageRule rule = repository.findReusableDecisionRule(p.hostName(), p.name(), p.severity(), p.severity(), action)
+                .orElseGet(() -> AlertTriageRule.builder()
+                        .hostPattern(p.hostName())
+                        .alertPattern(p.name())
+                        .severityMin(p.severity())
+                        .severityMax(p.severity())
+                        .action(action)
+                        .createdBy(user)
+                        .build());
+        rule.setHostPattern(p.hostName());
+        rule.setAlertPattern(p.name());
+        rule.setSeverityMin(p.severity());
+        rule.setSeverityMax(p.severity());
+        rule.setAction(action);
+        rule.setReason(blankToNull(req.reason()));
+        rule.setSilencedUntil(until);
+        rule.setMinDurationMinutes(req.minDurationMinutes());
+        rule.setRecurrenceWindowMinutes(req.recurrenceWindowMinutes());
+        rule.setRecurrenceCountThreshold(req.recurrenceCountThreshold());
+        rule.setEnabled(true);
+        if (rule.getCreatedBy() == null) rule.setCreatedBy(user);
         return AlertTriageRuleResponse.from(repository.save(rule));
     }
 
