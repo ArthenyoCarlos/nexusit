@@ -28,11 +28,48 @@ public class CorrelatedIncidentService {
     @Value("${application.glpi.assign-user-id:${GLPI_ASSIGN_USER_ID:2}}")
     private int glpiAssignUserId;
 
-    public IncidentListResponse listOpen() {
-        List<CorrelatedIncidentResponse> incidents = incidentRepository.findTop50ByStatusOrderByLastSeenAtDesc("OPEN")
-                .stream().map(CorrelatedIncidentResponse::from).toList();
-        int withTicket = (int) incidents.stream().filter(i -> i.openGlpiTicketId() != null && i.openGlpiTicketId() > 0).count();
-        return new IncidentListResponse(incidents.size(), withTicket, incidents.size() - withTicket, incidents);
+    public IncidentListResponse list(String status, String sourceType, String host, Boolean withTicket, Integer minSeverity, Boolean recurrent) {
+        var spec = org.springframework.data.jpa.domain.Specification.<CorrelatedIncident>where(null);
+        if (status != null && !status.isBlank() && !"ALL".equalsIgnoreCase(status)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("status"), status.trim().toUpperCase(Locale.ROOT)));
+        }
+        if (sourceType != null && !sourceType.isBlank() && !"ALL".equalsIgnoreCase(sourceType)) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("sourceType"), sourceType.trim().toUpperCase(Locale.ROOT)));
+        }
+        if (host != null && !host.isBlank()) {
+            String q = "%" + host.trim().toLowerCase(Locale.ROOT) + "%";
+            spec = spec.and((root, query, cb) -> cb.or(cb.like(cb.lower(root.get("affectedHost")), q), cb.like(cb.lower(root.get("title")), q)));
+        }
+        if (withTicket != null) {
+            spec = withTicket
+                    ? spec.and((root, query, cb) -> cb.isNotNull(root.get("openGlpiTicketId")))
+                    : spec.and((root, query, cb) -> cb.isNull(root.get("openGlpiTicketId")));
+        }
+        if (minSeverity != null) {
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("severity"), minSeverity));
+        }
+        if (Boolean.TRUE.equals(recurrent)) {
+            spec = spec.and((root, query, cb) -> cb.greaterThanOrEqualTo(root.get("occurrenceCount"), 2));
+        }
+        List<CorrelatedIncidentResponse> incidents = incidentRepository
+                .findAll(spec, org.springframework.data.domain.Sort.by(org.springframework.data.domain.Sort.Direction.DESC, "lastSeenAt"))
+                .stream().limit(200).map(CorrelatedIncidentResponse::from).toList();
+        long open = incidents.stream().filter(i -> "OPEN".equals(i.status())).count();
+        long resolved = incidents.stream().filter(i -> "RESOLVED".equals(i.status())).count();
+        long with = incidents.stream().filter(i -> i.openGlpiTicketId() != null && i.openGlpiTicketId() > 0).count();
+        long critical = incidents.stream().filter(i -> i.severity() >= 4).count();
+        long recurrentCount = incidents.stream().filter(i -> i.occurrenceCount() >= 2).count();
+        return new IncidentListResponse(incidents.size(), open, resolved, with, incidents.size() - with, critical, recurrentCount, incidents);
+    }
+
+    public IncidentSummaryResponse summary() {
+        List<CorrelatedIncident> all = incidentRepository.findAll();
+        long open = all.stream().filter(i -> "OPEN".equals(i.getStatus())).count();
+        long resolved = all.stream().filter(i -> "RESOLVED".equals(i.getStatus())).count();
+        long with = all.stream().filter(i -> i.getOpenGlpiTicketId() != null && i.getOpenGlpiTicketId() > 0).count();
+        long critical = all.stream().filter(i -> i.getSeverity() >= 4 && "OPEN".equals(i.getStatus())).count();
+        long recurrent = all.stream().filter(i -> i.getOccurrenceCount() >= 2 && "OPEN".equals(i.getStatus())).count();
+        return new IncidentSummaryResponse(all.size(), open, resolved, with, all.size() - with, critical, recurrent);
     }
 
     public IncidentDetailResponse detail(UUID id) {
@@ -61,6 +98,7 @@ public class CorrelatedIncidentService {
                 .recommendation(recommendZabbix(p))
                 .build());
         boolean newOccurrence = incident.getLastSourceEventId() == null || !incident.getLastSourceEventId().equals(p.id());
+        incident.setStatus("OPEN");
         incident.setLastSeenAt(LocalDateTime.now());
         incident.setSeverity(Math.max(incident.getSeverity(), p.severity()));
         incident.setLastSourceEventId(p.id());
@@ -92,6 +130,7 @@ public class CorrelatedIncidentService {
                 .build());
         String sourceEventId = "score:" + item.score() + ":loss:" + item.lossSamples24h() + ":down:" + item.downSamples24h() + ":reboots:" + item.reboots24h();
         boolean newOccurrence = incident.getLastSourceEventId() == null || !incident.getLastSourceEventId().equals(sourceEventId);
+        incident.setStatus("OPEN");
         incident.setLastSeenAt(LocalDateTime.now());
         incident.setSeverity(Math.max(incident.getSeverity(), item.ticketRecommended() ? 4 : 3));
         incident.setLastSourceEventId(sourceEventId);
@@ -128,6 +167,29 @@ public class CorrelatedIncidentService {
 
     public String analyzeIncident(UUID id) {
         return detail(id).analysis();
+    }
+
+    @Transactional
+    public CorrelatedIncidentResponse closeIncident(UUID id, String reason) {
+        CorrelatedIncident incident = incidentRepository.findById(id).orElseThrow();
+        incident.setStatus("RESOLVED");
+        incidentRepository.save(incident);
+        addEvent(incident, "NEXUSIT", "manual-close", "INCIDENT_RESOLVED", incident.getSeverity(),
+                reason == null || reason.isBlank() ? "Incidente marcado como resolvido no NexusIT" : reason.trim(), Map.of("reason", nvl(reason)));
+        if (incident.getOpenGlpiTicketId() != null && incident.getOpenGlpiTicketId() > 0) {
+            addFollowup(incident.getOpenGlpiTicketId(), "Incidente marcado como resolvido no NexusIT.\n\n" + nvl(reason));
+        }
+        return CorrelatedIncidentResponse.from(incident);
+    }
+
+    @Transactional
+    public CorrelatedIncidentResponse reopenIncident(UUID id, String reason) {
+        CorrelatedIncident incident = incidentRepository.findById(id).orElseThrow();
+        incident.setStatus("OPEN");
+        incidentRepository.save(incident);
+        addEvent(incident, "NEXUSIT", "manual-reopen", "INCIDENT_REOPENED", incident.getSeverity(),
+                reason == null || reason.isBlank() ? "Incidente reaberto no NexusIT" : reason.trim(), Map.of("reason", nvl(reason)));
+        return CorrelatedIncidentResponse.from(incident);
     }
 
     private int createTicket(CorrelatedIncident incident, String extraReason) {

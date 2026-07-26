@@ -17,6 +17,7 @@ const NAV = [
       { label: 'Monitoramento', path: '/monitoring', Icon: IconMonitor    },
       { label: 'Triagem Alertas', path: '/monitoring/triage', Icon: IconMonitor },
       { label: 'APs UniFi',     path: '/monitoring/aps', Icon: IconWifi   },
+      { label: 'Incidentes',    path: '/monitoring/incidents', Icon: IconIncident },
     ],
   },
   {
@@ -27,6 +28,7 @@ const NAV = [
       { label: 'Inventário',    path: '/inventory',  Icon: IconInventory  },
       { label: 'Cartuchos',     path: '/cartridges', Icon: IconCartridge  },
       { label: 'Rede',          path: '/network',    Icon: IconNetwork    },
+      { label: 'Backups',       path: '/backups',    Icon: IconBackup     },
     ],
   },
   {
@@ -186,6 +188,8 @@ function IconContract()   { return <svg {...i}><path d="M14 2H6a2 2 0 00-2 2v16a
 function IconSchedule()   { return <svg {...i}><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="12" cy="15" r="2"/></svg> }
 function IconWiki()       { return <svg {...i}><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/><path d="M9 9h6M9 13h4"/></svg> }
 function IconFinancial()  { return <svg {...i}><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg> }
+function IconIncident()   { return <svg {...i}><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg> }
+function IconBackup()     { return <svg {...i}><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg> }
 function IconHermes()     { return <svg {...i}><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg> }
 function IconTeam()       { return <svg {...i}><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/><path d="M8 11l2 2 4-4"/></svg> }
 function IconExecutive()  { return <svg {...i}><path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-4"/></svg> }
