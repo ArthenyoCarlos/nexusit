@@ -249,6 +249,10 @@ public class CorrelatedIncidentService {
         return Optional.empty();
     }
 
+    public void addGlpiFollowupSafely(int ticketId, String content) {
+        addFollowup(ticketId, content);
+    }
+
     private void addFollowup(int ticketId, String content) {
         try { glpiClient.post("/Ticket/" + ticketId + "/ITILFollowup", Map.of("input", Map.of("items_id", ticketId, "content", content))); }
         catch (Exception ignored) { }

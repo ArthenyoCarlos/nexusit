@@ -14,6 +14,7 @@ import java.util.UUID;
 public class CorrelatedIncidentController {
     private final CorrelatedIncidentService service;
     private final IncidentRunbookService runbookService;
+    private final IncidentAutoResolutionService autoResolutionService;
 
     @GetMapping
     public IncidentListResponse list(@RequestParam(required = false, defaultValue = "OPEN") String status,
@@ -33,6 +34,17 @@ public class CorrelatedIncidentController {
 
     @GetMapping("/{id}/analysis")
     public Map<String, String> analysis(@PathVariable UUID id) { return Map.of("analysis", service.analyzeIncident(id)); }
+
+    @GetMapping("/{id}/auto-resolution")
+    public IncidentAutoResolutionSummary autoResolutionStatus(@PathVariable UUID id) { return autoResolutionService.status(id); }
+
+    @PostMapping("/{id}/auto-resolve-check")
+    @PreAuthorize("hasRole('ADMIN')")
+    public IncidentAutoResolutionCheckResult autoResolveCheck(@PathVariable UUID id, Authentication auth) { return autoResolutionService.checkOne(id, auth); }
+
+    @PostMapping("/auto-resolve-check")
+    @PreAuthorize("hasRole('ADMIN')")
+    public IncidentAutoResolutionBatchResult autoResolveCheckAll(Authentication auth) { return autoResolutionService.checkOpen(auth); }
 
     @GetMapping("/{id}/runbook")
     public IncidentRunbookResponse runbook(@PathVariable UUID id) { return runbookService.get(id); }

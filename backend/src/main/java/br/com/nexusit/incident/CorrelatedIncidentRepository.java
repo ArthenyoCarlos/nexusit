@@ -11,5 +11,6 @@ import java.util.UUID;
 public interface CorrelatedIncidentRepository extends JpaRepository<CorrelatedIncident, UUID>, JpaSpecificationExecutor<CorrelatedIncident> {
     Optional<CorrelatedIncident> findByCorrelationKey(String correlationKey);
     List<CorrelatedIncident> findTop50ByStatusOrderByLastSeenAtDesc(String status);
+    List<CorrelatedIncident> findTop200ByStatusOrderByLastSeenAtAsc(String status);
     List<CorrelatedIncident> findByLastSeenAtAfterOrderByLastSeenAtDesc(LocalDateTime since);
 }

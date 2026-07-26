@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
 import Layout from '../components/Layout'
-import { closeIncident, createIncidentTicket, executeIncidentAction, getIncidentAnalysis, getIncidentRunbook, getIncidents, reopenIncident } from '../services/monitoring'
+import { checkAllIncidentAutoResolution, checkIncidentAutoResolution, closeIncident, createIncidentTicket, executeIncidentAction, getIncidentAnalysis, getIncidentAutoResolution, getIncidentRunbook, getIncidents, reopenIncident } from '../services/monitoring'
 
 const statusLabels = { OPEN: 'Aberto', RESOLVED: 'Resolvido' }
 const sourceLabels = { ZABBIX: 'Zabbix', UNIFI_AP: 'UniFi AP' }
 const safetyLabels = { READ_ONLY: 'Seguro/read-only', DOCUMENTATION: 'Documentação' }
+const resolutionLabels = { ACTIVE: 'Ainda ativo', WAITING_STABILITY: 'Aguardando estabilidade', AUTO_RESOLVED: 'Resolvido automaticamente', SKIPPED_FLAPPING: 'Oscilação crítica — manual', SKIPPED: 'Não aplicável' }
+function resolutionColor(s) { return s === 'AUTO_RESOLVED' ? 'var(--green)' : s === 'ACTIVE' ? 'var(--red)' : s === 'WAITING_STABILITY' ? 'var(--amber)' : 'var(--text-tertiary)' }
 function fmtDate(v) { return v ? new Date(v).toLocaleString('pt-BR') : '—' }
 function sevColor(s) { return s >= 5 ? 'var(--red)' : s >= 4 ? 'var(--orange)' : s >= 3 ? 'var(--amber)' : 'var(--text-tertiary)' }
 function ageText(v) {
@@ -23,10 +25,12 @@ export default function IncidentsPage() {
   const [detail, setDetail] = useState(null)
   const [analysis, setAnalysis] = useState(null)
   const [runbook, setRunbook] = useState(null)
+  const [autoResolution, setAutoResolution] = useState(null)
   const [actionResult, setActionResult] = useState(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
   const [actionBusy, setActionBusy] = useState('')
+  const [autoBusy, setAutoBusy] = useState(false)
   const [notice, setNotice] = useState('')
 
   async function load() {
@@ -61,11 +65,12 @@ export default function IncidentsPage() {
   ], [payload])
 
   async function selectIncident(item) {
-    setSelected(item); setDetail(null); setAnalysis(null); setRunbook(null); setActionResult(null); setNotice('')
+    setSelected(item); setDetail(null); setAnalysis(null); setRunbook(null); setAutoResolution(null); setActionResult(null); setNotice('')
     try {
-      const res = await getIncidentRunbook(item.id)
-      setRunbook(res.data)
-    } catch { setNotice('Falha ao carregar runbook do incidente.') }
+      const [rb, ar] = await Promise.all([getIncidentRunbook(item.id), getIncidentAutoResolution(item.id)])
+      setRunbook(rb.data)
+      setAutoResolution(ar.data)
+    } catch { setNotice('Falha ao carregar detalhes do incidente.') }
   }
 
   async function analyze(item) {
@@ -84,6 +89,28 @@ export default function IncidentsPage() {
       setRunbook(rb.data)
     } catch { setNotice('Falha ao executar ação guiada.') }
     finally { setActionBusy('') }
+  }
+
+  async function autoResolveOne(item) {
+    setAutoBusy(true); setNotice('')
+    try {
+      const res = await checkIncidentAutoResolution(item.id)
+      setNotice(res.data.decision?.status === 'AUTO_RESOLVED' ? 'Incidente resolvido automaticamente.' : res.data.decision?.reason || 'Checagem concluída.')
+      const ar = await getIncidentAutoResolution(item.id)
+      setAutoResolution(ar.data)
+      await load()
+    } catch { setNotice('Falha ao verificar auto-resolução.') }
+    finally { setAutoBusy(false) }
+  }
+
+  async function autoResolveAll() {
+    setAutoBusy(true); setNotice('')
+    try {
+      const res = await checkAllIncidentAutoResolution()
+      setNotice(`Auto-resolução: ${res.data.checked} checados, ${res.data.autoResolved} resolvidos, ${res.data.waitingStability} aguardando estabilidade.`)
+      await load()
+    } catch { setNotice('Falha ao verificar auto-resolução em lote.') }
+    finally { setAutoBusy(false) }
   }
 
   async function ticket(item) {
@@ -107,7 +134,7 @@ export default function IncidentsPage() {
   }
 
   return <Layout><div className="page">
-    <div className="page-header"><div className="page-header-left"><h1>Central de Incidentes</h1><p>Incidentes correlacionados Zabbix/UniFi com anti-duplicidade GLPI e análise operacional</p></div><button className="btn btn-secondary" onClick={load} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar'}</button></div>
+    <div className="page-header"><div className="page-header-left"><h1>Central de Incidentes</h1><p>Incidentes correlacionados Zabbix/UniFi com anti-duplicidade GLPI e análise operacional</p></div><div style={{display:'flex', gap:8, flexWrap:'wrap'}}><button className="btn btn-secondary" onClick={autoResolveAll} disabled={autoBusy}>{autoBusy ? 'Verificando...' : 'Verificar normalizações'}</button><button className="btn btn-secondary" onClick={load} disabled={loading}>{loading ? 'Atualizando...' : 'Atualizar'}</button></div></div>
     {notice && <div className="card" style={{ padding: 12, marginBottom: 14, borderColor: notice.includes('Falha') ? 'var(--red)' : 'var(--green)' }}>{notice}</div>}
     <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(150px,1fr))', gap:12, marginBottom:16 }}>{kpis.map(([l,v,c]) => <div key={l} className="stat-card"><div className="stat-value" style={{ color:c }}>{v}</div><div className="stat-label">{l}</div></div>)}</div>
     <div className="card" style={{ padding: 14, marginBottom: 16 }}>
@@ -133,6 +160,14 @@ export default function IncidentsPage() {
         {!selected ? <div className="empty-state"><h3>Selecione um incidente</h3><p>Veja análise, próximas ações e GLPI relacionado.</p></div> : <>
           <div style={{ display:'flex', justifyContent:'space-between', gap:10 }}><div><h3>{selected.title}</h3><p style={{ color:'var(--text-tertiary)', fontSize:12 }}>{selected.affectedHost} · {fmtDate(selected.lastSeenAt)}</p></div><span className="badge" style={{ color: sevColor(selected.severity) }}>S{selected.severity}</span></div>
           <p style={{ marginTop:12, color:'var(--text-secondary)' }}>{selected.recommendation}</p>
+          <div style={{ marginTop:14, padding:12, border:'1px solid var(--border)', borderRadius:12, background:'rgba(15,23,42,.22)' }}>
+            <div style={{ display:'flex', justifyContent:'space-between', gap:10, alignItems:'center' }}>
+              <div><strong>Status de normalização</strong><p style={{ color:'var(--text-secondary)', fontSize:12.5, marginTop:4 }}>{autoResolution?.latestCheck?.reason || 'Ainda sem checagem registrada para este incidente.'}</p></div>
+              <span style={{ color: resolutionColor(autoResolution?.latestCheck?.status), fontWeight:800, fontSize:12 }}>{resolutionLabels[autoResolution?.latestCheck?.status] || 'Sem checagem'}</span>
+            </div>
+            {autoResolution?.latestCheck && <p style={{ color:'var(--text-tertiary)', fontSize:12, marginTop:6 }}>Última checagem: {fmtDate(autoResolution.latestCheck.checkedAt)} · estabilidade {autoResolution.latestCheck.minutesStable}min</p>}
+            <button className="btn btn-secondary" style={{ marginTop:10 }} onClick={()=>autoResolveOne(selected)} disabled={autoBusy}>{autoBusy ? 'Verificando...' : 'Checar normalização agora'}</button>
+          </div>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginTop:14 }}>
             <button className="btn btn-primary" onClick={()=>analyze(selected)}>Analisar</button>
             <button className="btn btn-secondary" onClick={()=>ticket(selected)} disabled={busy}>{selected.openGlpiTicketId ? 'Reusar GLPI' : 'Criar GLPI'}</button>
