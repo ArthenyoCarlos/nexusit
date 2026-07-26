@@ -2,6 +2,7 @@ package br.com.nexusit.incident;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
@@ -12,6 +13,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class CorrelatedIncidentController {
     private final CorrelatedIncidentService service;
+    private final IncidentRunbookService runbookService;
 
     @GetMapping
     public IncidentListResponse list(@RequestParam(required = false, defaultValue = "OPEN") String status,
@@ -31,6 +33,18 @@ public class CorrelatedIncidentController {
 
     @GetMapping("/{id}/analysis")
     public Map<String, String> analysis(@PathVariable UUID id) { return Map.of("analysis", service.analyzeIncident(id)); }
+
+    @GetMapping("/{id}/runbook")
+    public IncidentRunbookResponse runbook(@PathVariable UUID id) { return runbookService.get(id); }
+
+    @GetMapping("/{id}/action-results")
+    public java.util.List<IncidentActionResultResponse> actionResults(@PathVariable UUID id) { return runbookService.recent(id); }
+
+    @PostMapping("/{id}/actions/{actionKey}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public IncidentActionResultResponse executeAction(@PathVariable UUID id, @PathVariable String actionKey, Authentication auth) {
+        return runbookService.execute(id, actionKey, auth);
+    }
 
     @PostMapping("/{id}/tickets")
     @PreAuthorize("hasRole('ADMIN')")
