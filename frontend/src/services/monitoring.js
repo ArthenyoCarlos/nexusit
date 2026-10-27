@@ -1,5 +1,7 @@
 import api from './api'
 
+export const requestTsCollection = (options = {}) => api.post('/monitoring/ts-sessions/refresh', {}, options)
+export const getTsCollectionStatus = (id, options = {}) => api.get(`/monitoring/ts-sessions/refresh/${encodeURIComponent(id)}`, options)
 export const getTsSessions = (options = {}) => api.get('/monitoring/ts-sessions', options)
 export const getHosts = () => api.get('/monitoring/hosts')
 export const getProblems = () => api.get('/monitoring/problems')

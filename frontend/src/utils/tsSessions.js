@@ -1,3 +1,24 @@
+export async function collectFreshTsSnapshot({ request, status, load, signal, pause = ms => new Promise(resolve => setTimeout(resolve, ms)) }) {
+  const check = () => { if (signal?.aborted) throw new DOMException('Cancelado', 'AbortError') }
+  check()
+  const { data: job } = await request({ signal, timeout: 10000 })
+  if (!job?.id) throw new Error('Não foi possível solicitar a coleta no TS.')
+  const deadline = Date.now() + 95000
+  while (Date.now() < deadline) {
+    check()
+    const { data: result } = await status(job.id, { signal, timeout: 10000 })
+    if (result.status === 'SUCCEEDED') {
+      const { data } = await load({ signal, timeout: 20000 })
+      check()
+      if (data?.status !== 'OK') throw new Error('A coleta não retornou dados válidos. Último dado preservado.')
+      return data
+    }
+    if (['FAILED', 'UNKNOWN'].includes(result.status)) throw new Error('Falha na coleta do TS. Último dado preservado; tente novamente.')
+    await pause(1000)
+  }
+  throw new Error('A coleta demorou além do esperado. Último dado preservado; tente novamente.')
+}
+
 export function createSessionPoller({ load, onData, onError, onBusy = () => {}, schedule = setTimeout, cancel = clearTimeout }) {
   let stopped = false, busy = false, timer, controller
   async function refresh() {

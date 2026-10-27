@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Layout from '../components/Layout'
-import { getTsSessions } from '../services/monitoring'
-import { collectionHealth, createSessionPoller, filterSessions, formatDisconnectedDuration, formatTsDate, paginateHistory, sessionCompliance, windowsEventLabel } from '../utils/tsSessions'
+import { getTsSessions, requestTsCollection, getTsCollectionStatus } from '../services/monitoring'
+import { collectFreshTsSnapshot, collectionHealth, createSessionPoller, filterSessions, formatDisconnectedDuration, formatTsDate, paginateHistory, sessionCompliance, windowsEventLabel } from '../utils/tsSessions'
 import './TsSessionsPage.css'
 
 const complianceLabels = { ACTIVE: 'Ativa', EXEMPT: 'Isenta · administrador', WITHIN_LIMIT: 'Dentro do limite / tolerância', OVERDUE: 'Prazo excedido', UNKNOWN: 'Desconhecida' }
@@ -28,6 +28,25 @@ export default function TsSessionsPage() {
   })
   const [now, setNow] = useState(Date.now())
   const pollerRef = useRef(null)
+  const manualRef = useRef(null)
+  const [collecting, setCollecting] = useState(false)
+
+  async function collectNow() {
+    if (manualRef.current) return
+    const controller = new AbortController()
+    manualRef.current = controller
+    setCollecting(true)
+    setError('')
+    try {
+      const snapshot = await collectFreshTsSnapshot({ request: requestTsCollection, status: getTsCollectionStatus, load: getTsSessions, signal: controller.signal })
+      if (!controller.signal.aborted) { setData(snapshot); setNow(Date.now()); setError('') }
+    } catch (failure) {
+      if (!controller.signal.aborted) setError(failure.message || 'Não foi possível coletar no TS. Último dado preservado.')
+    } finally {
+      if (!controller.signal.aborted) setCollecting(false)
+      manualRef.current = null
+    }
+  }
 
   useEffect(() => {
     const poller = createSessionPoller({
@@ -39,7 +58,7 @@ export default function TsSessionsPage() {
     pollerRef.current = poller
     poller.refresh()
     const clock = setInterval(() => setNow(Date.now()), 10000)
-    return () => { poller.stop(); pollerRef.current = null; clearInterval(clock) }
+    return () => { poller.stop(); pollerRef.current = null; manualRef.current?.abort(); clearInterval(clock) }
   }, [])
 
   const health = collectionHealth(data, error, now)
@@ -62,13 +81,14 @@ export default function TsSessionsPage() {
   return <Layout><div className="page ts-page">
     <header className="page-header">
       <div className="page-header-left"><h1>Sessões TS</h1><p>Terminal Server · desconexões, isenções e evidências do Windows</p></div>
-      <div className="ts-header-actions"><span className="badge badge-blue">Somente leitura</span><button className="btn btn-secondary" disabled={busy} onClick={() => pollerRef.current?.refresh()}>{busy ? 'Atualizando…' : 'Atualizar'}</button></div>
+      <div className="ts-header-actions"><span className="badge badge-blue">Somente leitura</span><button className="btn btn-secondary" disabled={busy || collecting} onClick={collectNow}>{collecting ? 'Coletando no servidor…' : busy ? 'Atualizando…' : 'Atualizar'}</button></div>
     </header>
 
     <section className="card ts-health" aria-label="Saúde da coleta" style={{ borderLeft: `4px solid ${health.color}` }}>
       <div className="ts-health-title"><strong style={{ color: health.color }} role="status">{busy && !data ? 'Consultando coletor…' : health.label}</strong><span>{data?.server || 'Servidor não informado'}{data?.ip ? ` · ${data.ip}` : ''}</span></div>
       <div className="ts-meta"><span>Snapshot: <strong>{formatTsDate(data?.collectedAt)}</strong></span><span>Último sucesso: <strong>{formatTsDate(data?.lastSuccessAt)}</strong></span><span>Atualização automática: 30s · America/Recife</span></div>
       {error && <p className="ts-warning" role="alert">{error}</p>}
+      {collecting && <p className="ts-warning" role="status">Consultando o Windows agora. Os dados anteriores ficam visíveis até a nova coleta terminar.</p>}
       {!error && health.status !== 'OK' && <p className="ts-warning">{hasSnapshot ? 'Snapshot anterior / desatualizado: contagens e durações abaixo não representam necessariamente o estado atual.' : 'Sem coleta válida: não é possível afirmar quantos usuários estão conectados nem avaliar a conformidade.'}</p>}
     </section>
 

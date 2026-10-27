@@ -1,0 +1,17 @@
+[Unit]
+Description=NexusIT TS on-demand read-only collection worker
+After=default.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/apps/nexusit/ops/ts-monitor
+ExecStart=/home/galdino/.hermes/venvs/ts-monitor/bin/python /opt/apps/nexusit/ops/ts-monitor/ts_refresh_worker.py
+Restart=on-failure
+RestartSec=3
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0027
+TimeoutStopSec=10
+
+[Install]
+WantedBy=default.target

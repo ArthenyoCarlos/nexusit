@@ -26,16 +26,25 @@ def prepare_snapshot(raw):
 
 
 def main():
-    import base64, datetime, fcntl, gzip, json, os, sqlite3
+    import base64, datetime, fcntl, gzip, json, os, sqlite3, sys
     from pathlib import Path
     from ts_access import session
     state = Path('/home/galdino/.hermes/state')
     state.mkdir(parents=True, exist_ok=True)
     lock = (state/'ts_sessions.lock').open('w')
+    manual = '--wait-lock' in sys.argv
     try:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        fcntl.flock(lock, fcntl.LOCK_EX | (0 if manual else fcntl.LOCK_NB))
     except BlockingIOError:
         return
+    if not manual:
+        with (state/'ts_manual_notifications.lock').open('a') as notifications_lock:
+            fcntl.flock(notifications_lock, fcntl.LOCK_EX)
+            spool = state/'ts_manual_notifications.log'
+            if spool.exists():
+                message = spool.read_text()
+                spool.write_text('')
+                if message.strip(): print(message.strip())
     target = state/'ts_sessions.json'
     previous = json.loads(target.read_text()) if target.exists() else {}
     now = datetime.datetime.now(datetime.timezone.utc).isoformat()
