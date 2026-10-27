@@ -16,6 +16,7 @@ const NAV = [
       { label: 'NexusAI',       path: '/hermes',     Icon: IconHermes     },
       { label: 'Monitoramento', path: '/monitoring', Icon: IconMonitor    },
       { label: 'Triagem Alertas', path: '/monitoring/triage', Icon: IconMonitor },
+      { label: 'Sessões TS',    path: '/monitoring/ts', Icon: IconRemoteDesktop },
       { label: 'APs UniFi',     path: '/monitoring/aps', Icon: IconWifi   },
       { label: 'Incidentes',    path: '/monitoring/incidents', Icon: IconIncident },
     ],

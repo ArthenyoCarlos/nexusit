@@ -1,5 +1,6 @@
 import api from './api'
 
+export const getTsSessions = (options = {}) => api.get('/monitoring/ts-sessions', options)
 export const getHosts = () => api.get('/monitoring/hosts')
 export const getProblems = () => api.get('/monitoring/problems')
 export const getHistory = (hours = 24) => api.get(`/monitoring/history?hours=${hours}`)

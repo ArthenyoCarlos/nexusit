@@ -11,6 +11,7 @@ import DependencyMapPage from './pages/DependencyMapPage'
 import InventoryPage from './pages/InventoryPage'
 import MonitoringPage from './pages/MonitoringPage'
 import AlertTriagePage from './pages/AlertTriagePage'
+import TsSessionsPage from './pages/TsSessionsPage'
 import UnifiApMonitoringPage from './pages/UnifiApMonitoringPage'
 import IncidentsPage from './pages/IncidentsPage'
 import BackupsPage from './pages/BackupsPage'
@@ -89,6 +90,7 @@ export default function App() {
                   <Route path="/hermes"     element={<HermesPage />} />
                   <Route path="/monitoring" element={<MonitoringPage />} />
                   <Route path="/monitoring/triage" element={<AlertTriagePage />} />
+                  <Route path="/monitoring/ts" element={<TsSessionsPage />} />
                   <Route path="/monitoring/aps" element={<UnifiApMonitoringPage />} />
                   <Route path="/monitoring/incidents" element={<IncidentsPage />} />
                   <Route path="/backups" element={<BackupsPage />} />
