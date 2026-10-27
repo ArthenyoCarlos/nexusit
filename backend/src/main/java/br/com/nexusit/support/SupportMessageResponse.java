@@ -14,8 +14,14 @@ public record SupportMessageResponse(
         String mediaFilename,
         String mediaMime,
         String mediaUrl,
-        String transcription
+        String transcription,
+        LocalDateTime readAt
 ) {
+    public SupportMessageResponse(UUID id, String direction, String author, String authorName, String content,
+                                  LocalDateTime createdAt, String mediaKind, String mediaFilename, String mediaMime,
+                                  String mediaUrl, String transcription) {
+        this(id, direction, author, authorName, content, createdAt, mediaKind, mediaFilename, mediaMime, mediaUrl, transcription, null);
+    }
     public static SupportMessageResponse from(SupportMessage m) {
         String mediaUrl = m.getMediaBytes() != null && m.getMediaBytes().length > 0
                 ? "/api/support/messages/" + m.getId() + "/media"
@@ -31,6 +37,6 @@ public record SupportMessageResponse(
                 m.getMediaFilename(),
                 m.getMediaMime(),
                 mediaUrl,
-                m.getTranscription());
+                m.getTranscription(), m.getReadAt());
     }
 }

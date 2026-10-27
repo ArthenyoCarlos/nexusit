@@ -17,4 +17,6 @@ public interface SupportMessageRepository extends JpaRepository<SupportMessage, 
     Optional<SupportMessage> findFirstByConversationIdOrderByCreatedAtDesc(UUID conversationId);
 
     long countByCreatedAtGreaterThanEqual(LocalDateTime since);
+
+    long countByConversationIdAndDirectionAndReadAtIsNull(UUID conversationId, MessageDirection direction);
 }

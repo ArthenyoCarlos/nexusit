@@ -30,6 +30,7 @@ public class EvolutionApiClient {
 
     private final EvolutionApiProperties props;
     private final RestTemplate restTemplate;
+    private final RestTemplate mediaRestTemplate;
 
     public EvolutionApiClient(EvolutionApiProperties props) {
         this.props = props;
@@ -37,6 +38,21 @@ public class EvolutionApiClient {
         factory.setConnectTimeout(5000);
         factory.setReadTimeout(10000);
         this.restTemplate = new RestTemplate(factory);
+        var mediaFactory = createRequestFactory();
+        mediaFactory.setConnectTimeout(5000);
+        mediaFactory.setReadTimeout(120000);
+        this.mediaRestTemplate = new RestTemplate(mediaFactory);
+    }
+
+    /** Only an explicit Evolution acknowledgement constitutes a remote read. Safe to retry. */
+    public boolean markMessagesRead(java.util.List<Map<String, Object>> keys) {
+        if (!props.isConfigured() || keys.isEmpty()) return false;
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        headers.set("apikey", props.getApiKey());
+        var response = restTemplate.exchange(props.getBaseUrl() + "/chat/markMessageAsRead/" + props.getInstanceName(),
+                HttpMethod.POST, new HttpEntity<>(Map.of("readMessages", keys), headers), Map.class);
+        return response.getBody() != null && "success".equals(response.getBody().get("read"));
     }
 
     /** Best-effort: logs and returns without throwing if not configured or if the call fails. */
@@ -64,16 +80,44 @@ public class EvolutionApiClient {
      * whether the message actually went out — unlike Hermes's fire-and-forget replies.
      */
     public void sendTextOrThrow(String target, String text) {
-        if (!props.isConfigured()) {
-            throw new IllegalStateException("Evolution API não configurada (defina application.whatsapp.*)");
-        }
+        sendAcknowledged(restTemplate, "/message/sendText/", Map.of("number", target, "text", text));
+    }
+
+    public void sendWhatsAppAudioOrThrow(String target, byte[] bytes) {
+        sendAcknowledged(mediaRestTemplate, "/message/sendWhatsAppAudio/", Map.of(
+                "number", target, "audio", Base64.getEncoder().encodeToString(bytes)));
+    }
+
+    public void sendMediaOrThrow(String target, byte[] bytes, String filename, String mime, String caption) {
+        String normalized = normalizeMime(mime);
+        sendAcknowledged(mediaRestTemplate, "/message/sendMedia/", Map.of(
+                "number", target, "mediatype", mediaType(normalized), "mimetype", normalized,
+                "caption", caption == null ? "" : caption, "fileName", filename == null ? defaultFilename(normalized) : filename,
+                "media", Base64.getEncoder().encodeToString(bytes)));
+    }
+
+    private void sendAcknowledged(RestTemplate client, String endpoint, Map<String, Object> body) {
+        if (!props.isConfigured()) throw new org.springframework.web.server.ResponseStatusException(
+                org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE, "Evolution API não configurada; nada foi enviado");
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         headers.set("apikey", props.getApiKey());
-        Map<String, Object> body = Map.of("number", target, "text", text);
-        restTemplate.exchange(
-                props.getBaseUrl() + "/message/sendText/" + props.getInstanceName(),
-                HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+        try {
+            var response = client.exchange(props.getBaseUrl() + endpoint + props.getInstanceName(),
+                    HttpMethod.POST, new HttpEntity<>(body, headers), Map.class);
+            if (response.getBody() == null || !(response.getBody().get("key") instanceof Map<?, ?> key)
+                    || !(key.get("id") instanceof String id) || id.isBlank()) {
+                throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+                        "Confirmação do WhatsApp incerta (sem ACK); confira antes de reenviar");
+            }
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.GATEWAY_TIMEOUT,
+                    "Confirmação do WhatsApp incerta por falha de conexão/tempo limite; confira antes de reenviar");
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            throw new org.springframework.web.server.ResponseStatusException(org.springframework.http.HttpStatus.BAD_GATEWAY,
+                    e.getStatusCode().is4xxClientError() ? "Envio rejeitado pelo WhatsApp (HTTP " + e.getStatusCode().value() + ")"
+                    : "WhatsApp retornou erro; confirmação incerta, confira antes de reenviar");
+        }
     }
 
     /** Best-effort media send through Evolution API v2 sendMedia endpoint. */

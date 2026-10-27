@@ -40,7 +40,7 @@ public class WhatsappWebhookController {
         try {
             processPayload(payload);
         } catch (Exception e) {
-            log.warn("Falha ao processar webhook do WhatsApp: {} — payload: {}", e.toString(), payload);
+            log.warn("Falha ao processar webhook do WhatsApp ({})", e.getClass().getSimpleName());
         }
         return ResponseEntity.ok().build();
     }
@@ -73,7 +73,8 @@ public class WhatsappWebhookController {
                 media != null ? media.bytes() : null,
                 media != null ? media.filename() : null,
                 media != null ? media.mime() : null,
-                media != null ? media.kind() : null
+                media != null ? media.kind() : null,
+                key.path("id").asText(null), remoteJid, false
         ));
     }
 

@@ -54,6 +54,13 @@ public class SupportMessage {
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    private String providerMessageId;
+    private String remoteJid;
+    private Boolean fromMe;
+    private LocalDateTime readAt;
+    private LocalDateTime remoteReadAt;
+    private boolean remoteReadPending;
+
     @PrePersist
     void prePersist() { if (createdAt == null) createdAt = LocalDateTime.now(); }
 }

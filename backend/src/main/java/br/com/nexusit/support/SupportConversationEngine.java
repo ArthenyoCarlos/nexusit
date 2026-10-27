@@ -298,9 +298,12 @@ public class SupportConversationEngine {
 
     private void recordInboundMessage(SupportConversation conversation, WhatsappContact contact,
                                       InboundWhatsappMessage msg, String transcription) {
-        recordMessage(conversation, MessageDirection.IN, MessageAuthor.EMPLOYEE,
-                employeeDisplayName(contact, msg), inboundContent(msg, transcription),
-                msg.mediaBytes(), msg.mediaFilename(), msg.mediaMime(), msg.mediaKind(), transcription);
+        messageRepo.save(SupportMessage.builder().conversation(conversation).direction(MessageDirection.IN)
+                .author(MessageAuthor.EMPLOYEE).authorName(employeeDisplayName(contact, msg))
+                .content(inboundContent(msg, transcription)).mediaBytes(msg.mediaBytes())
+                .mediaFilename(msg.mediaFilename()).mediaMime(msg.mediaMime()).mediaKind(msg.mediaKind())
+                .transcription(transcription == null || transcription.isBlank() ? null : transcription)
+                .providerMessageId(msg.providerMessageId()).remoteJid(msg.remoteJid()).fromMe(msg.fromMe()).build());
     }
 
     private void notifyTechniciansOfNewMessage(SupportConversation conversation, WhatsappContact contact,

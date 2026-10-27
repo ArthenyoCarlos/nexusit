@@ -3,12 +3,23 @@ import { useSearchParams } from 'react-router-dom'
 import { Capacitor } from '@capacitor/core'
 import { VoiceRecorder } from '@independo/capacitor-voice-recorder'
 import Layout from '../components/Layout'
+import { useTheme } from '../contexts/ThemeContext'
+import { readCandidate, shouldMarkRead, validateAttachment, validateAudioCaption, uploadError } from '../utils/supportCrm'
+import './SupportCrmPage.css'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation, addTechnician, removeTechnician, transferConversation } from '../services/support'
+import { markConversationRead, getQueue, getMine, getConversation, getMessageMediaBlob, claimConversation, replyToConversation, closeConversation, addTechnician, removeTechnician, transferConversation } from '../services/support'
 import { getTicket, updateTicketFields, getCategories, createCategory } from '../services/glpi'
 import { getUsers } from '../services/users'
 import { playAlertSound } from '../utils/alertSound'
+
+const initials = value => String(value || '?').split(/\s+/).map(s => s[0]).slice(0, 2).join('').toUpperCase()
+const clock = iso => iso ? new Date(iso).toLocaleTimeString('pt-BR', {hour:'2-digit', minute:'2-digit'}) : ''
+const day = iso => iso ? new Date(iso).toLocaleDateString('pt-BR', {day:'2-digit',month:'long',year:'numeric'}) : 'Histórico'
+function Icon({name}) {
+  const paths = {search:'m21 21-5-5 M19 11a8 8 0 1 1-16 0 8 8 0 0 1 16 0', back:'m15 18-6-6 6-6', more:'M12 5h.01 M12 12h.01 M12 19h.01', attach:'m8 13 7-7a3 3 0 0 1 4 4L9 20a5 5 0 0 1-7-7L13 2', mic:'M9 5a3 3 0 0 1 6 0v7a3 3 0 0 1-6 0z M5 10v2a7 7 0 0 0 14 0v-2 M12 19v3 M8 22h8', send:'m22 2-7 20-4-9-9-4 20-7z M22 2 11 13'}
+  return <svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={paths[name]}/></svg>
+}
 
 function base64ToBlob(base64, mimeType) {
   const byteChars = atob(base64)
@@ -46,23 +57,6 @@ function splitLockedTitlePrefix(title = '') {
     return { prefix, body: match[2] || '' }
   }
   return { prefix: '[Whatsapp]', body: String(title || '').trim() }
-}
-
-function timeAgo(iso) {
-  if (!iso) return '—'
-  const diff = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 1000))
-  if (diff < 60) return `${diff}s atrás`
-  if (diff < 3600) return `${Math.floor(diff / 60)}min atrás`
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h atrás`
-  return `${Math.floor(diff / 86400)}d atrás`
-}
-
-function queueWaitLevel(iso) {
-  if (!iso) return null
-  const minutes = Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60000))
-  if (minutes >= 60) return 'danger'
-  if (minutes >= 15) return 'warning'
-  return null
 }
 
 function formatBytes(bytes) {
@@ -206,6 +200,22 @@ function MediaAttachment({ message }) {
 }
 
 export default function SupportCrmPage() {
+  const { theme, toggleTheme } = useTheme()
+  const [filter, setFilter] = useState('Todas')
+  const [search, setSearch] = useState('')
+  const [toolsOpen, setToolsOpen] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [sendError, setSendError] = useState('')
+  const [recordSeconds, setRecordSeconds] = useState(0)
+  const [readStatus, setReadStatus] = useState('')
+  const selectedRef = useRef(null)
+  const detailRef = useRef(null)
+  const readLedger = useRef(new Map())
+  const detailBusy = useRef(new Set())
+  const listsBusy = useRef(false)
+  const cancelledRecording = useRef(false)
+  const recordingTarget = useRef(null)
+  const mounted = useRef(true)
   const { user } = useAuth()
   const [searchParams] = useSearchParams()
   const toast = useToast()
@@ -248,9 +258,13 @@ export default function SupportCrmPage() {
   const lastMessageCountRef = useRef(null)
 
   const loadLists = useCallback(async () => {
-    const [q, m] = await Promise.all([getQueue(), getMine()])
-    setQueue(q); setMine(m)
-    setLoading(false)
+    if (listsBusy.current) return
+    listsBusy.current = true
+    try {
+      const [q, m] = await Promise.all([getQueue(), getMine()])
+      if (mounted.current) { setQueue(q); setMine(m) }
+    } catch { /* Preserve last successful lists on transient errors. */ }
+    finally { listsBusy.current = false; if (mounted.current) setLoading(false) }
   }, [])
 
   useEffect(() => {
@@ -261,7 +275,7 @@ export default function SupportCrmPage() {
 
   useEffect(() => {
     const id = searchParams.get('conversation')
-    if (id) setSelectedId(id)
+    if (id && !selectedRef.current) { selectedRef.current = id; setSelectedId(id) }
   }, [searchParams])
 
   useEffect(() => {
@@ -270,19 +284,60 @@ export default function SupportCrmPage() {
 
   const loadDetail = useCallback(async (id) => {
     if (!id) { setDetail(null); return }
-    try { setDetail(await getConversation(id)) } catch { setDetail(null) }
+    if (detailBusy.current.has(String(id))) return
+    detailBusy.current.add(String(id))
+    try {
+      const data = await getConversation(id)
+      if (mounted.current && String(selectedRef.current) === String(id)) setDetail(data)
+    } catch { /* Keep the current thread during transient polling failures. */ }
+    finally { detailBusy.current.delete(String(id)) }
   }, [])
 
   useEffect(() => {
+    selectedRef.current = selectedId
+    setDetail(null)
+    setReadStatus(readLedger.current.get(String(selectedId))?.remoteRead || '')
+    setToolsOpen(false)
     lastMessageCountRef.current = null
     isNearBottomRef.current = true
     loadDetail(selectedId)
   }, [selectedId, loadDetail])
 
+  detailRef.current = detail
+  const attemptRead = useCallback(async () => {
+    const id = selectedRef.current
+    const data = detailRef.current
+    const candidate = readCandidate(data?.messages)
+    const previous = readLedger.current.get(String(id))
+    const el = threadBodyRef.current
+    if (!shouldMarkRead({ candidate, previous, open: !!id && String(data?.conversation?.id) === String(id) && !!el?.getClientRects().length,
+      visible: document.visibilityState === 'visible', nearBottom: isNearBottomRef.current })) return
+    const entry = { id: candidate, inFlight: true, attempts: previous?.id === candidate ? (previous.attempts || 0) + 1 : 1 }
+    readLedger.current.set(String(id), entry)
+    try {
+      const result = await markConversationRead(id, candidate)
+      Object.assign(entry, result, { inFlight: false, retryAt: Date.now() + Math.min(60000, 5000 * 2 ** (entry.attempts - 1)) })
+      if (String(selectedRef.current) !== String(id)) return
+      setReadStatus(result.remoteRead)
+      if (result.localRead) {
+        const update = list => list.map(c => String(c.id) === String(id) ? { ...c, unreadCount: result.unreadCount } : c)
+        setQueue(update); setMine(update)
+      }
+    } catch {
+      Object.assign(entry, { inFlight: false, remoteRead: 'PENDING', retryAt: Date.now() + Math.min(60000, 5000 * 2 ** (entry.attempts - 1)) })
+    }
+  }, [])
+  useEffect(() => {
+    const check = () => attemptRead()
+    document.addEventListener('visibilitychange', check)
+    window.addEventListener('focus', check)
+    return () => { document.removeEventListener('visibilitychange', check); window.removeEventListener('focus', check) }
+  }, [attemptRead])
   const handleThreadScroll = () => {
     const el = threadBodyRef.current
     if (!el) return
     isNearBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+    attemptRead()
   }
 
   useEffect(() => {
@@ -303,10 +358,12 @@ export default function SupportCrmPage() {
 
   useEffect(() => {
     if (isNearBottomRef.current) threadEndRef.current?.scrollIntoView({ block: 'nearest' })
+    const timer = setTimeout(attemptRead, 350)
+    return () => clearTimeout(timer)
   }, [detail])
 
   useEffect(() => {
-    if (!selectedFile || !selectedFile.type.startsWith('image/')) { setSelectedFilePreview(null); return undefined }
+    if (!selectedFile || !(selectedFile.type.startsWith('image/') || selectedFile.type.startsWith('audio/'))) { setSelectedFilePreview(null); return undefined }
     const url = URL.createObjectURL(selectedFile)
     setSelectedFilePreview(url)
     return () => URL.revokeObjectURL(url)
@@ -327,30 +384,52 @@ export default function SupportCrmPage() {
     } finally { setClaimingId(null) }
   }
 
+  const selectConversation = id => {
+    if (sending || recording || savingTech || ticketSaving || closing || claimingId) { toast.add('Finalize ou cancele o áudio/envio antes de trocar de conversa.', 'warning'); return }
+    if ((message.trim() || selectedFile) && !window.confirm('Descartar o rascunho desta conversa?')) return
+    selectedRef.current = id
+    setMessage(''); setSelectedFile(null); setSendError('')
+    setSelectedId(id)
+  }
   const handleSend = async (e) => {
     e.preventDefault()
-    if ((!message.trim() && !selectedFile) || !selectedId) return
-    setSending(true)
+    if (sending || recording || (!message.trim() && !selectedFile) || !selectedId || !isMine) return
+    const invalid = validateAttachment(selectedFile) || validateAudioCaption(message, selectedFile)
+    if (invalid) { setSendError(invalid); return }
+    const target = selectedId
+    setSending(true); setSendError(''); setUploadProgress(0)
     try {
-      isNearBottomRef.current = true
-      setDetail(await replyToConversation(selectedId, message.trim(), selectedFile))
-      setMessage('')
-      setSelectedFile(null)
-      if (fileInputRef.current) fileInputRef.current.value = ''
-    } finally { setSending(false) }
+      const response = await replyToConversation(target, message.trim(), selectedFile, progress => {
+        setUploadProgress(progress.total ? Math.round(progress.loaded * 100 / progress.total) : 0)
+      })
+      if (String(selectedRef.current) === String(target)) {
+        isNearBottomRef.current = true
+        setDetail(response); setMessage(''); setSelectedFile(null)
+        if (fileInputRef.current) fileInputRef.current.value = ''
+      }
+    } catch (error) { setSendError(uploadError(error)) }
+    finally { setSending(false) }
   }
 
   const startRecording = async () => {
+    cancelledRecording.current = false
+    recordingTarget.current = selectedRef.current
+    setRecordSeconds(0)
+    setRecording(true)
     if (Capacitor.isNativePlatform()) {
       try {
         const { value: allowed } = await VoiceRecorder.requestAudioRecordingPermission()
         if (!allowed) {
+          setRecording(false)
           toast.add('Permissão de microfone negada.', 'error')
           return
         }
+        if (!mounted.current || cancelledRecording.current || recordingTarget.current !== selectedRef.current) { setRecording(false); return }
         await VoiceRecorder.startRecording()
+        if (!mounted.current || cancelledRecording.current) { await VoiceRecorder.stopRecording(); setRecording(false); return }
         setRecording(true)
       } catch (e) {
+        setRecording(false)
         console.error('VoiceRecorder.startRecording falhou:', e)
         toast.add(`Não foi possível iniciar a gravação (${e.message || e}).`, 'error')
       }
@@ -359,6 +438,7 @@ export default function SupportCrmPage() {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      if (!mounted.current || cancelledRecording.current || recordingTarget.current !== selectedRef.current) { stream.getTracks().forEach(t => t.stop()); setRecording(false); return }
       const preferredTypes = ['audio/ogg;codecs=opus', 'audio/webm;codecs=opus', 'audio/webm']
       const mimeType = preferredTypes.find(type => MediaRecorder.isTypeSupported(type))
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
@@ -369,13 +449,14 @@ export default function SupportCrmPage() {
         const type = recorder.mimeType || 'audio/webm'
         const blob = new Blob(audioChunksRef.current, { type })
         const ext = type.includes('ogg') ? 'ogg' : type.includes('mp4') ? 'm4a' : 'webm'
-        setSelectedFile(new File([blob], `audio-tecnico-${Date.now()}.${ext}`, { type }))
+        if (mounted.current && !cancelledRecording.current && recordingTarget.current === selectedRef.current) setSelectedFile(new File([blob], `audio-tecnico-${Date.now()}.${ext}`, { type }))
         setRecording(false)
       }
       mediaRecorderRef.current = recorder
-      recorder.start()
+      recorder.start(1000)
       setRecording(true)
     } catch (e) {
+      setRecording(false)
       console.error('getUserMedia(audio) falhou:', e)
       toast.add(`Não foi possível acessar o microfone (${e.name || e.message || 'erro desconhecido'}).`, 'error')
     }
@@ -387,7 +468,7 @@ export default function SupportCrmPage() {
         const { value } = await VoiceRecorder.stopRecording()
         const blob = base64ToBlob(value.recordDataBase64, value.mimeType)
         const ext = value.fileExtension || 'm4a'
-        setSelectedFile(new File([blob], `audio-tecnico-${Date.now()}.${ext}`, { type: value.mimeType }))
+        if (mounted.current && !cancelledRecording.current && recordingTarget.current === selectedRef.current) setSelectedFile(new File([blob], `audio-tecnico-${Date.now()}.${ext}`, { type: value.mimeType }))
       } catch (e) {
         console.error('VoiceRecorder.stopRecording falhou:', e)
         toast.add(`Não foi possível finalizar a gravação (${e.message || e}).`, 'error')
@@ -401,6 +482,27 @@ export default function SupportCrmPage() {
     if (recorder && recorder.state !== 'inactive') recorder.stop()
     else setRecording(false)
   }
+
+  const cancelRecording = () => {
+    cancelledRecording.current = true
+    stopRecording()
+  }
+  useEffect(() => {
+    if (!recording) return
+    const timer = setInterval(() => setRecordSeconds(n => n + 1), 1000)
+    return () => clearInterval(timer)
+  }, [recording])
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+      cancelledRecording.current = true
+      const recorder = mediaRecorderRef.current
+      if (recorder?.state !== 'inactive' && recorder) recorder.stop()
+      recorder?.stream?.getTracks().forEach(track => track.stop())
+      if (Capacitor.isNativePlatform()) VoiceRecorder.stopRecording().catch(() => {})
+    }
+  }, [])
 
   const handleClose = async () => {
     if (!selectedId) return
@@ -469,11 +571,13 @@ export default function SupportCrmPage() {
 
   useEffect(() => {
     if (!ticketPanelOpen || !conversation?.glpiTicketId) return
+    let active = true
     setTicketLoading(true)
     getTicket(conversation.glpiTicketId)
-      .then(res => setTicketDetail(res.data))
-      .catch(() => { setTicketDetail(null); toast.add('Não foi possível carregar os dados do chamado.', 'error') })
-      .finally(() => setTicketLoading(false))
+      .then(res => { if (active) setTicketDetail(res.data) })
+      .catch(() => { if (active) { setTicketDetail(null); toast.add('Não foi possível carregar os dados do chamado.', 'error') } })
+      .finally(() => { if (active) setTicketLoading(false) })
+    return () => { active = false }
   }, [ticketPanelOpen, conversation?.glpiTicketId])
 
   useEffect(() => {
@@ -548,78 +652,29 @@ export default function SupportCrmPage() {
 
   return (
     <Layout>
-      <div className="page fade-up">
-        <div className="page-header">
-          <div className="page-header-left">
-            <h1>CRM de Suporte</h1>
-            <p>Atendimentos iniciados pelo Hermes via WhatsApp</p>
-          </div>
-        </div>
-
-        <div className="support-crm-grid">
-
-          {/* Lists */}
-          <div className="support-crm-lists">
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <p className="label-caps" style={{ margin: 0 }}>Fila</p>
-                {queue.length > 0 && <span className="badge badge-amber" style={{ fontSize: 10.5 }}>{queue.length}</span>}
-              </div>
-              {loading ? (
-                <div className="skeleton" style={{ height: 72, borderRadius: 10 }} />
-              ) : queue.length === 0 ? (
-                <div className="card empty-state" style={{ padding: '16px 14px' }}><p style={{ fontSize: 12.5 }}>Nenhum atendimento aguardando</p></div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[...queue].sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)).map(c => {
-                    const waitLevel = queueWaitLevel(c.createdAt)
-                    return (
-                      <div key={c.id} className="card" style={{ padding: '12px 14px',
-                        border: waitLevel === 'danger' ? '1px solid var(--red-border, #dc2626)' : waitLevel === 'warning' ? '1px solid var(--amber-border, #d97706)' : undefined }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{c.contactName || c.contactPhone}</p>
-                          {waitLevel === 'danger' && <span className="badge badge-red" style={{ fontSize: 9.5 }}>Espera &gt; 1h</span>}
-                          {waitLevel === 'warning' && <span className="badge badge-amber" style={{ fontSize: 9.5 }}>Espera &gt; 15min</span>}
-                        </div>
-                        <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                          {c.glpiTicketId ? `Chamado #${c.glpiTicketId}` : '—'} · {timeAgo(c.createdAt)}
-                        </p>
-                        <button onClick={() => handleClaim(c.id)} disabled={claimingId === c.id} className="btn btn-primary btn-sm" style={{ marginTop: 8, width: '100%' }}>
-                          {claimingId === c.id ? 'Assumindo...' : 'Atender'}
-                        </button>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
+      <div className={`crm page fade-up ${selectedId ? 'crm-chat-open' : ''}`}>
+        <div className="crm-topline"><span>Atendimento <b>WhatsApp</b></span><span className="crm-topnote">NexusIT · Central de suporte</span></div>
+        <div className="support-crm-grid crm-shell">
+          <aside className="support-crm-lists crm-sidebar">
+            <div className="crm-list-heading"><h1>Conversas</h1><button type="button" className="crm-icon" onClick={toggleTheme} aria-label="Alternar tema">{theme === 'dark' ? '☀' : '☾'}</button></div>
+            <label className="crm-search"><Icon name="search"/><input aria-label="Buscar conversas" placeholder="Buscar nome ou telefone" value={search} onChange={e => setSearch(e.target.value)}/></label>
+            <div className="crm-filters">{['Todas','Não lidas','Fila','Meus'].map(f => <button type="button" key={f} className={filter === f ? 'active' : ''} onClick={() => setFilter(f)}>{f}</button>)}</div>
+            <div className="crm-conversations">
+              {loading && <p className="crm-empty">Carregando conversas…</p>}
+              {Array.from(new Map([...queue, ...mine].map(c => [c.id, c])).values())
+                .filter(c => (!search || `${c.contactName} ${c.contactPhone}`.toLowerCase().includes(search.toLowerCase())) && (filter !== 'Não lidas' || c.unreadCount > 0) && (filter !== 'Fila' || queue.some(q => q.id === c.id)) && (filter !== 'Meus' || mine.some(m => m.id === c.id)))
+                .sort((a,b) => new Date(b.lastMessageAt || b.createdAt) - new Date(a.lastMessageAt || a.createdAt))
+                .map(c => <button type="button" key={c.id} onClick={() => selectConversation(c.id)} className={`crm-conversation ${String(selectedId) === String(c.id) ? 'active' : ''}`}>
+                  <span className="crm-avatar">{initials(c.contactName || c.contactPhone)}</span>
+                  <span className="crm-contact"><span className="crm-contact-title"><strong>{c.contactName || c.contactPhone}</strong><time>{clock(c.lastMessageAt || c.createdAt)}</time></span>
+                    <span className="crm-contact-preview"><span>{c.lastMessagePreview || c.lastMessageContent || STATE_LABEL[c.state] || 'Conversa de suporte'}</span>{c.unreadCount > 0 && <b className="crm-unread">{c.unreadCount}</b>}</span>
+                    <small>{queue.some(q => q.id === c.id) ? 'Fila · ' : ''}{c.glpiTicketId ? `Chamado #${c.glpiTicketId}` : 'Sem chamado'}</small>
+                  </span>
+                </button>)}
+              {!loading && !queue.length && !mine.length && <p className="crm-empty">Nenhuma conversa no momento.</p>}
             </div>
-
-            <div>
-              <p className="label-caps" style={{ marginBottom: 8 }}>Meus atendimentos</p>
-              {mine.length === 0 ? (
-                <div className="card empty-state" style={{ padding: '16px 14px' }}><p style={{ fontSize: 12.5 }}>Nenhum atendimento em andamento</p></div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {[...mine].sort((a, b) => Number(b.lastMessageAuthor === 'EMPLOYEE') - Number(a.lastMessageAuthor === 'EMPLOYEE')).map(c => {
-                    const awaitingReply = c.lastMessageAuthor === 'EMPLOYEE'
-                    return (
-                      <button key={c.id} onClick={() => setSelectedId(c.id)}
-                        className="card card-hover" style={{ padding: '12px 14px', textAlign: 'left', width: '100%', cursor: 'pointer',
-                          border: selectedId === c.id ? '2px solid var(--accent)' : awaitingReply ? '1px solid var(--warning, #d97706)' : '1px solid var(--border)' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                          <p style={{ fontWeight: 600, fontSize: 13.5, color: 'var(--text-primary)' }}>{c.contactName || c.contactPhone}</p>
-                          {awaitingReply && <span className="badge badge-amber" style={{ fontSize: 9.5 }}>Aguardando resposta</span>}
-                        </div>
-                        <p style={{ fontSize: 11.5, color: 'var(--text-tertiary)', marginTop: 2 }}>
-                          {c.glpiTicketId ? `Chamado #${c.glpiTicketId}` : '—'} · {timeAgo(c.lastMessageAt || c.claimedAt)}
-                        </p>
-                      </button>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
+            <footer className="crm-list-footer">Mensagens e chamados, em um só lugar</footer>
+          </aside>
 
           {/* Thread */}
           <div className="card support-thread-card">
@@ -629,7 +684,9 @@ export default function SupportCrmPage() {
               <>
                 <div className="support-thread-header-wrap">
                   <div className="support-thread-header">
-                    <div>
+                    <button type="button" className="crm-back crm-icon" onClick={() => selectConversation(null)} aria-label="Voltar às conversas"><Icon name="back"/></button>
+                    <span className="crm-avatar">{initials(conversation.contactName || conversation.contactPhone)}</span>
+                    <div className="crm-header-contact">
                       <p style={{ fontWeight: 600, fontSize: 14.5, color: 'var(--text-primary)' }}>{conversation.contactName || conversation.contactPhone}</p>
                       <p style={{ fontSize: 12, color: 'var(--text-tertiary)' }}>
                         {conversation.contactPhone} · {conversation.glpiTicketId ? `Chamado #${conversation.glpiTicketId}` : 'sem chamado'} · {STATE_LABEL[conversation.state] ?? conversation.state}
@@ -655,12 +712,14 @@ export default function SupportCrmPage() {
                         ))}
                       </div>
                     </div>
-                    {conversation.state === 'HUMAN_ACTIVE' && (
+                    <button type="button" className="crm-icon" onClick={() => setToolsOpen(o => !o)} aria-label="Ações do atendimento"><Icon name="more"/></button>
+                    {conversation.state === 'PENDING_TECH' && <button onClick={() => handleClaim(conversation.id)} disabled={!!claimingId || sending} className="btn btn-primary btn-sm">Atender</button>}
+                    {toolsOpen && conversation.state === 'HUMAN_ACTIVE' && (
                       <button onClick={handleClose} disabled={closing} className="btn btn-danger btn-sm">{closing ? 'Fechando...' : 'Fechar chamado'}</button>
                     )}
                   </div>
 
-                  {canManage && (
+                  {canManage && toolsOpen && (
                     <div className="support-thread-tech-controls">
                       <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                         <select value={addTechId} onChange={e => setAddTechId(e.target.value)} disabled={savingTech} className="input" style={{ fontSize: 12, height: 32, padding: '2px 8px' }}>
@@ -746,39 +805,45 @@ export default function SupportCrmPage() {
                 </div>
 
                 <div className="support-thread-body" ref={threadBodyRef} onScroll={handleThreadScroll}>
-                  {detail.messages.map(m => {
-                    const mine = m.author === 'TECH'
+                  {detail.messages.map((m, index) => {
+                    const mine = m.author === 'TECH' || m.direction === 'OUT'
                     const system = m.author === 'HERMES'
                     return (
-                      <div key={m.id} className={`support-message-row ${mine ? 'is-tech' : 'is-customer'}`}>
-                        <div style={{
-                          padding: '8px 12px', borderRadius: 'var(--r-lg)',
-                          background: mine ? 'var(--accent)' : system ? 'var(--bg-muted)' : 'var(--bg-subtle)',
-                          color: mine ? 'var(--text-inverse)' : 'var(--text-primary)',
-                        }}>
+                      <div key={m.id} className="crm-message-group">
+                      {(!index || day(m.createdAt) !== day(detail.messages[index - 1].createdAt)) && <div className="crm-date"><span>{day(m.createdAt)}</span></div>}
+                      <div className={`support-message-row ${mine ? 'is-tech' : 'is-customer'}`}>
+                        <div className={`crm-bubble ${system ? 'crm-system' : ''}`}>
                           {!mine && <p style={{ fontSize: 10.5, fontWeight: 700, opacity: 0.7, marginBottom: 2 }}>{m.authorName}</p>}
                           {m.content && <p style={{ fontSize: 13, whiteSpace: 'pre-wrap' }}>{m.content}</p>}
                           <MediaAttachment message={m} />
+                          <div className="crm-message-meta"><time>{clock(m.createdAt)}</time>{mine && <span title="Aceito pela API; não indica entrega ou leitura pelo destinatário">Enviado</span>}</div>
                         </div>
+                      </div>
                       </div>
                     )
                   })}
                   <div ref={threadEndRef} />
                 </div>
 
+                <div className="crm-read-status">{readStatus === 'CONFIRMED' ? 'Leitura das entradas sincronizada com WhatsApp' : readStatus === 'UNAVAILABLE' ? 'Lida no CRM · confirmação WhatsApp indisponível' : readStatus === 'PENDING' ? 'Lida no CRM · sincronização WhatsApp pendente' : ''}</div>
                 <form onSubmit={handleSend} className="support-reply-form">
                   {selectedFile && (
                     <div className="support-selected-file">
-                      {selectedFilePreview && <img src={selectedFilePreview} alt="" className="support-selected-file-thumb" />}
+                      {selectedFilePreview && selectedFile.type.startsWith('audio/') && <audio controls src={selectedFilePreview} aria-label="Ouvir áudio antes de enviar" />}
+                      {selectedFilePreview && selectedFile.type.startsWith('image/') && <img src={selectedFilePreview} alt="" className="support-selected-file-thumb" />}
                       <span style={{ fontSize: 12.5, color: 'var(--text-secondary)' }}>📎 {selectedFile.name} · {formatBytes(selectedFile.size)}</span>
-                      <button type="button" onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="btn btn-default btn-sm">Remover</button>
+                      <button type="button" disabled={sending} onClick={() => { setSelectedFile(null); if (fileInputRef.current) fileInputRef.current.value = '' }} className="btn btn-default btn-sm">Remover</button>
                     </div>
                   )}
+                  {recording && <div className="crm-recording" role="status"><span className="crm-record-dot"/> Gravando {Math.floor(recordSeconds / 60)}:{String(recordSeconds % 60).padStart(2, '0')} <button type="button" className="btn btn-default btn-sm" onClick={cancelRecording}>Cancelar gravação</button></div>}
+                  {sending && <div className="crm-upload" role="status">{selectedFile ? uploadProgress < 100 ? `Enviando arquivo… ${uploadProgress}%` : 'Processando / convertendo e enviando ao WhatsApp…' : 'Enviando mensagem…'}<progress max="100" value={uploadProgress}/></div>}
+                  {sendError && <p className="crm-error" role="alert">{sendError}</p>}
                   <div className="support-composer-row">
                     <input
                       value={message}
                       onChange={e => setMessage(e.target.value)}
-                      disabled={!isMine}
+                      disabled={!isMine || sending || recording}
+                      aria-label="Mensagem"
                       placeholder={isMine ? 'Escreva uma resposta, anexe ou cole (Ctrl+V) um print...' : conversation.state === 'HUMAN_ACTIVE' ? 'Atendido por outro técnico' : 'Atendimento não está ativo'}
                       className="input support-composer-input"
                     />
@@ -790,14 +855,15 @@ export default function SupportCrmPage() {
                       onChange={e => setSelectedFile(e.target.files?.[0] ?? null)}
                       style={{ display: 'none' }}
                     />
-                    <button type="button" disabled={!isMine || sending || recording} onClick={() => fileInputRef.current?.click()} className="btn btn-default support-composer-action">Anexar</button>
+                    <button type="button" disabled={!isMine || sending || recording} onClick={() => fileInputRef.current?.click()} className="btn btn-default support-composer-action" aria-label="Anexar arquivo" title="Anexar arquivo"><Icon name="attach"/></button>
                     {recording ? (
                       <button type="button" onClick={stopRecording} className="btn btn-danger support-composer-action">Parar áudio</button>
                     ) : (
-                      <button type="button" disabled={!isMine || sending || selectedFile} onClick={startRecording} className="btn btn-default support-composer-action">Gravar áudio</button>
+                      <button type="button" disabled={!isMine || sending || selectedFile} onClick={startRecording} className="btn btn-default support-composer-action" aria-label="Gravar áudio" title="Gravar áudio"><Icon name="mic"/></button>
                     )}
-                    <button type="submit" disabled={!isMine || sending || recording || (!message.trim() && !selectedFile)} className="btn btn-primary support-composer-send">{sending ? 'Enviando...' : 'Enviar'}</button>
+                    <button type="submit" disabled={!isMine || sending || recording || (!message.trim() && !selectedFile)} aria-label="Enviar mensagem" className="btn btn-primary support-composer-send">{sending ? '…' : <><Icon name="send"/><span className="crm-send-label">Enviar</span></>}</button>
                   </div>
+                  <small className="crm-limits">Entrada até 32 MB · áudio convertido até 16 MB. A duração não define o tamanho.</small>
                 </form>
               </>
             )}

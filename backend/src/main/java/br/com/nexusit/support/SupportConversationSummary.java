@@ -18,9 +18,18 @@ public record SupportConversationSummary(
         LocalDateTime closedAt,
         LocalDateTime lastMessageAt,
         String lastMessageAuthor,
-        String lastMessagePreview
+        String lastMessagePreview,
+        long unreadCount
 ) {
     public record TechnicianRef(UUID id, String name) {}
+
+    public SupportConversationSummary(UUID id, String contactPhone, String contactName, Integer glpiTicketId,
+            String state, UUID claimedById, String claimedByName, List<TechnicianRef> technicians,
+            LocalDateTime createdAt, LocalDateTime claimedAt, LocalDateTime closedAt, LocalDateTime lastMessageAt,
+            String lastMessageAuthor, String lastMessagePreview) {
+        this(id, contactPhone, contactName, glpiTicketId, state, claimedById, claimedByName, technicians,
+                createdAt, claimedAt, closedAt, lastMessageAt, lastMessageAuthor, lastMessagePreview, 0);
+    }
 
     public static SupportConversationSummary from(SupportConversation c) {
         return from(c, List.of(), null);
@@ -31,6 +40,11 @@ public record SupportConversationSummary(
     }
 
     public static SupportConversationSummary from(SupportConversation c, List<SupportConversationTechnician> extraTechnicians, SupportMessage lastMessage) {
+        return from(c, extraTechnicians, lastMessage, 0);
+    }
+
+    public static SupportConversationSummary from(SupportConversation c, List<SupportConversationTechnician> extraTechnicians,
+                                                   SupportMessage lastMessage, long unreadCount) {
         String contactName = c.getContact().getGlpiUserName() != null && !c.getContact().getGlpiUserName().isBlank()
                 ? c.getContact().getGlpiUserName() : c.getContact().getDisplayName();
         String preview = lastMessage == null ? null : lastMessage.getContent();
@@ -48,7 +62,8 @@ public record SupportConversationSummary(
                 c.getClosedAt(),
                 lastMessage != null ? lastMessage.getCreatedAt() : null,
                 lastMessage != null ? lastMessage.getAuthor().name() : null,
-                (preview != null && preview.length() > 140) ? preview.substring(0, 140) + "…" : preview
+                (preview != null && preview.length() > 140) ? preview.substring(0, 140) + "…" : preview,
+                unreadCount
         );
     }
 }

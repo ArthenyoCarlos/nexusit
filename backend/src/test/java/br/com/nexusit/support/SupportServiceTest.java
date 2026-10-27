@@ -70,7 +70,7 @@ class SupportServiceTest {
 
         service.reply(conversationId, tech, "Segue evidência", image);
 
-        verify(evolutionApiClient).sendMedia(eq("559999999999"), aryEq(new byte[]{1, 2, 3}), eq("print.png"), eq("image/png"), eq("*Consultor(a) Arthenyo Carlos:* Segue evidência"));
+        verify(evolutionApiClient).sendMediaOrThrow(eq("559999999999"), aryEq(new byte[]{1, 2, 3}), eq("print.png"), eq("image/png"), eq("*Consultor(a) Arthenyo Carlos:* Segue evidência"));
         verify(glpiService).addFollowup(eq(123), contains("[Consultor(a) Arthenyo Carlos] Segue evidência"));
         verify(glpiService).uploadDocumentToTicket(eq(123), aryEq(new byte[]{1, 2, 3}), eq("print.png"), eq("image/png"));
 
@@ -104,15 +104,21 @@ class SupportServiceTest {
                 .build();
         byte[] audioBytes = new byte[]{9, 8, 7};
         MockMultipartFile audio = new MockMultipartFile("file", "audio.ogg", "audio/ogg", audioBytes);
+        var converter = mock(WhatsappAudioConverter.class);
+        byte[] converted = "OggS fixture converted by controlled seam".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        when(converter.convert(audioBytes, "audio.ogg")).thenReturn(
+                new WhatsappAudioConverter.Audio(converted, "audio.ogg", "audio/ogg; codecs=opus"));
+        org.springframework.test.util.ReflectionTestUtils.setField(service, "audioConverter", converter);
 
         when(conversationRepo.findByIdWithContact(conversationId)).thenReturn(Optional.of(conversation));
         when(messageRepo.findByConversation(conversationId)).thenReturn(List.of());
 
         service.reply(conversationId, tech, "", audio);
 
-        verify(evolutionApiClient).sendWhatsAppAudio(eq("559999999999"), aryEq(audioBytes));
-        verify(evolutionApiClient, never()).sendMedia(anyString(), any(), anyString(), anyString(), anyString());
-        verify(glpiService).uploadDocumentToTicket(eq(123), aryEq(audioBytes), eq("audio.ogg"), eq("audio/ogg"));
+        verify(converter).convert(audioBytes, "audio.ogg");
+        verify(evolutionApiClient).sendWhatsAppAudioOrThrow(eq("559999999999"), aryEq(converted));
+        verify(evolutionApiClient, never()).sendMediaOrThrow(anyString(), any(), anyString(), anyString(), anyString());
+        verify(glpiService).uploadDocumentToTicket(eq(123), aryEq(converted), eq("audio.ogg"), eq("audio/ogg; codecs=opus"));
 
         ArgumentCaptor<SupportMessage> saved = ArgumentCaptor.forClass(SupportMessage.class);
         verify(messageRepo).save(saved.capture());

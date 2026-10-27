@@ -15,8 +15,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
+
 import java.text.Normalizer;
 import java.time.Duration;
 import java.time.LocalDate;
@@ -43,21 +42,21 @@ public class SupportService {
     private final GlpiService glpiService;
     private final EvolutionApiClient evolutionApiClient;
     private final BotAtendimentoTiStateStore stateStore;
+    private WhatsappAudioConverter audioConverter = new WhatsappAudioConverter();
 
     public List<SupportConversationSummary> getQueue() {
-        return conversationRepo.findQueue().stream().map(SupportConversationSummary::from).toList();
+        return conversationRepo.findQueue().stream().map(c -> summary(c, List.of())).toList();
     }
 
     public List<SupportConversationSummary> getMine(User user) {
         return conversationRepo.findMine(user.getId()).stream()
-                .map(c -> SupportConversationSummary.from(c, List.of(),
-                        messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null)))
+                .map(c -> summary(c, List.of()))
                 .toList();
     }
 
     public List<SupportConversationSummary> getAll(int days) {
         LocalDateTime since = LocalDateTime.now().minusDays(Math.max(1, days));
-        return conversationRepo.findAllSince(since).stream().map(SupportConversationSummary::from).toList();
+        return conversationRepo.findAllSince(since).stream().map(c -> summary(c, List.of())).toList();
     }
 
     public SupportDashboardResponse getDashboard(int days) {
@@ -67,11 +66,13 @@ public class SupportService {
         LocalDate today = now.toLocalDate();
 
         List<SupportConversation> conversations = conversationRepo.findAllSince(since);
-        Map<UUID, SupportMessage> lastMessages = conversations.stream()
-                .collect(Collectors.toMap(SupportConversation::getId,
-                        c -> messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null)));
+        Map<UUID, SupportMessage> lastMessages = new LinkedHashMap<>();
+        for (SupportConversation c : conversations) {
+            messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(c.getId())
+                    .ifPresent(m -> lastMessages.put(c.getId(), m));
+        }
         List<SupportConversationSummary> summaries = conversations.stream()
-                .map(c -> SupportConversationSummary.from(c, List.of(), lastMessages.get(c.getId())))
+                .map(c -> SupportConversationSummary.from(c, List.of(), lastMessages.get(c.getId()), unreadCount(c)))
                 .toList();
 
         long total = conversations.size();
@@ -132,7 +133,65 @@ public class SupportService {
         List<SupportMessageResponse> messages = messageRepo.findByConversation(id).stream()
                 .map(SupportMessageResponse::from).toList();
         List<SupportConversationTechnician> extraTechnicians = technicianRepo.findByConversation(id);
-        return new SupportConversationDetail(SupportConversationSummary.from(conversation, extraTechnicians), messages);
+        return new SupportConversationDetail(summary(conversation, extraTechnicians), messages);
+    }
+
+    private long unreadCount(SupportConversation c) {
+        return messageRepo.countByConversationIdAndDirectionAndReadAtIsNull(c.getId(), MessageDirection.IN);
+    }
+
+    private SupportConversationSummary summary(SupportConversation c, List<SupportConversationTechnician> technicians) {
+        return SupportConversationSummary.from(c, technicians,
+                messageRepo.findFirstByConversationIdOrderByCreatedAtDesc(c.getId()).orElse(null), unreadCount(c));
+    }
+
+    @Transactional
+    public SupportReadResponse markRead(UUID id, User user, UUID throughMessageId) {
+        SupportConversation conversation = getOrThrow(id);
+        if (user == null) throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        // Queue viewers may read unclaimed tickets; active tickets follow reply authorization.
+        if (conversation.getClaimedBy() != null) ensureCanReply(conversation, user);
+        List<SupportMessage> messages = messageRepo.findByConversation(id);
+        if (throughMessageId == null) {
+            // A missing cursor cannot prove what the browser displayed: never read unseen arrivals.
+            return new SupportReadResponse(true, unread(messages), "UNAVAILABLE", null);
+        }
+        int end = -1;
+        for (int i = 0; i < messages.size(); i++) {
+            if (throughMessageId.equals(messages.get(i).getId())) { end = i; break; }
+        }
+        if (end < 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mensagem fora deste atendimento");
+        LocalDateTime now = LocalDateTime.now();
+        List<SupportMessage> displayed = messages.subList(0, end + 1).stream()
+                .filter(m -> m.getDirection() == MessageDirection.IN).toList();
+        for (SupportMessage m : displayed) {
+            if (m.getReadAt() == null) m.setReadAt(now);
+        }
+        List<SupportMessage> available = displayed.stream().filter(m -> m.getProviderMessageId() != null
+                && !m.getProviderMessageId().isBlank() && m.getRemoteJid() != null
+                && m.getRemoteJid().endsWith("@s.whatsapp.net") && Boolean.FALSE.equals(m.getFromMe())).toList();
+        List<SupportMessage> pending = available.stream().filter(m -> m.getRemoteReadAt() == null).toList();
+        for (SupportMessage m : pending) m.setRemoteReadPending(true);
+        if (!pending.isEmpty()) {
+            List<Map<String, Object>> keys = pending.stream().map(m -> Map.<String, Object>of(
+                    "remoteJid", m.getRemoteJid(), "fromMe", false, "id", m.getProviderMessageId())).toList();
+            try {
+                if (evolutionApiClient.markMessagesRead(keys)) {
+                    for (SupportMessage m : pending) { m.setRemoteReadAt(now); m.setRemoteReadPending(false); }
+                }
+            } catch (Exception ignored) {
+                log.warn("Confirmação remota de leitura pendente; nova tentativa apenas em leitura explícita");
+            }
+        }
+        String remote = available.stream().anyMatch(m -> m.getRemoteReadAt() == null) ? "PENDING"
+                : available.size() == displayed.size() && !available.isEmpty() ? "CONFIRMED" : "UNAVAILABLE";
+        messageRepo.saveAll(displayed);
+        return new SupportReadResponse(true, unread(messages), remote,
+                displayed.stream().map(SupportMessage::getReadAt).max(Comparator.naturalOrder()).orElse(null));
+    }
+
+    private long unread(List<SupportMessage> messages) {
+        return messages.stream().filter(m -> m.getDirection() == MessageDirection.IN && m.getReadAt() == null).count();
     }
 
     public SupportMessageMedia getMessageMedia(UUID messageId) {
@@ -301,6 +360,13 @@ public class SupportService {
         String mime = null;
         String kind = null;
         if (file != null && !file.isEmpty()) {
+            if ("audio".equals(mediaKind(file.getContentType())) && !cleanMessage.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Envie o texto e o áudio separadamente; áudio não suporta legenda. Nada foi enviado.");
+            }
+            if (file.getSize() > 32L * 1024 * 1024) {
+                throw new ResponseStatusException(HttpStatus.PAYLOAD_TOO_LARGE, "Anexo excede 32 MB");
+            }
             try {
                 bytes = file.getBytes();
             } catch (IOException e) {
@@ -310,7 +376,7 @@ public class SupportService {
             mime = file.getContentType() == null || file.getContentType().isBlank() ? "application/octet-stream" : file.getContentType();
             kind = mediaKind(mime);
             if ("audio".equals(kind)) {
-                OutgoingMedia converted = convertAudioForWhatsapp(bytes, filename, mime);
+                WhatsappAudioConverter.Audio converted = audioConverter.convert(bytes, filename);
                 bytes = converted.bytes();
                 filename = converted.filename();
                 mime = converted.mime();
@@ -321,30 +387,32 @@ public class SupportService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Informe uma mensagem ou anexe uma mídia");
         }
 
-        recordMessage(conversation, MessageDirection.OUT, MessageAuthor.TECH, user.getName(), cleanMessage, bytes, filename, mime, kind, null);
-
         String signedText = signedMessage(user, cleanMessage);
         if (bytes != null && bytes.length > 0) {
-            // Áudio geralmente não mostra caption no WhatsApp; quando houver texto junto, envie o texto antes.
+
             if ("audio".equals(kind)) {
                 // A Evolution v2 tem endpoint específico para áudio/voice note. O sendMedia pode retornar ACK,
                 // mas alguns clientes WhatsApp não exibem o áudio gravado pelo navegador.
-                if (!cleanMessage.isBlank()) {
-                    evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), signedText);
-                }
-                evolutionApiClient.sendWhatsAppAudio(conversation.getContact().getPhoneNumber(), bytes);
+                evolutionApiClient.sendWhatsAppAudioOrThrow(conversation.getContact().getPhoneNumber(), bytes);
             } else {
-                evolutionApiClient.sendMedia(conversation.getContact().getPhoneNumber(), bytes, filename, mime, cleanMessage.isBlank() ? signedHeader(user) : signedText);
+                evolutionApiClient.sendMediaOrThrow(conversation.getContact().getPhoneNumber(), bytes, filename, mime, cleanMessage.isBlank() ? signedHeader(user) : signedText);
             }
         } else {
-            evolutionApiClient.sendText(conversation.getContact().getPhoneNumber(), signedText);
+            evolutionApiClient.sendTextOrThrow(conversation.getContact().getPhoneNumber(), signedText);
         }
 
+        // Persist only after the provider ACK. Never automatically retry a user send.
+        recordMessage(conversation, MessageDirection.OUT, MessageAuthor.TECH, user.getName(), cleanMessage, bytes, filename, mime, kind, null);
+
         if (conversation.getGlpiTicketId() != null) {
+            try {
             String followup = "[" + supportTitle(user) + " " + user.getName() + "]" + (cleanMessage.isBlank() ? " Enviou anexo." : " " + cleanMessage);
             glpiService.addFollowup(conversation.getGlpiTicketId(), followup);
             if (bytes != null && bytes.length > 0) {
                 glpiService.uploadDocumentToTicket(conversation.getGlpiTicketId(), bytes, filename, mime);
+            }
+            } catch (Exception ignored) {
+                log.warn("WhatsApp confirmado; sincronização GLPI falhou, sem retry agendado (não repetir envio)");
             }
         }
         return getDetail(id);
@@ -473,69 +541,7 @@ public class SupportService {
         return "document";
     }
 
-    private OutgoingMedia convertAudioForWhatsapp(byte[] input, String filename, String mime) {
-        String normalizedMime = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
-        boolean alreadyWhatsappFriendly = normalizedMime.startsWith("audio/ogg") || normalizedMime.startsWith("audio/mpeg") || normalizedMime.startsWith("audio/mp4");
-        if (alreadyWhatsappFriendly) {
-            return new OutgoingMedia(input, filename, mime);
-        }
 
-        Path in = null;
-        Path out = null;
-        try {
-            in = Files.createTempFile("nexusit-audio-in-", extensionFor(filename, mime));
-            out = Files.createTempFile("nexusit-audio-out-", ".ogg");
-            Files.write(in, input);
-            Process process = new ProcessBuilder(
-                    "ffmpeg", "-y", "-hide_banner", "-loglevel", "error",
-                    "-i", in.toString(),
-                    "-vn", "-c:a", "libopus", "-b:a", "32k", "-ar", "48000", "-ac", "1",
-                    out.toString()
-            ).redirectErrorStream(true).start();
-            byte[] output = process.getInputStream().readAllBytes();
-            boolean finished = process.waitFor(20, java.util.concurrent.TimeUnit.SECONDS);
-            if (!finished) {
-                process.destroyForcibly();
-                throw new IOException("timeout ao converter áudio");
-            }
-            if (process.exitValue() != 0) {
-                throw new IOException("ffmpeg exit=" + process.exitValue() + " output=" + new String(output));
-            }
-            byte[] converted = Files.readAllBytes(out);
-            String outName = baseName(filename == null || filename.isBlank() ? "audio-tecnico" : filename) + ".ogg";
-            return new OutgoingMedia(converted, outName, "audio/ogg; codecs=opus");
-        } catch (Exception e) {
-            log.warn("Falha ao converter áudio '{}' de {} para OGG/Opus; enviando original: {}", filename, mime, e.toString());
-            return new OutgoingMedia(input, filename, mime);
-        } finally {
-            deleteQuietly(in);
-            deleteQuietly(out);
-        }
-    }
-
-    private String extensionFor(String filename, String mime) {
-        if (filename != null && filename.contains(".")) {
-            return filename.substring(filename.lastIndexOf('.'));
-        }
-        String m = mime == null ? "" : mime.toLowerCase(Locale.ROOT);
-        if (m.contains("webm")) return ".webm";
-        if (m.contains("ogg")) return ".ogg";
-        if (m.contains("mpeg") || m.contains("mp3")) return ".mp3";
-        return ".audio";
-    }
-
-    private String baseName(String filename) {
-        String clean = filename.replaceAll("[\\r\\n\\t]", "_");
-        int dot = clean.lastIndexOf('.');
-        return dot > 0 ? clean.substring(0, dot) : clean;
-    }
-
-    private void deleteQuietly(Path path) {
-        if (path == null) return;
-        try { Files.deleteIfExists(path); } catch (IOException ignored) { }
-    }
-
-    private record OutgoingMedia(byte[] bytes, String filename, String mime) {}
 
     private String safeFilename(String original, String mime) {
         if (original != null && !original.isBlank()) {

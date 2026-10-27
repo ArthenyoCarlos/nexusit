@@ -43,6 +43,14 @@ public class SupportController {
     @GetMapping("/{id}")
     public SupportConversationDetail getDetail(@PathVariable UUID id) { return service.getDetail(id); }
 
+    public record ReadRequest(UUID throughMessageId) {}
+
+    @PostMapping("/{id}/read")
+    public SupportReadResponse markRead(@PathVariable UUID id, @RequestBody(required = false) ReadRequest request,
+                                       @AuthenticationPrincipal User user) {
+        return service.markRead(id, user, request == null ? null : request.throughMessageId());
+    }
+
     @GetMapping("/messages/{messageId}/media")
     public ResponseEntity<byte[]> getMessageMedia(@PathVariable UUID messageId) {
         SupportMessageMedia media = service.getMessageMedia(messageId);
